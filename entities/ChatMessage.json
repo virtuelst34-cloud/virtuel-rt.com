@@ -1,0 +1,1 @@
+{"name":"ChatMessage","properties":{"salon":{"type":"string"},"author_name":{"type":"string"},"author_avatar":{"type":"string"},"author_initials":{"type":"string"},"text":{"type":"string"},"image_url":{"type":"string"},"reactions":{"type":"object"},"is_system":{"type":"boolean"},"is_announcement":{"type":"boolean"}}}

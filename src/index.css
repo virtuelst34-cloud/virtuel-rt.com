@@ -1,0 +1,150 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: 'DM Sans', system-ui, sans-serif;
+    --font-mono: 'DM Mono', monospace;
+    --background: 240 20% 3.5%;
+    --foreground: 213 31% 91%;
+    --card: 240 18% 5.5%;
+    --card-foreground: 213 31% 91%;
+    --popover: 240 18% 5.5%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 263 70% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 15% 9%;
+    --secondary-foreground: 213 31% 91%;
+    --muted: 240 15% 9%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 263 50% 22%;
+    --accent-foreground: 263 90% 82%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 10% 12%;
+    --input: 240 10% 12%;
+    --ring: 263 70% 58%;
+    --radius: 0.625rem;
+    --sidebar-background: 240 18% 5.5%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 263 70% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 263 50% 22%;
+    --sidebar-accent-foreground: 263 90% 82%;
+    --sidebar-border: 240 10% 12%;
+    --sidebar-ring: 263 70% 58%;
+  }
+
+  /* ── Thème clair ── */
+  .light {
+    --background: 220 20% 97%;
+    --foreground: 220 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+    --primary: 263 70% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 92%;
+    --secondary-foreground: 220 20% 10%;
+    --muted: 220 15% 92%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 263 50% 88%;
+    --accent-foreground: 263 70% 30%;
+    --destructive: 0 84% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 15% 85%;
+    --input: 220 15% 85%;
+    --ring: 263 70% 50%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 20% 30%;
+    --sidebar-border: 220 15% 85%;
+  }
+
+  /* ── Mode soirée ── */
+  .party {
+    --background: 270 40% 4%;
+    --foreground: 300 80% 95%;
+    --card: 280 35% 7%;
+    --secondary: 280 30% 11%;
+    --border: 300 30% 18%;
+    --primary: 300 90% 65%;
+    --ring: 300 90% 65%;
+  }
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground font-sans; }
+}
+
+/* ── Mode soirée : fond animé ── */
+.party body,
+.party .bg-background {
+  background: linear-gradient(135deg, #1a0030, #0d001a, #001a2e, #1a0030);
+  background-size: 400% 400%;
+  animation: party-bg 8s ease infinite;
+}
+@keyframes party-bg {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Particules soirée */
+.party::before {
+  content: '✨🎉🎊⭐🌟💫';
+  position: fixed;
+  top: -20px;
+  left: 0;
+  width: 100%;
+  font-size: 20px;
+  animation: party-fall 6s linear infinite;
+  pointer-events: none;
+  z-index: 9999;
+  letter-spacing: 80px;
+  opacity: 0.6;
+}
+@keyframes party-fall {
+  0%   { transform: translateY(-40px) rotate(0deg); opacity: 0.8; }
+  100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.2); border-radius: 4px; }
+
+/* ── Animations ── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+.animate-pulse-dot { animation: pulse-dot 2s infinite; }
+
+@keyframes fade-in-down {
+  from { opacity: 0; transform: translate(-50%, -12px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-fade-in-down { animation: fade-in-down 0.3s ease forwards; }
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-4px); }
+}
+.animate-bounce { animation: bounce 0.8s ease infinite; }
+
+/* ── Gradients ── */
+.xp-gradient      { background: linear-gradient(90deg, hsl(var(--primary)), hsl(330, 81%, 60%)); }
+.premium-gradient { background: linear-gradient(90deg, hsl(var(--primary)), hsl(330, 81%, 60%)); }
+
+/* ── Mode soirée : glow sur les éléments ── */
+.party .bg-card {
+  box-shadow: 0 0 30px rgba(200, 0, 255, 0.05);
+}
+.party .border-border {
+  border-color: rgba(200, 0, 255, 0.15);
+}

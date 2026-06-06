@@ -1,0 +1,1 @@
+{"name":"UserProfile","properties":{"display_name":{"type":"string"},"avatar_class":{"type":"string"},"initials":{"type":"string"},"xp":{"type":"number"},"level":{"type":"number"},"is_online":{"type":"boolean"},"is_banned":{"type":"boolean"}}}

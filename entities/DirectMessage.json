@@ -1,0 +1,32 @@
+{
+  "name": "DirectMessage",
+  "type": "object",
+  "properties": {
+    "sender_name": {
+      "type": "string"
+    },
+    "sender_avatar": {
+      "type": "string"
+    },
+    "sender_initials": {
+      "type": "string"
+    },
+    "recipient_name": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    },
+    "image_url": {
+      "type": "string"
+    },
+    "is_read": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "sender_name",
+    "recipient_name"
+  ]
+}

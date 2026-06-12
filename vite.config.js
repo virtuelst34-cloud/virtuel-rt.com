@@ -1,13 +1,57 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   logLevel: 'error',
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      manifest: {
+        name: 'Virtuel',
+        short_name: 'Virtuel',
+        description: 'Application de chat en temps réel',
+        theme_color: '#8b5cf6',
+        icons: [
+          {
+            src: '/pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: '/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png'
+          }
+        ]
+      }
+    })
+  ],
   resolve: {
     alias: {
       '@': '/src'
     }
+  },
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/test/',
+        '*.config.js',
+        '*.config.ts',
+        'e2e/',
+        '.e2e/',
+      ],
+    },
+    exclude: [
+      'node_modules/',
+      'e2e/',
+      '.e2e/',
+    ],
   },
   build: {
     target: 'ES2020',
@@ -18,6 +62,7 @@ export default defineConfig({
         drop_debugger: true,
       },
     },
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         /**
@@ -84,5 +129,28 @@ export default defineConfig({
     },
     // Report compression level
     reportCompressed: true,
+  },
+  // Performance optimizations for dev
+  server: {
+    hmr: {
+      overlay: false,
+    },
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+    },
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 3000,
+    strictPort: false,
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+    },
   },
 })

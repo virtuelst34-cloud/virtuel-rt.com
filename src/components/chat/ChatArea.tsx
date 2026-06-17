@@ -3,6 +3,7 @@ import { useUser, useSalons, useXP, useModeration, useMessages, useNotifications
 import { SALONS, SCENE_MEMBERS } from '@/lib/chatConfig';
 import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown } from 'lucide-react';
 import MessageBubble from './MessageBubble';
+import Avatar from './Avatar';
 import ChatInput from './ChatInput';
 import ReactionPicker from './ReactionPicker';
 import LevelUpToast from './LevelUpToast';
@@ -418,10 +419,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
               {allMembers.map((m, i) => (
                 <button key={m.name + i} onClick={() => handleViewProfile(m.name)}
                   className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 transition-colors text-left">
-                  <div className={`w-[22px] h-[22px] rounded-full flex items-center justify-center text-[8px] font-bold border shrink-0
-                    ${m.avatar==='av1'?'bg-purple-900 text-purple-200 border-purple-500':m.avatar==='av2'?'bg-emerald-900 text-emerald-300 border-emerald-500':m.avatar==='av3'?'bg-red-900 text-red-300 border-red-500':m.avatar==='av4'?'bg-blue-900 text-blue-300 border-blue-500':m.avatar==='av5'?'bg-amber-900 text-amber-300 border-amber-500':'bg-pink-900 text-pink-300 border-pink-500'}`}>
-                    {m.initials}
-                  </div>
+                  <Avatar avatarClass={m.avatar || 'av1'} initials={m.initials} size="xs" />
                   <span className="text-[11px] text-muted-foreground/80 truncate flex-1">{m.name}</span>
                   {(m as any).speaking && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />}
                 </button>

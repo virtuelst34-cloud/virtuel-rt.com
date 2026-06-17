@@ -1,5 +1,5 @@
 import React, { useState, useRef, ChangeEvent } from 'react';
-import { useChat } from '@/lib/ChatContext';
+import { useUser, useXP } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import { getBadgeForLevel, getUnlockedBadges, getBadgeStats, SPECIAL_BADGES } from '@/lib/diamondBadges';
@@ -7,14 +7,15 @@ import { X, Edit3, Check, Flame, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6'] as const;
+const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9', 'av10', 'av11', 'av12'] as const;
 
 interface UserProfileModalProps {
   onClose: () => void;
 }
 
 export default function UserProfileModal({ onClose }: UserProfileModalProps) {
-  const { user, updateProfile, xpProgress, xpForLevel } = useChat();
+  const { user, updateProfile } = useUser();
+  const { xpProgress, xpForLevel } = useXP();
   const [editing, setEditing]   = useState(false);
   const [draft, setDraft]       = useState({ bio: user?.bio || '', avatar: user?.avatar || 'av1' });
   const [saved, setSaved]       = useState(false);
@@ -69,22 +70,21 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
           {/* Avatar + nom */}
           <div className="-mt-8 mb-4 flex items-end justify-between">
             <div className="relative">
-              {editing ? (
-                <div className="flex gap-1.5 flex-wrap">
-                  {AVATARS.map(av => (
-                    <button key={av} type="button" onClick={() => setDraft(d => ({ ...d, avatar: av }))}
-                      className={`rounded-full transition-all ${draft.avatar === av ? 'ring-2 ring-white scale-110' : 'opacity-60 hover:opacity-100'}`}>
-                      <Avatar avatarClass={av} initials={user.initials} size="md" />
-                    </button>
-                  ))}
-                </div>
-              ) : (
+              {!editing && (
                 <>
                   <Avatar avatarClass={user.avatar} initials={user.initials} size="lg" />
                   <div className="absolute -bottom-2 -right-2">
                     <DiamondBadge level={lvl} size="sm" />
                   </div>
                 </>
+              )}
+              {editing && (
+                <div className="relative">
+                  <Avatar avatarClass={draft.avatar} initials={user.initials} size="lg" />
+                  <div className="absolute -bottom-2 -right-2">
+                    <DiamondBadge level={lvl} size="sm" />
+                  </div>
+                </div>
               )}
             </div>
 
@@ -129,9 +129,27 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
             )}
           </div>
 
+          {/* Sélecteur d'avatar */}
+          {editing && (
+            <div className="mb-4">
+              <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-2">Avatar</div>
+              <div className="grid grid-cols-6 gap-2.5 max-w-[280px]">
+                {AVATARS.map(av => (
+                  <button key={av} type="button" onClick={() => setDraft(d => ({ ...d, avatar: av }))}
+                    className={`rounded-full transition-all ${draft.avatar === av ? 'ring-2 ring-white ring-offset-2 ring-offset-card scale-110' : 'opacity-60 hover:opacity-100 hover:scale-105'}`}>
+                    <Avatar avatarClass={av} initials={user.initials} size="md" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Bio */}
           <div className="mb-4">
-            <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5">Bio</div>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest">Bio</div>
+              {editing && <div className="text-[10px] text-muted-foreground/40">{draft.bio.length}/160</div>}
+            </div>
             {editing ? (
               <textarea
                 value={draft.bio}

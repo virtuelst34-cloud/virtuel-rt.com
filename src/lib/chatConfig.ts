@@ -64,13 +64,24 @@ export interface AvatarStyle {
   bg: string;
   text: string;
   border: string;
+  skin: string;
+  hair: string;
+  look: 'short' | 'long' | 'curly' | 'bun' | 'bald' | 'cap' | 'mohawk' | 'braids' | 'beanie' | 'afro' | 'bob' | 'spiky';
+  blush?: boolean;
+  glasses?: boolean;
 }
 
 export const AVATAR_STYLES: Record<string, AvatarStyle> = {
-  av1: { bg: 'bg-purple-900', text: 'text-purple-200', border: 'border-purple-500' },
-  av2: { bg: 'bg-emerald-900', text: 'text-emerald-300', border: 'border-emerald-500' },
-  av3: { bg: 'bg-red-900', text: 'text-red-300', border: 'border-red-500' },
-  av4: { bg: 'bg-blue-900', text: 'text-blue-300', border: 'border-blue-500' },
-  av5: { bg: 'bg-amber-900', text: 'text-amber-300', border: 'border-amber-500' },
-  av6: { bg: 'bg-pink-900', text: 'text-pink-300', border: 'border-pink-500' },
+  av1:  { bg: 'bg-purple-900',  text: 'text-purple-200',  border: 'border-purple-500',  skin: '#f0c9a0', hair: '#3b2a4a', look: 'long',   blush: true },
+  av2:  { bg: 'bg-emerald-900', text: 'text-emerald-300', border: 'border-emerald-500', skin: '#c98a5e', hair: '#1f2e28', look: 'short' },
+  av3:  { bg: 'bg-red-900',     text: 'text-red-300',     border: 'border-red-500',     skin: '#f5d6b8', hair: '#7a1f1f', look: 'curly' },
+  av4:  { bg: 'bg-blue-900',    text: 'text-blue-300',    border: 'border-blue-500',    skin: '#e8b48c', hair: '#23344a', look: 'cap',    glasses: true },
+  av5:  { bg: 'bg-amber-900',   text: 'text-amber-300',   border: 'border-amber-500',   skin: '#8a5a3c', hair: '#171210', look: 'afro' },
+  av6:  { bg: 'bg-pink-900',    text: 'text-pink-300',    border: 'border-pink-500',    skin: '#fbe0c8', hair: '#a3456b', look: 'bun',    blush: true },
+  av7:  { bg: 'bg-cyan-900',    text: 'text-cyan-300',    border: 'border-cyan-500',    skin: '#d8a877', hair: '#0e3a3f', look: 'mohawk' },
+  av8:  { bg: 'bg-lime-900',    text: 'text-lime-300',    border: 'border-lime-500',    skin: '#f3cda3', hair: '#4a3a1f', look: 'braids' },
+  av9:  { bg: 'bg-violet-900',  text: 'text-violet-300',  border: 'border-violet-500',  skin: '#caa17a', hair: '#2c2c54', look: 'beanie' },
+  av10: { bg: 'bg-orange-900',  text: 'text-orange-300',  border: 'border-orange-500',  skin: '#f6e2c6', hair: '#5e3a1a', look: 'bob',    glasses: true },
+  av11: { bg: 'bg-teal-900',    text: 'text-teal-300',    border: 'border-teal-500',    skin: '#9c6b46', hair: '#111111', look: 'bald',   blush: true },
+  av12: { bg: 'bg-fuchsia-900', text: 'text-fuchsia-300', border: 'border-fuchsia-500', skin: '#eccab0', hair: '#d4546e', look: 'spiky' },
 };

@@ -37,18 +37,18 @@ export default function NotificationsPanel({ onClose }: NotificationsPanelProps)
 
         {/* Header */}
         <div className="px-4 py-3 border-b border-border flex items-center gap-2 shrink-0">
-          <Bell className="w-4 h-4 text-purple-400" />
+          <Bell className="w-4 h-4 text-purple-400 animate-pulse" />
           <span className="text-[13px] font-semibold text-foreground flex-1">Notifications</span>
           <button onClick={markAllRead} title="Tout marquer comme lu"
-            className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-colors">
+            className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-all duration-200 hover:scale-110 active:scale-95">
             <CheckCheck className="w-3.5 h-3.5" />
           </button>
           <button onClick={clearNotifications} title="Tout effacer"
-            className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 hover:scale-110 active:scale-95">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
           <button onClick={onClose}
-            className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-colors">
+            className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-all duration-200 hover:scale-110 active:scale-95">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -57,17 +57,18 @@ export default function NotificationsPanel({ onClose }: NotificationsPanelProps)
         <div className="flex-1 overflow-y-auto">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground/40">
-              <Bell className="w-8 h-8" />
+              <Bell className="w-8 h-8 animate-float" />
               <p className="text-xs">Aucune notification</p>
             </div>
           ) : (
-            (notifications as AppNotification[]).map(notif => {
+            (notifications as AppNotification[]).map((notif, index) => {
               const cfg = TYPE_CONFIG[notif.type] || TYPE_CONFIG.default;
               const Icon = cfg.icon;
               return (
                 <div key={notif.id}
-                  className={`flex items-start gap-3 px-4 py-3 border-b border-border/50 transition-colors ${notif.read ? 'opacity-60' : 'bg-white/[0.02]'}`}>
-                  <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg}`}>
+                  className={`flex items-start gap-3 px-4 py-3 border-b border-border/50 transition-all duration-200 hover:bg-white/[0.04] ${notif.read ? 'opacity-60' : 'bg-white/[0.02]'} animate-slide-in-right`}
+                  style={{ animationDelay: `${index * 30}ms` }}>
+                  <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${cfg.bg} transition-transform duration-200 hover:scale-110`}>
                     <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -77,7 +78,7 @@ export default function NotificationsPanel({ onClose }: NotificationsPanelProps)
                     </p>
                   </div>
                   {!notif.read && (
-                    <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0 mt-1.5" />
+                    <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0 mt-1.5 animate-pulse" />
                   )}
                 </div>
               );

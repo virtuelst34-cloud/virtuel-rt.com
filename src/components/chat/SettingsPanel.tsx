@@ -7,7 +7,7 @@ import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, Use
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6'] as const;
+const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9', 'av10', 'av11', 'av12'] as const;
 
 interface Tab {
   id: string;
@@ -80,22 +80,23 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
         <div className="px-5 py-4 border-b border-border flex items-center gap-2.5 shrink-0">
           <span className="text-[15px] font-semibold text-foreground flex-1">Paramètres</span>
           {saved && (
-            <span className="text-[11px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-full flex items-center gap-1.5">
+            <span className="text-[11px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-full flex items-center gap-1.5 animate-slide-in-up">
               <Check className="w-3 h-3" /> Sauvegardé
             </span>
           )}
-          <button onClick={onClose} className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 hover:text-foreground transition-all duration-200 hover:scale-110 active:scale-95">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
           <div className="w-[150px] bg-secondary border-r border-border p-1.5 flex flex-col gap-0.5 shrink-0">
-            {TABS.map(tab => {
+            {TABS.map((tab, index) => {
               const Icon = tab.icon;
               return (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition-all border ${activeTab === tab.id ? 'bg-primary/12 border-primary/25 text-primary' : 'border-transparent text-muted-foreground/60 hover:bg-white/[0.04] hover:text-muted-foreground'}`}>
+                  className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition-all border ${activeTab === tab.id ? 'bg-primary/12 border-primary/25 text-primary scale-105' : 'border-transparent text-muted-foreground/60 hover:bg-white/[0.04] hover:text-muted-foreground hover:scale-[1.02]'} animate-slide-in-right`}
+                  style={{ animationDelay: `${index * 50}ms` }}>
                   <Icon className="w-3.5 h-3.5" />{tab.label}
                 </button>
               );
@@ -124,10 +125,11 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <div className="mb-4">
                   <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-2">Statut</div>
                   <div className="flex gap-2 flex-wrap">
-                    {STATUSES.map(s => (
+                    {STATUSES.map((s, index) => (
                       <button key={s.id} onClick={() => setStatus(s.id as any)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] transition-all ${(user.status || 'online') === s.id ? 'bg-primary/12 border-primary/30 text-primary' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'}`}>
-                        <span className={`w-2 h-2 rounded-full ${s.color}`} />{s.label}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] transition-all duration-200 hover:scale-105 active:scale-95 ${(user.status || 'online') === s.id ? 'bg-primary/12 border-primary/30 text-primary' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'}`}
+                        style={{ animationDelay: `${index * 50}ms` }}>
+                        <span className={`w-2 h-2 rounded-full ${s.color}`}/>{s.label}
                       </button>
                     ))}
                   </div>
@@ -137,18 +139,19 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <div className="mb-4">
                   <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-2">Avatar</div>
                   {editing ? (
-                    <div className="flex gap-2 flex-wrap">
-                      {AVATARS.map(av => (
+                    <div className="grid grid-cols-6 gap-2.5 max-w-[260px]">
+                      {AVATARS.map((av, index) => (
                         <button key={av} onClick={() => setDraft(d => ({ ...d, avatar: av }))}
-                          className={`rounded-full transition-all ${draft.avatar === av ? 'ring-2 ring-primary scale-110' : 'opacity-60 hover:opacity-100'}`}>
+                          className={`rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ${draft.avatar === av ? 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-110' : 'opacity-60 hover:opacity-100'}`}
+                          style={{ animationDelay: `${index * 30}ms` }}>
                           <Avatar avatarClass={av} initials={user.initials} size="md" />
                         </button>
                       ))}
                     </div>
                   ) : (
-                    <div className="relative inline-block">
+                    <div className="relative inline-block transition-transform duration-200 hover:scale-110">
                       <Avatar avatarClass={user.avatar} initials={user.initials} size="lg" />
-                      <div className="absolute -bottom-2 -right-2">
+                      <div className="absolute -bottom-2 -right-2 animate-float">
                         <DiamondBadge level={lvl} size="sm" />
                       </div>
                     </div>
@@ -161,7 +164,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                   <div className="flex items-center gap-2">
                     <span className="text-[15px] font-bold text-foreground">{user.name}</span>
                     <DiamondBadge level={lvl} size="sm" showLabel />
-                    {isPremium && <span className="text-[10px] bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 rounded-full px-2 py-px">PREMIUM</span>}
+                    {isPremium && <span className="text-[10px] bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 rounded-full px-2 py-px animate-pulse">PREMIUM</span>}
                   </div>
                   {user.joinedAt && (
                     <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50 mt-1">
@@ -173,11 +176,14 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
 
                 {/* Statut personnalisé */}
                 <div className="mb-4">
-                  <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5">Statut personnalisé</div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest">Statut personnalisé</div>
+                    {editing && <div className="text-[10px] text-muted-foreground/40">{draft.statusText.length}/60</div>}
+                  </div>
                   {editing ? (
                     <input value={draft.statusText} onChange={e => setDraft(d => ({ ...d, statusText: e.target.value }))}
                       maxLength={60} placeholder="Ex: 🎵 En train d'écouter..."
-                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 transition-colors" />
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200" />
                   ) : (
                     <p className="text-sm text-muted-foreground/80 italic">{user.statusText || 'Aucun statut défini.'}</p>
                   )}
@@ -185,20 +191,23 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
 
                 {/* Bio */}
                 <div className="mb-4">
-                  <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5">Bio</div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest">Bio</div>
+                    {editing && <div className="text-[10px] text-muted-foreground/40">{draft.bio.length}/160</div>}
+                  </div>
                   {editing ? (
                     <textarea value={draft.bio} onChange={e => setDraft(d => ({ ...d, bio: e.target.value }))}
                       maxLength={160} rows={3} placeholder="Parlez de vous..."
-                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 resize-none transition-colors" />
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 resize-none transition-all duration-200" />
                   ) : (
                     <p className="text-sm text-muted-foreground/80 italic">{user.bio || 'Aucune bio.'}</p>
                   )}
                 </div>
 
                 {/* XP */}
-                <div className="bg-secondary border border-border rounded-xl p-3.5 mb-4">
+                <div className="bg-secondary border border-border rounded-xl p-3.5 mb-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-lg hover:shadow-primary/10">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2"><Flame className="w-4 h-4 text-orange-400" /><span className="text-xs font-semibold text-foreground">Niveau {lvl}</span></div>
+                    <div className="flex items-center gap-2"><Flame className="w-4 h-4 text-orange-400 animate-pulse"/><span className="text-xs font-semibold text-foreground">Niveau {lvl}</span></div>
                     <span className="text-[11px] text-muted-foreground/50">{xp.toLocaleString()} / {nextXp.toLocaleString()} XP</span>
                   </div>
                   <div className="bg-background rounded-full h-[6px] overflow-hidden">
@@ -209,11 +218,11 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 {/* Badges */}
                 <div>
                   <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                    <Diamond className="w-3 h-3 text-indigo-400" /> Badges ({unlocked.length})
+                    <Diamond className="w-3 h-3 text-indigo-400 animate-float" /> Badges ({unlocked.length})
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {unlocked.map(b => (
-                      <span key={b.id} className="flex items-center gap-1 bg-secondary border rounded-full px-2 py-1 text-[10px] font-medium" style={{ color: b.color, borderColor: b.color + '44' }}>
+                    {unlocked.map((b, index) => (
+                      <span key={b.id} className="flex items-center gap-1 bg-secondary border rounded-full px-2 py-1 text-[10px] font-medium transition-all duration-200 hover:scale-110 hover:shadow-lg hover:shadow-indigo-500/20" style={{ color: b.color, borderColor: b.color + '44', animationDelay: `${index * 30}ms` }}>
                         <Diamond className="w-3 h-3 shrink-0" style={{ color: b.color, filter: `drop-shadow(0 0 3px ${b.glow})` }} />{b.label}
                       </span>
                     ))}
@@ -230,12 +239,30 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
 
                 <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3">Thème</div>
                 <div className="flex gap-3 mb-6">
-                  {[{ id: 'dark', label: 'Sombre', icon: Moon }, { id: 'light', label: 'Clair', icon: Sun }].map(({ id, label, icon: Icon }) => (
+                  {[{ id: 'dark', label: 'Sombre', icon: Moon }, { id: 'light', label: 'Clair', icon: Sun }].map(({ id, label, icon: Icon }, index) => (
                     <button key={id} onClick={() => theme !== id && toggleTheme()}
-                      className={`flex-1 flex flex-col items-center gap-2 py-4 rounded-xl border transition-all ${theme === id ? 'bg-primary/12 border-primary/40 text-primary' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'}`}>
+                      className={`flex-1 flex flex-col items-center gap-2 py-4 rounded-xl border transition-all duration-200 hover:scale-105 active:scale-95 ${theme === id ? 'bg-primary/12 border-primary/40 text-primary scale-105' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'}`}
+                      style={{ animationDelay: `${index * 50}ms` }}>
                       <Icon className="w-5 h-5" />
                       <span className="text-xs font-medium">{label}</span>
-                      {theme === id && <span className="text-[9px] bg-primary/20 text-primary rounded-full px-2 py-px">Actif</span>}
+                      {theme === id && <span className="text-[9px] bg-primary/20 text-primary rounded-full px-2 py-px animate-pulse">Actif</span>}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Couleur d'accent */}
+                <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 mt-6">Couleur d'accent</div>
+                <div className="flex gap-2.5 flex-wrap">
+                  {ACCENT_COLORS.map((c, index) => (
+                    <button key={c.id} onClick={() => changeAccent(c.id)}
+                      title={c.label}
+                      className={`flex flex-col items-center gap-1.5 transition-all duration-200 hover:scale-110 active:scale-95 ${accentColor === c.id ? 'scale-110' : 'opacity-70 hover:opacity-100'}`}
+                      style={{ animationDelay: `${index * 30}ms` }}>
+                      <span
+                        className={`w-8 h-8 rounded-full border-2 transition-all duration-200 ${accentColor === c.id ? 'border-foreground shadow-lg shadow-primary/30' : 'border-border'}`}
+                        style={{ backgroundColor: `hsl(${c.value})` }}
+                      />
+                      <span className="text-[9px] text-muted-foreground/60">{c.label}</span>
                     </button>
                   ))}
                 </div>
@@ -243,28 +270,28 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 {/* Mode soirée */}
                 <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3">Mode soirée 🎉</div>
                 <button onClick={togglePartyMode}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${partyMode ? 'bg-pink-500/15 border-pink-500/40 text-pink-400' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'}`}>
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] ${partyMode ? 'bg-pink-500/15 border-pink-500/40 text-pink-400' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'}`}>
                   <PartyPopper className="w-5 h-5 shrink-0" />
                   <div className="flex-1 text-left">
                     <div className="text-sm font-medium">{partyMode ? '🎊 Mode soirée actif !' : 'Activer le mode soirée'}</div>
                     <div className="text-[10px] opacity-60 mt-0.5">Fond animé, couleurs festives, particules</div>
                   </div>
-                  <div className={`w-9 h-5 rounded-full transition-all ${partyMode ? 'bg-pink-500' : 'bg-muted-foreground/20'} relative`}>
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${partyMode ? 'left-4' : 'left-0.5'}`} />
+                  <div className={`w-9 h-5 rounded-full transition-all duration-300 ${partyMode ? 'bg-pink-500' : 'bg-muted-foreground/20'} relative`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-300 ${partyMode ? 'left-4' : 'left-0.5'}`} />
                   </div>
                 </button>
 
                 {/* Mode compact */}
                 <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 mt-6">Mode compact</div>
                 <button onClick={toggleCompactMode}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${compactMode ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'}`}>
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] ${compactMode ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'}`}>
                   <Minimize2 className="w-5 h-5 shrink-0" />
                   <div className="flex-1 text-left">
                     <div className="text-sm font-medium">{compactMode ? 'Mode compact actif' : 'Activer le mode compact'}</div>
                     <div className="text-[10px] opacity-60 mt-0.5">Affichage plus dense des messages</div>
                   </div>
-                  <div className={`w-9 h-5 rounded-full transition-all ${compactMode ? 'bg-indigo-500' : 'bg-muted-foreground/20'} relative`}>
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${compactMode ? 'left-4' : 'left-0.5'}`} />
+                  <div className={`w-9 h-5 rounded-full transition-all duration-300 ${compactMode ? 'bg-indigo-500' : 'bg-muted-foreground/20'} relative`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-300 ${compactMode ? 'left-4' : 'left-0.5'}`} />
                   </div>
                 </button>
               </div>
@@ -276,15 +303,16 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <h3 className="text-[13px] font-semibold text-foreground mb-5">Utilisateurs bloqués</h3>
                 {blockedUsers.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground/40">
-                    <Shield className="w-8 h-8" /><p className="text-xs">Aucun utilisateur bloqué</p>
+                    <Shield className="w-8 h-8 animate-float" /><p className="text-xs">Aucun utilisateur bloqué</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {blockedUsers.map(name => (
-                      <div key={name} className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-3 py-2.5">
+                    {blockedUsers.map((name, index) => (
+                      <div key={name} className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-3 py-2.5 transition-all duration-200 hover:scale-[1.01] animate-slide-in-up"
+                        style={{ animationDelay: `${index * 50}ms` }}>
                         <UserX className="w-4 h-4 text-muted-foreground/40 shrink-0" />
                         <span className="text-sm text-foreground flex-1">{name}</span>
-                        <button onClick={() => unblockUser(name)} className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] hover:bg-emerald-500/25 transition-colors">Débloquer</button>
+                        <button onClick={() => unblockUser(name)} className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] hover:bg-emerald-500/25 transition-all duration-200 hover:scale-105 active:scale-95">Débloquer</button>
                       </div>
                     ))}
                   </div>
@@ -297,21 +325,22 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
               <div>
                 <h3 className="text-[13px] font-semibold text-foreground mb-5">Compte Premium</h3>
                 {isPremium ? (
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-5 text-center">
-                    <Star className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-5 text-center transition-all duration-200 hover:scale-[1.01] hover:shadow-lg hover:shadow-yellow-500/20">
+                    <Star className="w-8 h-8 text-yellow-400 mx-auto mb-2 animate-float" />
                     <p className="text-sm font-semibold text-yellow-400 mb-1">Vous êtes Premium !</p>
                     <p className="text-[11px] text-muted-foreground/60">XP x2 activé sur tous vos messages.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="bg-secondary border border-border rounded-xl p-4 space-y-2">
-                      {['🎨 Badge Premium exclusif', '⚡ XP x2 par message', '🎵 Accès aux salons VIP', '🌟 Couleur de pseudo personnalisée', '📌 Messages épinglés'].map(f => (
-                        <div key={f} className="flex items-center gap-2 text-sm text-muted-foreground/80">
+                      {['🎨 Badge Premium exclusif', '⚡ XP x2 par message', '🎵 Accès aux salons VIP', '🌟 Couleur de pseudo personnalisée', '📌 Messages épinglés'].map((f, index) => (
+                        <div key={f} className="flex items-center gap-2 text-sm text-muted-foreground/80 transition-all duration-200 hover:scale-[1.01]"
+                          style={{ animationDelay: `${index * 50}ms` }}>
                           <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />{f}
                         </div>
                       ))}
                     </div>
-                    <button onClick={activatePremium} className="w-full py-3 rounded-xl premium-gradient text-white font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+                    <button onClick={activatePremium} className="w-full py-3 rounded-xl premium-gradient text-white font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]">
                       <Star className="w-4 h-4" /> Activer Premium (démo)
                     </button>
                     <p className="text-[10px] text-muted-foreground/40 text-center">Mode démo — aucun paiement requis</p>

@@ -139,25 +139,26 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
             { id: 'video', label: 'Vidéo' }
           ].map(({ id, label }) => (
             <button key={id} onClick={() => setFilter(id)}
-              className={`flex-1 py-1 rounded-md text-[10px] font-medium transition-all ${filter === id ? 'bg-primary/15 text-primary' : 'text-muted-foreground/50 hover:text-muted-foreground'}`}>
+              className={`flex-1 py-1 rounded-md text-[10px] font-medium transition-all duration-200 ${filter === id ? 'bg-primary/15 text-primary scale-105' : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-white/5'}`}>
               {label}
             </button>
           ))}
         </div>
 
         <div className="flex-1 overflow-y-auto py-1.5 px-2">
-          {filteredSalons.map(salon => (
+          {filteredSalons.map((salon, index) => (
             <button key={salon.id} onClick={() => handleSalonClick(salon)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5 hover:bg-white/[0.05] transition-colors text-left group">
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5 hover:bg-white/[0.05] transition-all duration-200 text-left group hover:scale-[1.02] active:scale-[0.98] animate-slide-in-up"
+              style={{ animationDelay: `${index * 50}ms` }}>
 
               {/* Emoji avec fond */}
-              <div className="w-9 h-9 rounded-xl bg-secondary border border-border flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition-transform">
+              <div className="w-9 h-9 rounded-xl bg-secondary border border-border flex items-center justify-center text-lg shrink-0 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
                 {salon.emoji || SALON_EMOJI[salon.id] || '💬'}
               </div>
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[13px] font-medium text-foreground truncate">{salon.name}</span>
+                  <span className="text-[13px] font-medium text-foreground truncate group-hover:text-primary transition-colors">{salon.name}</span>
                   {salon.isPrivate && <Lock className="w-3 h-3 text-amber-400" />}
                   {salon.live && <PulseDot color="bg-red-500" />}
                 </div>
@@ -168,7 +169,7 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
                       <span className="text-[10px] text-muted-foreground/50">{salon.count} en ligne</span>
                     </>
                   )}
-                  {salon.live && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/30 rounded px-1.5 py-px font-semibold">LIVE</span>}
+                  {salon.live && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/30 rounded px-1.5 py-px font-semibold animate-pulse">LIVE</span>}
                 </div>
               </div>
             </button>
@@ -290,15 +291,16 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
           {onlineUsers.length === 0 ? (
             <p className="text-[10px] text-muted-foreground/30 italic text-center py-4">Personne d'autre en ligne</p>
           ) : (
-            onlineUsers.map(u => (
+            onlineUsers.map((u, index) => (
               <div key={u.name}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-xl mb-0.5 hover:bg-white/[0.04] transition-colors group"
+                className="flex items-center gap-2 px-2 py-1.5 rounded-xl mb-0.5 hover:bg-white/[0.04] transition-all duration-200 group hover:scale-[1.01] animate-slide-in-up"
+                style={{ animationDelay: `${index * 30}ms` }}
                 onMouseEnter={() => setHoveredUser(u.name)}
                 onMouseLeave={() => setHoveredUser(null)}>
 
-                <button className="relative shrink-0" onClick={() => setViewProfile(u.name)}>
+                <button className="relative shrink-0 transition-transform duration-200 hover:scale-110" onClick={() => setViewProfile(u.name)}>
                   <Avatar avatarClass={u.avatar || 'av1'} initials={u.initials || u.name.slice(0,2).toUpperCase()} size="xs" />
-                  <span className="absolute -bottom-px -right-px w-2 h-2 bg-emerald-500 border-2 border-card rounded-full" />
+                  <span className="absolute -bottom-px -right-px w-2 h-2 bg-emerald-500 border-2 border-card rounded-full animate-pulse" />
                 </button>
 
                 <div className="flex-1 min-w-0">
@@ -317,15 +319,15 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
                 </div>
 
                 {/* Boutons d'interaction — visibles au hover */}
-                <div className={`flex gap-1 transition-opacity ${hoveredUser === u.name ? 'opacity-100' : 'opacity-0'}`}>
+                <div className={`flex gap-1 transition-all duration-200 ${hoveredUser === u.name ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'}`}>
                   <button onClick={() => handleWave(u.name)}
                     title="Saluer"
-                    className={`w-5 h-5 rounded-lg flex items-center justify-center transition-all text-xs ${waved[u.name] ? 'bg-amber-500/20 text-amber-400' : 'bg-secondary border border-border text-muted-foreground/50 hover:text-amber-400 hover:border-amber-500/40'}`}>
+                    className={`w-5 h-5 rounded-lg flex items-center justify-center transition-all duration-200 text-xs hover:scale-110 active:scale-95 ${waved[u.name] ? 'bg-amber-500/20 text-amber-400' : 'bg-secondary border border-border text-muted-foreground/50 hover:text-amber-400 hover:border-amber-500/40'}`}>
                     {waved[u.name] ? '👋' : <Hand className="w-2.5 h-2.5" />}
                   </button>
                   <button onClick={() => onOpenDM?.(u.name)}
                     title="Message privé"
-                    className="w-5 h-5 rounded-lg flex items-center justify-center bg-secondary border border-border text-muted-foreground/50 hover:text-primary hover:border-primary/40 transition-all">
+                    className="w-5 h-5 rounded-lg flex items-center justify-center bg-secondary border border-border text-muted-foreground/50 hover:text-primary hover:border-primary/40 transition-all duration-200 hover:scale-110 active:scale-95">
                     <MessageSquare className="w-2.5 h-2.5" />
                   </button>
                 </div>
@@ -349,11 +351,11 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
           <div className="bg-card border border-border/50 rounded-3xl w-full max-w-[380px] overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300"
             onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-border flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 animate-pulse">
                 <Lock className="w-4 h-4" />
               </div>
               <span className="text-[15px] font-semibold text-foreground flex-1">Salon privé</span>
-              <button onClick={() => setPasswordPrompt(null)} className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 transition-colors">
+              <button onClick={() => setPasswordPrompt(null)} className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 hover:text-foreground transition-all duration-200 hover:scale-110 active:scale-95">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -367,12 +369,12 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
                   type="password"
                   autoFocus
                   placeholder="Entrez le mot de passe..."
-                  className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-amber-500/50 mb-3"
+                  className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-amber-500/50 focus:shadow-lg focus:shadow-amber-500/10 transition-all duration-200 mb-3"
                 />
-                {passwordError && <p className="text-[11px] text-red-400 mb-3">{passwordError}</p>}
+                {passwordError && <p className="text-[11px] text-red-400 mb-3 animate-slide-in-up">{passwordError}</p>}
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl px-4 py-3 text-sm font-semibold text-white hover:shadow-lg hover:shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl px-4 py-3 text-sm font-semibold text-white hover:shadow-lg hover:shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
                 >
                   Entrer
                 </button>

@@ -38,15 +38,16 @@ export default function ReactionPicker({ position, onSelect, onClose }: Reaction
   return (
     <div
       ref={ref}
-      className="fixed z-[500] bg-card border border-white/10 rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.6)] overflow-hidden"
+      className="fixed z-[500] bg-card border border-white/10 rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.6)] overflow-hidden animate-scale-in"
       style={{ top, left, width: W }}
       onClick={e => e.stopPropagation()}
     >
       {/* Réactions rapides */}
       <div className="flex items-center gap-1 px-3 py-2.5 border-b border-white/[0.06]">
-        {QUICK_REACTIONS.map(em => (
+        {QUICK_REACTIONS.map((em, index) => (
           <button key={em} onClick={() => { onSelect(em); onClose(); }}
-            className="text-xl w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/[0.08] hover:scale-125 transition-all">
+            className="text-xl w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/[0.08] hover:scale-125 transition-all duration-200 active:scale-95"
+            style={{ animationDelay: `${index * 30}ms` }}>
             {em}
           </button>
         ))}
@@ -55,9 +56,10 @@ export default function ReactionPicker({ position, onSelect, onClose }: Reaction
       {/* Tous les emojis */}
       <div className="p-2 max-h-[180px] overflow-y-auto">
         <div className="grid grid-cols-8 gap-0.5">
-          {EMOJIS.map(em => (
+          {EMOJIS.map((em, index) => (
             <button key={em} onClick={() => { onSelect(em); onClose(); }}
-              className="text-lg w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.08] hover:scale-110 transition-all">
+              className="text-lg w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.08] hover:scale-110 transition-all duration-200 active:scale-95"
+              style={{ animationDelay: `${index * 5}ms` }}>
               {em}
             </button>
           ))}

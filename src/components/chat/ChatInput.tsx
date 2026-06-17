@@ -237,13 +237,13 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
       )}
 
       <div 
-        className={`flex items-end gap-2 bg-secondary border rounded-xl px-2 py-1.5 transition-colors ${disabled ? 'opacity-50 border-border' : 'border-white/10 focus-within:border-primary/50'}`}
+        className={`flex items-end gap-2 bg-secondary border rounded-xl px-2 py-1.5 transition-all duration-200 ${disabled ? 'opacity-50 border-border' : 'border-white/10 focus-within:border-primary/50 focus-within:shadow-lg focus-within:shadow-primary/10'}`}
         role="group"
         aria-label="Formulaire d'envoi de message">
         <button 
           onClick={(e) => { e.stopPropagation(); if (!disabled) fileInputRef.current?.click(); }}
           disabled={disabled}
-          className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.06] hover:text-muted-foreground transition-colors disabled:pointer-events-none"
+          className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.06] hover:text-muted-foreground transition-all duration-200 hover:scale-110 active:scale-95 disabled:pointer-events-none"
           aria-label="Joindre une image"
           title="Joindre une image">
           <ImageIcon className="w-4 h-4" aria-hidden="true" />
@@ -259,7 +259,7 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
         <button 
           onClick={(e) => { e.stopPropagation(); if (!disabled) setShowEmojis(!showEmojis); }}
           disabled={disabled}
-          className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.06] hover:text-muted-foreground transition-colors disabled:pointer-events-none"
+          className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 disabled:pointer-events-none ${showEmojis ? 'bg-primary/20 text-primary' : 'text-muted-foreground/60 hover:bg-white/[0.06] hover:text-muted-foreground'}`}
           aria-label={showEmojis ? "Fermer le sélecteur d'emojis" : "Ouvrir le sélecteur d'emojis"}
           aria-expanded={showEmojis}
           aria-haspopup="dialog"
@@ -279,13 +279,13 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
           aria-describedby={mentions.length > 0 ? 'mention-suggestions' : undefined}
           aria-autocomplete="list"
           aria-controls={mentions.length > 0 ? 'mention-suggestions' : undefined}
-          className="flex-1 bg-transparent border-none outline-none text-[13px] text-foreground placeholder:text-muted-foreground/40 resize-none min-h-[22px] max-h-[120px] leading-relaxed py-0.5 disabled:cursor-not-allowed"
+          className="flex-1 bg-transparent border-none outline-none text-[13px] text-foreground placeholder:text-muted-foreground/40 resize-none min-h-[22px] max-h-[120px] leading-relaxed py-0.5 disabled:cursor-not-allowed transition-all duration-200"
           style={{ height: 'auto' }}
         />
         <button 
           onClick={handleSend} 
           disabled={!text.trim() || disabled}
-          className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shrink-0 disabled:bg-secondary disabled:text-muted-foreground/40 hover:bg-primary/80 transition-colors"
+          className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shrink-0 disabled:bg-secondary disabled:text-muted-foreground/40 hover:bg-primary/80 transition-all duration-200 hover:scale-105 active:scale-95 disabled:hover:scale-100"
           aria-label="Envoyer le message"
           aria-disabled={!text.trim() || disabled}
           title="Envoyer">

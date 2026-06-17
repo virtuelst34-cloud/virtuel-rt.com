@@ -70,10 +70,10 @@ export default function Sidebar({ onOpenDM, onOpenNotifications, onOpenSettings 
 function IconBtn({ icon: Icon, title, onClick, badge }: IconBtnProps) {
   return (
     <button onClick={onClick} title={title}
-      className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-secondary border border-border text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.06] transition-colors">
-      <Icon className="w-4 h-4" />
+      className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-secondary border border-border text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.06] transition-all duration-200 hover:scale-105 active:scale-95 group">
+      <Icon className="w-4 h-4 group-hover:animate-float" />
       {badge && (
-        <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
           {badge > 9 ? '9+' : badge}
         </span>
       )}

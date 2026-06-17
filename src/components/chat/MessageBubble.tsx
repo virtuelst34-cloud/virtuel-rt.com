@@ -74,15 +74,14 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
 
   return (
     <div
-      className={`flex ${compactMode ? 'gap-1.5 mb-1.5' : 'gap-2.5 mb-2.5'} items-start ${isOwn ? 'flex-row-reverse' : ''} ${message.pinned ? 'bg-amber-500/5 rounded-xl px-2 -mx-2' : ''}`}
+      className={`flex ${compactMode ? 'gap-1.5 mb-1.5' : 'gap-2.5 mb-2.5'} items-start ${isOwn ? 'flex-row-reverse' : ''} ${message.pinned ? 'bg-amber-500/5 rounded-xl px-2 -mx-2 animate-pulse' : ''} transition-all duration-300`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       role="article"
       aria-labelledby={`message-author-${message.id}`}
-      aria-describedby={`message-content-${message.id}`}
-    >
+      aria-describedby={`message-content-${message.id}`}>
       <button 
-        className={`${compactMode ? 'mt-0' : 'mt-0.5'} shrink-0`} 
+        className={`${compactMode ? 'mt-0' : 'mt-0.5'} shrink-0 transition-transform duration-200 hover:scale-110`} 
         onClick={() => onViewProfile?.(message.author_name)} 
         aria-label={`Voir le profil de ${message.author_name}`}
         title={`Voir le profil de ${message.author_name}`}>
@@ -93,23 +92,23 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
         {/* Auteur + heure */}
         <div className={`flex items-center gap-1.5 ${isOwn ? 'flex-row-reverse' : ''}`}>
           <button 
-            className={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline ${isOwn ? 'text-emerald-400' : 'text-purple-300'}`}
+            className={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline transition-colors ${isOwn ? 'text-emerald-400' : 'text-purple-300'}`}
             onClick={() => onViewProfile?.(message.author_name)}
             id={`message-author-${message.id}`}
             aria-label={`Message de ${message.author_name}`}>
             {message.author_name}
           </button>
           <span className={`${compactMode ? 'text-[9px]' : 'text-[10px]'} text-muted-foreground/40`} aria-label={`Envoyé à ${time}`}>{time}</span>
-          {message.pinned && <Pin className="w-3 h-3 text-amber-400" aria-label="Message épinglé" />}
+          {message.pinned && <Pin className="w-3 h-3 text-amber-400 animate-bounce" aria-label="Message épinglé" />}
         </div>
 
         {/* Bulle + toolbar */}
-        <div className="relative">
+        <div className="relative transition-all duration-300 hover:scale-[1.02]">
 
           {/* Message cité (réponse) */}
           {message.replyTo && (
             <div 
-              className={`${compactMode ? 'mb-0.5 px-2 py-1' : 'mb-1 px-2.5 py-1.5'} rounded-lg border-l-2 bg-white/5 ${compactMode ? 'text-[10px]' : 'text-[11px]'} text-muted-foreground/60 truncate`}
+              className={`${compactMode ? 'mb-0.5 px-2 py-1' : 'mb-1 px-2.5 py-1.5'} rounded-lg border-l-2 bg-white/5 ${compactMode ? 'text-[10px]' : 'text-[11px]'} text-muted-foreground/60 truncate transition-all duration-200`}
               style={{ borderLeftColor: isOwn ? '#34d399' : '#a78bfa' }}
               role="complementary"
               aria-label={`Réponse à ${message.replyTo.author_name}`}>
@@ -119,10 +118,10 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
           )}
 
           <div 
-            className={`${compactMode ? 'px-2 py-1.5 text-[12px]' : 'px-3 py-2 text-[13px]'} text-foreground leading-relaxed break-words
+            className={`${compactMode ? 'px-2 py-1.5 text-[12px]' : 'px-3 py-2 text-[13px]'} text-foreground leading-relaxed break-words transition-all duration-200
             ${isOwn
-              ? 'bg-purple-700/25 border border-purple-500/30 rounded-xl rounded-br-sm'
-              : 'bg-secondary/80 border border-border rounded-xl rounded-bl-sm'
+              ? 'bg-purple-700/25 border border-purple-500/30 rounded-xl rounded-br-sm hover:bg-purple-700/35'
+              : 'bg-secondary/80 border border-border rounded-xl rounded-bl-sm hover:bg-secondary/90'
             }`}
             id={`message-content-${message.id}`}>
             <SafeMessageContent text={message.text} imageUrl={message.image_url} isSystem={false} currentUserName={user?.name} />
@@ -131,13 +130,13 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
           {/* Toolbar au hover */}
           {hovered && (
             <div 
-              className={`absolute -top-8 ${isOwn ? 'left-0' : 'right-0'} bg-card border border-white/10 rounded-xl px-1 py-1 flex items-center gap-0.5 z-10 shadow-lg`}
+              className={`absolute -top-8 ${isOwn ? 'left-0' : 'right-0'} bg-card border border-white/10 rounded-xl px-1 py-1 flex items-center gap-0.5 z-10 shadow-lg animate-slide-in-up`}
               role="toolbar"
               aria-label="Actions du message">
               {/* Répondre */}
               <button 
                 onClick={() => onReply?.(message)}
-                className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.08] hover:text-primary transition-colors"
+                className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.08] hover:text-primary transition-all duration-200 hover:scale-110"
                 aria-label="Répondre à ce message"
                 title="Répondre">
                 <Reply className="w-3.5 h-3.5" aria-hidden="true" />
@@ -147,7 +146,7 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
               <button 
                 ref={smileRef} 
                 onClick={() => openPicker(smileRef)}
-                className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.08] hover:text-yellow-400 transition-colors"
+                className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.08] hover:text-yellow-400 transition-all duration-200 hover:scale-110"
                 aria-label="Réagir à ce message"
                 aria-haspopup="dialog"
                 title="Réagir">
@@ -157,7 +156,7 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
               {/* Épingler */}
               <button 
                 onClick={() => onPin(message.id)}
-                className={`p-1.5 rounded-lg transition-colors ${message.pinned ? 'text-amber-400 bg-amber-500/10' : 'text-muted-foreground/60 hover:bg-white/[0.08] hover:text-amber-400'}`}
+                className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 ${message.pinned ? 'text-amber-400 bg-amber-500/10' : 'text-muted-foreground/60 hover:bg-white/[0.08] hover:text-amber-400'}`}
                 aria-label={message.pinned ? 'Désépingler ce message' : 'Épingler ce message'}
                 aria-pressed={message.pinned}
                 title={message.pinned ? 'Désépingler' : 'Épingler'}>
@@ -168,7 +167,7 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
               {isOwn && (
                 <button 
                   onClick={() => onDelete(message.id)}
-                  className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.08] hover:text-red-400 transition-colors"
+                  className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.08] hover:text-red-400 transition-all duration-200 hover:scale-110"
                   aria-label="Supprimer ce message"
                   title="Supprimer">
                   <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
@@ -180,14 +179,14 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
                 <>
                   <button 
                     onClick={handleReport}
-                    className={`p-1.5 rounded-lg transition-colors ${reported ? 'text-orange-400 bg-orange-500/10' : 'text-muted-foreground/60 hover:bg-white/[0.08] hover:text-orange-400'}`}
+                    className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 ${reported ? 'text-orange-400 bg-orange-500/10' : 'text-muted-foreground/60 hover:bg-white/[0.08] hover:text-orange-400'}`}
                     aria-label={reported ? 'Message signalé' : 'Signaler ce message'}
                     title={reported ? 'Signalé' : 'Signaler'}>
                     <Flag className="w-3.5 h-3.5" aria-hidden="true" />
                   </button>
                   <button 
                     onClick={handleBlock}
-                    className={`p-1.5 rounded-lg transition-colors ${confirmBlock ? 'text-red-400 bg-red-500/20 animate-pulse' : 'text-muted-foreground/60 hover:bg-white/[0.08] hover:text-red-400'}`}
+                    className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 ${confirmBlock ? 'text-red-400 bg-red-500/20 animate-pulse' : 'text-muted-foreground/60 hover:bg-white/[0.08] hover:text-red-400'}`}
                     aria-label={confirmBlock ? 'Confirmer le blocage' : 'Bloquer cet utilisateur'}
                     title={confirmBlock ? 'Cliquer encore pour confirmer' : 'Bloquer'}>
                     <UserX className="w-3.5 h-3.5" aria-hidden="true" />
@@ -201,7 +200,7 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
         {/* Réactions existantes + bouton + */}
         {(hasReactions || hovered) && (
           <div 
-            className={`flex gap-1 flex-wrap mt-0.5 items-center ${isOwn ? 'justify-end' : ''}`}
+            className={`flex gap-1 flex-wrap mt-0.5 items-center ${isOwn ? 'justify-end' : ''} transition-all duration-200`}
             role="group"
             aria-label="Réactions">
             {Object.entries(reactions).map(([emoji, users]) => {
@@ -211,9 +210,9 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
                 <button 
                   key={emoji}
                   onClick={() => onReact(message.id, null, emoji)}
-                  className={`flex items-center gap-1 text-xs rounded-full px-2 py-0.5 border transition-all select-none hover:scale-110
+                  className={`flex items-center gap-1 text-xs rounded-full px-2 py-0.5 border transition-all select-none hover:scale-110 active:scale-95
                     ${isMine
-                      ? 'bg-purple-700/25 border-purple-500/50 text-purple-200'
+                      ? 'bg-purple-700/25 border-purple-500/50 text-purple-200 hover:bg-purple-700/35'
                       : 'bg-white/5 border-white/10 text-foreground/70 hover:bg-white/10'
                     }`}
                   aria-label={`${emoji} - ${users.length} réaction${users.length > 1 ? 's' : ''}${isMine ? ', vous avez réagi' : ''}`}
@@ -229,7 +228,7 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
               <button 
                 ref={plusRef} 
                 onClick={() => openPicker(plusRef)}
-                className="flex items-center justify-center w-6 h-6 rounded-full bg-white/5 border border-white/10 text-muted-foreground/50 hover:bg-white/10 hover:text-foreground transition-all hover:scale-110"
+                className="flex items-center justify-center w-6 h-6 rounded-full bg-white/5 border border-white/10 text-muted-foreground/50 hover:bg-white/10 hover:text-foreground transition-all hover:scale-110 active:scale-95"
                 aria-label="Ajouter une réaction"
                 aria-haspopup="dialog"
                 title="Ajouter une réaction">

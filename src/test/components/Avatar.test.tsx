@@ -1,23 +1,29 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import Avatar from '@/components/chat/Avatar'
 
 describe('Avatar component', () => {
-  it('should render with initials', () => {
-    render(<Avatar avatarClass="av1" initials="AB" size="md" />)
-    expect(screen.getByText('AB')).toBeInTheDocument()
+  it('should render with initials as title', () => {
+    const { container } = render(<Avatar avatarClass="av1" initials="AB" size="md" />)
+    expect(container.querySelector('[title="AB"]')).toBeInTheDocument()
+    expect(container.querySelector('svg')).toBeInTheDocument()
   })
 
   it('should render with different sizes', () => {
-    const { rerender } = render(<Avatar avatarClass="av1" initials="AB" size="xs" />)
-    expect(screen.getByText('AB')).toBeInTheDocument()
+    const { container, rerender } = render(<Avatar avatarClass="av1" initials="AB" size="xs" />)
+    expect(container.querySelector('svg')).toBeInTheDocument()
 
     rerender(<Avatar avatarClass="av1" initials="AB" size="lg" />)
-    expect(screen.getByText('AB')).toBeInTheDocument()
+    expect(container.querySelector('svg')).toBeInTheDocument()
   })
 
   it('should render with default size', () => {
-    render(<Avatar avatarClass="av1" initials="AB" />)
-    expect(screen.getByText('AB')).toBeInTheDocument()
+    const { container } = render(<Avatar avatarClass="av1" initials="AB" />)
+    expect(container.querySelector('svg')).toBeInTheDocument()
+  })
+
+  it('should fall back to av1 style for unknown avatarClass', () => {
+    const { container } = render(<Avatar avatarClass="unknown" initials="ZZ" size="md" />)
+    expect(container.querySelector('svg')).toBeInTheDocument()
   })
 })

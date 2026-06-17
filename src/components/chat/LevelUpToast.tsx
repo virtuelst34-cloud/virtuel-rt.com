@@ -39,10 +39,10 @@ export default function LevelUpToast({ level, onDone }: LevelUpToastProps) {
       role="alert"
       aria-live="polite"
       aria-atomic="true">
-      <div className="flex items-center gap-3 bg-card border rounded-2xl px-5 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+      <div className="flex items-center gap-3 bg-card border rounded-2xl px-5 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.5)] animate-scale-in"
         style={{ borderColor: badge.color + '60' }}
         aria-label={`Niveau ${level} atteint. ${badge.label} débloqué.`}>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: badge.color + '22' }}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center animate-float" style={{ background: badge.color + '22' }}>
           <Diamond className="w-5 h-5" style={{ color: badge.color, filter: `drop-shadow(0 0 8px ${badge.glow})` }} aria-hidden="true" />
         </div>
         <div>

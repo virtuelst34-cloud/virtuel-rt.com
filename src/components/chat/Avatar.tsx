@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { AVATAR_STYLES } from '@/lib/chatConfig';
+import AvatarFace from './AvatarFace';
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg';
 
@@ -19,8 +20,11 @@ const Avatar = memo(function Avatar({ avatarClass, initials, size = 'md' }: Avat
   };
   const sizeClass = sizes[size] || sizes.md;
   return (
-    <div className={`${sizeClass} rounded-full flex items-center justify-center font-bold border shrink-0 ${style.bg} ${style.text} ${style.border}`}>
-      {initials}
+    <div
+      className={`${sizeClass} rounded-full overflow-hidden flex items-center justify-center font-bold border shrink-0 ${style.bg} ${style.border}`}
+      title={initials}
+    >
+      <AvatarFace style={style} />
     </div>
   );
 });

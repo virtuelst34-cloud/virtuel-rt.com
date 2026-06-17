@@ -8,7 +8,7 @@ const meta: Meta<typeof Avatar> = {
   argTypes: {
     avatarClass: {
       control: 'select',
-      options: ['av1', 'av2', 'av3', 'av4', 'av5'],
+      options: ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9', 'av10', 'av11', 'av12'],
     },
     size: {
       control: 'select',

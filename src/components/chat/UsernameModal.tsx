@@ -1,11 +1,11 @@
 import React, { useState, FormEvent } from 'react';
-import { useChat } from '@/lib/contexts';
+import { useUser } from '@/lib/contexts';
 import Avatar from './Avatar';
 
-const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6'];
+const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9', 'av10', 'av11', 'av12'];
 
 export default function UsernameModal() {
-  const { login } = useChat();
+  const { login } = useUser();
   const [name, setName] = useState('');
   const [selectedAv, setSelectedAv] = useState('av1');
   const initials = name.trim() ? name.trim().slice(0, 2).toUpperCase() : '??';

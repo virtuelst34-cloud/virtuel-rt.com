@@ -9,29 +9,41 @@ import { XPProvider } from '@/lib/contexts/XPContext'
 import { DMProvider } from '@/lib/contexts/DMContext'
 import { BadgesProvider } from '@/lib/contexts/BadgesContext'
 import { UIProvider } from '@/lib/contexts/UIContext'
+import { TypingProvider } from '@/lib/contexts/TypingContext'
+import { CustomEmojisProvider } from '@/lib/contexts/CustomEmojisContext'
+import { FriendsProvider } from '@/lib/contexts/FriendsContext'
+import { MuteBlockProvider } from '@/lib/contexts/MuteBlockContext'
 
 export function TestProviders({ children }: { children: ReactNode }) {
   return (
-    <UserProvider>
-      <NotificationsProvider>
+    <NotificationsProvider>
+      <UserProvider>
         <PreferencesProvider>
-          <SalonsProvider>
-            <MessagesProvider>
-              <ModerationProvider>
-                <XPProvider>
-                  <DMProvider>
-                    <BadgesProvider>
-                      <UIProvider>
-                        {children}
-                      </UIProvider>
-                    </BadgesProvider>
-                  </DMProvider>
-                </XPProvider>
-              </ModerationProvider>
-            </MessagesProvider>
-          </SalonsProvider>
+          <MessagesProvider>
+            <TypingProvider>
+              <DMProvider>
+                <FriendsProvider>
+                  <MuteBlockProvider>
+                    <ModerationProvider>
+                      <SalonsProvider>
+                        <UIProvider>
+                          <XPProvider>
+                            <BadgesProvider>
+                              <CustomEmojisProvider>
+                                {children}
+                              </CustomEmojisProvider>
+                            </BadgesProvider>
+                          </XPProvider>
+                        </UIProvider>
+                      </SalonsProvider>
+                    </ModerationProvider>
+                  </MuteBlockProvider>
+                </FriendsProvider>
+              </DMProvider>
+            </TypingProvider>
+          </MessagesProvider>
         </PreferencesProvider>
-      </NotificationsProvider>
-    </UserProvider>
+      </UserProvider>
+    </NotificationsProvider>
   )
 }

@@ -2,8 +2,8 @@ import React, { useState, useRef, ChangeEvent } from 'react';
 import { useUser, useXP } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
-import { getBadgeForLevel, getUnlockedBadges, getBadgeStats, SPECIAL_BADGES } from '@/lib/diamondBadges';
-import { X, Edit3, Check, Flame, Calendar } from 'lucide-react';
+import { getBadgeForLevel, getUnlockedBadges, getBadgeStats, SPECIAL_BADGES, getSpecialBadgeForUser } from '@/lib/diamondBadges';
+import { X, Edit3, Check, Flame, Calendar, Venus, Mars, CircleHelp } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -17,7 +17,13 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
   const { user, updateProfile } = useUser();
   const { xpProgress, xpForLevel } = useXP();
   const [editing, setEditing]   = useState(false);
-  const [draft, setDraft]       = useState({ bio: user?.bio || '', avatar: user?.avatar || 'av1' });
+  const [draft, setDraft]       = useState({ 
+    bio: user?.bio || '', 
+    avatar: user?.avatar || 'av1',
+    gender: user?.gender || 'prefer_not_to_say',
+    age: user?.age || '',
+    city: user?.city || ''
+  });
   const [saved, setSaved]       = useState(false);
   const savedTimerRef           = useRef<number | null>(null);
 
@@ -33,7 +39,14 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
   const userSpecialBadges = (user as any)?.specialBadges || [];
 
   const handleSave = () => {
-    updateProfile({ bio: draft.bio, avatar: draft.avatar, initials: user.initials });
+    updateProfile({ 
+      bio: draft.bio, 
+      avatar: draft.avatar, 
+      initials: user.initials,
+      gender: draft.gender,
+      age: draft.age ? Number(draft.age) : undefined,
+      city: draft.city
+    });
     setEditing(false);
     setSaved(true);
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
@@ -41,7 +54,13 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
   };
 
   const handleCancel = () => {
-    setDraft({ bio: user.bio || '', avatar: user.avatar || 'av1' });
+    setDraft({ 
+      bio: user.bio || '', 
+      avatar: user.avatar || 'av1',
+      gender: user.gender || 'prefer_not_to_say',
+      age: user.age?.toString() || '',
+      city: user.city || ''
+    });
     setEditing(false);
   };
 
@@ -74,7 +93,7 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
                 <>
                   <Avatar avatarClass={user.avatar} initials={user.initials} size="lg" />
                   <div className="absolute -bottom-2 -right-2">
-                    <DiamondBadge level={lvl} size="sm" />
+                    <DiamondBadge level={lvl} size="sm" specialBadge={getSpecialBadgeForUser(user) || undefined} />
                   </div>
                 </>
               )}
@@ -82,7 +101,7 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
                 <div className="relative">
                   <Avatar avatarClass={draft.avatar} initials={user.initials} size="lg" />
                   <div className="absolute -bottom-2 -right-2">
-                    <DiamondBadge level={lvl} size="sm" />
+                    <DiamondBadge level={lvl} size="sm" specialBadge={getSpecialBadgeForUser(user) || undefined} />
                   </div>
                 </div>
               )}
@@ -113,7 +132,7 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-[17px] font-bold text-foreground">{user.name}</span>
-              <DiamondBadge level={lvl} size="sm" showLabel />
+              <DiamondBadge level={lvl} size="sm" showLabel specialBadge={getSpecialBadgeForUser(user) || undefined} />
               {userSpecialBadges.map((specialId: string) => {
                 const special = SPECIAL_BADGES.find(b => b.id === specialId);
                 return special ? (
@@ -127,6 +146,99 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
                 Membre depuis {format(new Date(user.joinedAt), 'd MMMM yyyy', { locale: fr })}
               </div>
             )}
+          </div>
+
+          {/* Informations personnelles */}
+          <div className="mb-4">
+            <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-2">Informations personnelles</div>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="bg-secondary/50 border border-border/30 rounded-xl px-3 py-2">
+                <div className="text-[9px] text-muted-foreground/50 uppercase tracking-wider mb-1">Âge</div>
+                {editing ? (
+                  <input
+                    type="number"
+                    value={draft.age}
+                    onChange={e => setDraft(d => ({ ...d, age: e.target.value }))}
+                    placeholder="Âge"
+                    className="w-full bg-transparent border-none outline-none text-sm text-foreground placeholder:text-muted-foreground/40"
+                  />
+                ) : (
+                  <div className="text-sm font-medium text-foreground">{user.age ? `${user.age} ans` : '-'}</div>
+                )}
+              </div>
+              <div className="bg-secondary/50 border border-border/30 rounded-xl px-3 py-2">
+                <div className="text-[9px] text-muted-foreground/50 uppercase tracking-wider mb-1">Ville</div>
+                {editing ? (
+                  <input
+                    type="text"
+                    value={draft.city}
+                    onChange={e => setDraft(d => ({ ...d, city: e.target.value }))}
+                    placeholder="Ville"
+                    className="w-full bg-transparent border-none outline-none text-sm text-foreground placeholder:text-muted-foreground/40"
+                  />
+                ) : (
+                  <div className="text-sm font-medium text-foreground truncate">{user.city || '-'}</div>
+                )}
+              </div>
+            </div>
+            <div className="bg-secondary/50 border border-border/30 rounded-xl px-3 py-2">
+              <div className="text-[9px] text-muted-foreground/50 uppercase tracking-wider mb-2">Sexe</div>
+              {editing ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDraft(d => ({ ...d, gender: 'male' }))}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      draft.gender === 'male' 
+                        ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400' 
+                        : 'bg-white/5 border border-border/30 text-muted-foreground hover:bg-white/10'
+                    }`}
+                  >
+                    <Mars className="w-3.5 h-3.5" /> Homme
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDraft(d => ({ ...d, gender: 'female' }))}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      draft.gender === 'female' 
+                        ? 'bg-pink-500/20 border border-pink-500/40 text-pink-400' 
+                        : 'bg-white/5 border border-border/30 text-muted-foreground hover:bg-white/10'
+                    }`}
+                  >
+                    <Venus className="w-3.5 h-3.5" /> Femme
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDraft(d => ({ ...d, gender: 'other' }))}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      draft.gender === 'other' 
+                        ? 'bg-purple-500/20 border border-purple-500/40 text-purple-400' 
+                        : 'bg-white/5 border border-border/30 text-muted-foreground hover:bg-white/10'
+                    }`}
+                  >
+                    <CircleHelp className="w-3.5 h-3.5" /> Autre
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDraft(d => ({ ...d, gender: 'prefer_not_to_say' }))}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      draft.gender === 'prefer_not_to_say' 
+                        ? 'bg-gray-500/20 border border-gray-500/40 text-gray-400' 
+                        : 'bg-white/5 border border-border/30 text-muted-foreground hover:bg-white/10'
+                    }`}
+                  >
+                    -
+                  </button>
+                </div>
+              ) : (
+                <div className="text-sm font-medium text-foreground">
+                  {user.gender === 'male' ? 'Homme' : 
+                   user.gender === 'female' ? 'Femme' : 
+                   user.gender === 'other' ? 'Autre' : 
+                   'Non précisé'}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Sélecteur d'avatar */}

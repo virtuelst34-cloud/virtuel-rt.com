@@ -44,6 +44,9 @@ export const SPECIAL_BADGES: SpecialBadge[] = [
   { id: 'founder', label: 'Fondateur', color: '#ffd700', icon: '👑' },
   { id: 'moderator', label: 'Modérateur', color: '#ff6b6b', icon: '🛡️' },
   { id: 'vip', label: 'VIP', color: '#c084fc', icon: '⭐' },
+  { id: 'direction', label: 'Direction', color: '#3b82f6', icon: '🎯' },
+  { id: 'master_op', label: 'Master OP', color: '#ef4444', icon: '⚡' },
+  { id: 'iridescent', label: 'Diamant Iridescence', color: '#ffffff', icon: '💎' },
 ];
 
 // Système de rareté
@@ -146,3 +149,17 @@ export function getBadgeStats(customBadges: DiamondBadge[] = []): {
 
 // Compat — export ancien nom pour ne pas casser les imports existants
 export const DIAMOND_BADGES = DIAMOND_BADGES_DEFAULT;
+
+// Fonction pour obtenir le badge spécial d'un utilisateur basé sur ses rôles
+export function getSpecialBadgeForUser(user: {
+  isFounder?: boolean;
+  isDirection?: boolean;
+  isMasterOp?: boolean;
+  isIridescent?: boolean;
+}): string | null {
+  if (user.isIridescent) return 'iridescent';
+  if (user.isFounder) return 'founder';
+  if (user.isMasterOp) return 'master_op';
+  if (user.isDirection) return 'direction';
+  return null;
+}

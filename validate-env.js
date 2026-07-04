@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Script de validation des variables d'environnement Base44
+ * Script de validation des variables d'environnement Supabase
  * Exécutez avec: node validate-env.js
  */
 
@@ -12,16 +12,17 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log('🔍 Validation des variables d\'environnement Base44...\n');
+console.log('🔍 Validation des variables d\'environnement Supabase...\n');
 
-// Variables requises
 const requiredVars = [
-  { name: 'VITE_BASE44_APP_ID', description: 'ID de votre application Base44' },
-  { name: 'VITE_BASE44_APP_BASE_URL', description: 'URL de votre backend Base44' },
-  { name: 'VITE_BASE44_API_KEY', description: 'Clé API pour l\'authentification Base44' }
+  { name: 'VITE_SUPABASE_URL', description: 'URL du projet Supabase' },
+  { name: 'VITE_SUPABASE_ANON_KEY', description: 'Clé anonyme (anon key) Supabase' },
 ];
 
-// Chercher les fichiers .env possibles
+const optionalVars = [
+  { name: 'VITE_SENTRY_DSN', description: 'DSN Sentry pour le monitoring (optionnel)' },
+];
+
 const envFiles = ['.env', '.env.local', '.env.development', '.env.production'];
 let foundEnvFile = null;
 let envContent = '';
@@ -46,7 +47,6 @@ if (foundEnvFile) {
   console.log('\n');
 }
 
-// Parser les variables d'environnement
 const envVars = {};
 if (envContent) {
   envContent.split('\n').forEach(line => {
@@ -57,12 +57,12 @@ if (envContent) {
   });
 }
 
-// Vérifier chaque variable requise
 let allValid = true;
+
 requiredVars.forEach(({ name, description }) => {
   const value = envVars[name] || process.env[name];
-  
-  if (value && value !== '' && value !== 'your_' + name.toLowerCase() + '_value') {
+
+  if (value && value !== '' && !value.includes('your_')) {
     console.log(`✅ ${name}`);
     console.log(`   Description: ${description}`);
     console.log(`   Valeur: ${value.substring(0, 30)}${value.length > 30 ? '...' : ''}\n`);
@@ -74,16 +74,23 @@ requiredVars.forEach(({ name, description }) => {
   }
 });
 
-// Résumé
+optionalVars.forEach(({ name, description }) => {
+  const value = envVars[name] || process.env[name];
+  if (value && value !== '') {
+    console.log(`ℹ️  ${name} (optionnel)`);
+    console.log(`   Description: ${description}\n`);
+  }
+});
+
 console.log('─'.repeat(50));
 if (allValid) {
-  console.log('✅ Toutes les variables d\'environnement sont correctement configurées.');
+  console.log('✅ Toutes les variables d\'environnement requises sont configurées.');
   process.exit(0);
 } else {
   console.log('❌ Certaines variables d\'environnement sont manquantes ou incorrectes.');
   console.log('\nPour configurer votre projet:');
   console.log('1. Créez un fichier .env.local dans le répertoire racine');
-  console.log('2. Ajoutez les variables manquantes avec vos valeurs réelles');
-  console.log('3. Relancez ce script pour vérifier: node validate-env.js\n');
+  console.log('2. Ajoutez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY depuis votre dashboard Supabase');
+  console.log('3. Relancez ce script: node validate-env.js\n');
   process.exit(1);
 }

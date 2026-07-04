@@ -3,8 +3,8 @@ import { useNotifications } from './NotificationsContext';
 
 const SalonsContext = createContext(null);
 
-const SALONS_KEY = 'virtuel_st_custom_salons';
-const HIDDEN_SALONS_KEY = 'virtuel_st_hidden_salons';
+const SALONS_KEY = 'virtuel_rt_custom_salons';
+const HIDDEN_SALONS_KEY = 'virtuel_rt_hidden_salons';
 
 export function SalonsProvider({ children }) {
   const [customSalons, setCustomSalons] = useState([]);

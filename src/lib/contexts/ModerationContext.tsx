@@ -18,7 +18,7 @@ interface ModerationContextType {
 
 const ModerationContext = createContext<ModerationContextType | null>(null);
 
-const BLOCKED_KEY = 'virtuel_st_blocked';
+const BLOCKED_KEY = 'virtuel_rt_blocked';
 
 export function ModerationProvider({ children }: { children: ReactNode }) {
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);

@@ -23,7 +23,7 @@ describe('Sidebar', () => {
     );
 
     // Vérifier que le logo est présent
-    expect(screen.getByText('V')).toBeInTheDocument();
+    expect(screen.getByAltText('Virtuel-RT')).toBeInTheDocument();
   });
 
   it('devrait avoir des boutons principaux', () => {

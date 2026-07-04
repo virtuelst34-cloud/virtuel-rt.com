@@ -1,8 +1,8 @@
-# Virtuel.st - Application de Chat en Temps Réel
+# Virtuel-RT - Application de Chat en Temps Réel
 
 ## 📋 Description
 
-Virtuel.st est une application de chat en temps réel moderne et interactive avec des fonctionnalités avancées de gestion de communauté, de gamification (XP, niveaux, badges), et de modération.
+Virtuel-RT est une application de chat en temps réel moderne et interactive avec des fonctionnalités avancées de gestion de communauté, de gamification (XP, niveaux, badges), et de modération.
 
 ## 🚀 Fonctionnalités
 
@@ -47,9 +47,13 @@ Virtuel.st est une application de chat en temps réel moderne et interactive ave
 - **Framer Motion** : Animations fluides
 - **Lucide React** : Icônes modernes
 
+### Backend
+- **Supabase** : Authentification, base de données PostgreSQL, temps réel (Realtime)
+
 ### State Management
-- **React Context API** : Gestion d'état globale
-- **Contexts personnalisés** : User, Messages, Salons, XP, Moderation, Badges, Notifications, Preferences, DM, UI
+- **React Context API** : Gestion d'état globale (14 contextes)
+- **React Query** : Cache et requêtes asynchrones
+- **Contexts** : User, Messages, Salons, XP, Moderation, Badges, Notifications, Preferences, DM, UI, Typing, Friends, MuteBlock, CustomEmojis
 
 ### Validation
 - **Zod** : Validation de schémas TypeScript
@@ -65,7 +69,7 @@ Virtuel.st est une application de chat en temps réel moderne et interactive ave
 ## 📁 Structure du Projet
 
 ```
-virtuel-st/
+virtuel-rt/
 ├── src/
 │   ├── components/
 │   │   ├── chat/              # Composants de chat
@@ -114,7 +118,7 @@ virtuel-st/
 1. **Cloner le repository**
 ```bash
 git clone <repository-url>
-cd virtuel-st
+cd virtuel-rt
 ```
 
 2. **Installer les dépendances**
@@ -125,17 +129,19 @@ npm install
 3. **Configurer les variables d'environnement**
 Créer un fichier `.env.local` :
 ```env
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
-VITE_BASE44_API_KEY=your_api_key
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-4. **Valider la configuration**
+4. **Initialiser la base Supabase**
+Exécuter `supabase/schema.sql` dans l'éditeur SQL Supabase (schéma complet idempotent).
+
+5. **Valider la configuration**
 ```bash
 node validate-env.js
 ```
 
-5. **Lancer l'application**
+6. **Lancer l'application**
 ```bash
 npm run dev
 ```
@@ -296,29 +302,20 @@ Pour toute question ou problème :
 
 ## Dépannage après déploiement
 
-Besoin d'aide ?
+### URL Supabase invalide
 
-Découvrez les problèmes courants après le déploiement et comment les résoudre.
+Vérifiez que `VITE_SUPABASE_URL` correspond à l'URL de votre projet Supabase (Project Settings → API).
 
-### App ID invalide
+### Clé Supabase invalide
 
-Vérifiez que `VITE_BASE44_APP_ID` correspond à l'ID de votre application dans Base44.
-
-### URL de base invalide
-
-Vérifiez que `VITE_BASE44_APP_BASE_URL` correspond à l'URL de votre backend Base44.
-
-### Clé API invalide
-
-Vérifiez que `VITE_BASE44_API_KEY` correspond à la clé API dans Base44 → Paramètres du projet → Clés API.
+Vérifiez que `VITE_SUPABASE_ANON_KEY` correspond à la clé `anon` publique dans Supabase → Project Settings → API.
 
 ### Variable d'environnement non définie
 
-Vérifiez les déploiements → Variables d'environnement pour confirmer que `VITE_BASE44_APP_ID`, `VITE_BASE44_APP_BASE_URL` et `VITE_BASE44_API_KEY` ont été enregistrées.
+Vérifiez les déploiements → Variables d'environnement pour confirmer que `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` ont été enregistrées.
 
 ### Erreur de configuration
 
 Si vous voyez des erreurs dans la console au démarrage :
-- ❌ `VITE_BASE44_APP_ID is not defined` : Vérifiez que la variable est définie dans `.env.local`
-- ❌ `VITE_BASE44_APP_BASE_URL is not defined` : Vérifiez que l'URL de base est configurée
-- ❌ `VITE_BASE44_API_KEY is not defined` : Vérifiez que la clé API est configurée
+- ❌ `Supabase URL or Anon Key is missing` : Configurez les variables dans `.env.local`
+- ❌ Erreurs RLS : Vérifiez que les migrations SQL ont été appliquées sur votre projet Supabase

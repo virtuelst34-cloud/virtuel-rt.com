@@ -68,6 +68,87 @@ function DiamondSVG({ color, glow, px }: DiamondSVGProps) {
   );
 }
 
+// Diamant Iridescent avec animation de couleur changeante (effet ionisation)
+function IridescentDiamond({ px }: { px: number }) {
+  return (
+    <svg width={px} height={px} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"
+      className="animate-iridescent"
+      style={{ 
+        filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.6)) drop-shadow(0 0 4px rgba(168,85,247,0.5))',
+        flexShrink: 0 
+      }}>
+      <defs>
+        {/* Gradient iridescent animé */}
+        <linearGradient id="iridescent-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ff6b6b">
+            <animate attributeName="stopColor" values="#ff6b6b;#ffd700;#34d399;#60a5fa;#a78bfa;#ff6b6b" dur="4s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="25%" stopColor="#ffd700">
+            <animate attributeName="stopColor" values="#ffd700;#34d399;#60a5fa;#a78bfa;#ff6b6b;#ffd700" dur="4s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="50%" stopColor="#34d399">
+            <animate attributeName="stopColor" values="#34d399;#60a5fa;#a78bfa;#ff6b6b;#ffd700;#34d399" dur="4s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="75%" stopColor="#60a5fa">
+            <animate attributeName="stopColor" values="#60a5fa;#a78bfa;#ff6b6b;#ffd700;#34d399;#60a5fa" dur="4s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="100%" stopColor="#a78bfa">
+            <animate attributeName="stopColor" values="#a78bfa;#ff6b6b;#ffd700;#34d399;#60a5fa;#a78bfa" dur="4s" repeatCount="indefinite" />
+          </stop>
+        </linearGradient>
+        
+        {/* Gradient pour facettes avec animation */}
+        <linearGradient id="iridescent-top" x1="10" y1="2" x2="22" y2="13" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95">
+            <animate attributeName="stopOpacity" values="0.95;0.85;0.95" dur="2s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="100%" stopColor="url(#iridescent-gradient)" stopOpacity="0.8" />
+        </linearGradient>
+        
+        <linearGradient id="iridescent-left" x1="2" y1="13" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="url(#iridescent-gradient)" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="url(#iridescent-gradient)" stopOpacity="0.5" />
+        </linearGradient>
+        
+        <linearGradient id="iridescent-right" x1="30" y1="13" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="url(#iridescent-gradient)" stopOpacity="0.7" />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0.4" />
+        </linearGradient>
+        
+        <linearGradient id="iridescent-mid" x1="10" y1="13" x2="22" y2="13" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+          <stop offset="50%" stopColor="url(#iridescent-gradient)" stopOpacity="0.6" />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0.2" />
+        </linearGradient>
+      </defs>
+
+      {/* Couronne (haut) */}
+      <polygon points="16,2 22,12 10,12" fill="url(#iridescent-top)" />
+      <polygon points="4,9 10,12 16,2" fill="url(#iridescent-top)" opacity="0.8" />
+      <polygon points="28,9 22,12 16,2" fill="url(#iridescent-top)" opacity="0.6" />
+      <polygon points="2,13 4,9 10,12" fill="url(#iridescent-gradient)" opacity="0.6" />
+      <polygon points="30,13 28,9 22,12" fill="url(#iridescent-gradient)" opacity="0.4" />
+
+      {/* Ceinture */}
+      <polygon points="2,13 10,12 16,14 10,15" fill="url(#iridescent-mid)" />
+      <polygon points="30,13 22,12 16,14 22,15" fill="url(#iridescent-mid)" opacity="0.8" />
+
+      {/* Pavillon (bas) */}
+      <polygon points="2,13 10,15 16,30" fill="url(#iridescent-left)" />
+      <polygon points="10,15 22,15 16,30" fill="url(#iridescent-gradient)" opacity="0.7" />
+      <polygon points="30,13 22,15 16,30" fill="url(#iridescent-right)" />
+
+      {/* Reflets animés */}
+      <polygon points="10,4 14,6 11,10 8,8" fill="#ffffff" opacity="0.6">
+        <animate attributeName="opacity" values="0.6;0.8;0.6" dur="1.5s" repeatCount="indefinite" />
+      </polygon>
+      <polygon points="18,3 20,4 19,6" fill="#ffffff" opacity="0.4">
+        <animate attributeName="opacity" values="0.4;0.6;0.4" dur="1.5s" repeatCount="indefinite" begin="0.5s" />
+      </polygon>
+    </svg>
+  );
+}
+
 interface DiamondBadgeProps {
   level: number;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -92,6 +173,7 @@ const DiamondBadge = memo(function DiamondBadge({ level, size = 'sm', showLabel 
 
   // Déterminer si c'est un badge spécial ou un badge de niveau
   const isSpecial = 'icon' in badge;
+  const isIridescent = specialBadge === 'iridescent';
   
   // Pour les badges de niveau, utiliser getBadgePreview
   const diamondBadge = isSpecial ? null : badge as DiamondBadgeType;
@@ -109,13 +191,15 @@ const DiamondBadge = memo(function DiamondBadge({ level, size = 'sm', showLabel 
   return (
     <span className={`relative group inline-flex items-center gap-1 shrink-0 ${animationClass}`} title={badge.label}>
       <span className="relative inline-flex items-center justify-center shrink-0">
-        {showPing && (
+        {showPing && !isIridescent && (
           <span
             className="absolute rounded-full animate-ping opacity-25"
             style={{ width: '150%', height: '150%', background: badge.color }}
           />
         )}
-        {isSpecial ? (
+        {isIridescent ? (
+          <IridescentDiamond px={px} />
+        ) : isSpecial ? (
           <span className="text-2xl" style={{ color: badge.color }}>{(badge as SpecialBadge).icon}</span>
         ) : (
           <DiamondSVG color={badge.color} glow={glow} px={px} />
@@ -133,9 +217,11 @@ const DiamondBadge = memo(function DiamondBadge({ level, size = 'sm', showLabel 
         opacity-0 group-hover:opacity-100 transition-opacity duration-150
         whitespace-nowrap text-[10px] font-semibold px-2 py-1 rounded-lg border shadow-lg"
         style={{
-          background: `${badge.color}18`,
-          borderColor: `${badge.color}50`,
-          color: badge.color,
+          background: isIridescent 
+            ? 'linear-gradient(135deg, rgba(255,107,107,0.2), rgba(255,215,0,0.2), rgba(52,211,153,0.2), rgba(96,165,250,0.2), rgba(167,139,250,0.2))'
+            : `${badge.color}18`,
+          borderColor: isIridescent ? 'rgba(255,255,255,0.3)' : `${badge.color}50`,
+          color: isIridescent ? '#ffffff' : badge.color,
         }}>
         {badge.label} {isSpecial ? '' : `· Nv.${minLevel}+`}
       </span>

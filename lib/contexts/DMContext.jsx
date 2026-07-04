@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 
 const DMContext = createContext(null);
-const DM_KEY = 'virtuel_st_dm';
+const DM_KEY = 'virtuel_rt_dm';
 
 export function DMProvider({ children }) {
   const [conversations, setConversations] = useState({});

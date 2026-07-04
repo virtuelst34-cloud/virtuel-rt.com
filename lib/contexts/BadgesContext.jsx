@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 
 const BadgesContext = createContext(null);
 
-const BADGES_KEY = 'virtuel_st_custom_badges';
+const BADGES_KEY = 'virtuel_rt_custom_badges';
 
 export function BadgesProvider({ children }) {
   const [customBadges, setCustomBadges] = useState([]);

@@ -1,7 +1,7 @@
 import React, { useState, useRef, memo, RefObject } from 'react';
 import Avatar from './Avatar';
 import SafeMessageContent from './SafeMessageContent';
-import { useUser, usePreferences } from '@/lib/contexts';
+import { useUser, usePreferences, useMuteBlock } from '@/lib/contexts';
 import { useModeration } from '@/lib/contexts';
 import { Smile, Trash2, Flag, UserX, Pin, Plus, Reply } from 'lucide-react';
 import { format } from 'date-fns';
@@ -33,7 +33,8 @@ interface MessageBubbleContentProps {
 const MessageBubbleContent = function MessageBubbleContent({ message, onReact, onDelete, onPin, onViewProfile, onReply }: MessageBubbleContentProps) {
   const { user } = useUser();
   const { compactMode } = usePreferences();
-  const { blockUser, reportMessage } = useModeration();
+  const { reportMessage } = useModeration();
+  const { blockUser } = useMuteBlock();
   const isOwn = message.author_name === user?.name;
   const [hovered, setHovered]       = useState(false);
   const [reported, setReported]     = useState(false);
@@ -81,8 +82,11 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
       aria-labelledby={`message-author-${message.id}`}
       aria-describedby={`message-content-${message.id}`}>
       <button 
-        className={`${compactMode ? 'mt-0' : 'mt-0.5'} shrink-0 transition-transform duration-200 hover:scale-110`} 
-        onClick={() => onViewProfile?.(message.author_name)} 
+        className={`${compactMode ? 'mt-0' : 'mt-0.5'} shrink-0 transition-transform duration-200 hover:scale-110 cursor-pointer`} 
+        onClick={(e) => {
+          e.stopPropagation();
+          onViewProfile?.(message.author_name);
+        }}
         aria-label={`Voir le profil de ${message.author_name}`}
         title={`Voir le profil de ${message.author_name}`}>
         <Avatar avatarClass={message.author_avatar} initials={message.author_initials} size={compactMode ? 'sm' : 'md'} />
@@ -92,8 +96,11 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
         {/* Auteur + heure */}
         <div className={`flex items-center gap-1.5 ${isOwn ? 'flex-row-reverse' : ''}`}>
           <button 
-            className={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline transition-colors ${isOwn ? 'text-emerald-400' : 'text-purple-300'}`}
-            onClick={() => onViewProfile?.(message.author_name)}
+            className={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline transition-colors ${isOwn ? 'text-emerald-400' : 'text-purple-300'} cursor-pointer`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewProfile?.(message.author_name);
+            }}
             id={`message-author-${message.id}`}
             aria-label={`Message de ${message.author_name}`}>
             {message.author_name}

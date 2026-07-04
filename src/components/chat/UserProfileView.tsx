@@ -1,9 +1,10 @@
 import React from 'react';
-import { useChat } from '@/lib/contexts';
+import { useChat, useFriends, useMuteBlock } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
-import { getBadgeForLevel, getUnlockedBadges, getBadgeStats, SPECIAL_BADGES } from '@/lib/diamondBadges';
-import { X, MessageSquare, UserX, Flame, Calendar } from 'lucide-react';
+import GenderIcon from './GenderIcon';
+import { getBadgeForLevel, getUnlockedBadges, getBadgeStats, SPECIAL_BADGES, getSpecialBadgeForUser } from '@/lib/diamondBadges';
+import { X, MessageSquare, UserX, Flame, Calendar, VolumeX, UserCheck, UserPlus, UserMinus } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -15,7 +16,9 @@ interface UserProfileViewProps {
 
 // Fiche profil en lecture seule d'un autre utilisateur
 export default function UserProfileView({ targetName, onClose, onOpenDM }: UserProfileViewProps) {
-  const { profiles, user, blockUser, isBlocked } = useChat();
+  const { profiles, user } = useChat();
+  const { isFriend, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, removeFriend, pendingRequests, outgoingRequests } = useFriends();
+  const { isMuted, isBlocked, muteUser, unmuteUser, blockUser, unblockUser } = useMuteBlock();
   const target = profiles[targetName] || { name: targetName, avatar: 'av1', initials: targetName.slice(0, 2).toUpperCase(), level: 1, xp: 0 };
 
   const lvl      = target.level || 1;
@@ -24,9 +27,40 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
   const stats    = getBadgeStats();
   const targetSpecialBadges = (target as any)?.specialBadges || [];
   const blocked  = isBlocked(targetName);
+  const muted   = isMuted(targetName);
+  const friend   = isFriend(targetName);
+  const incomingRequest = pendingRequests.find(r => r.user_id === targetName);
+  const outgoingRequest = outgoingRequests.find(r => r.friend_id === targetName);
 
-  const handleBlock = () => { blockUser(targetName); onClose(); };
-  const handleDM    = () => { onClose(); onOpenDM?.(targetName); };
+  const handleBlock = async () => { 
+    if (blocked) {
+      await unblockUser(targetName);
+    } else {
+      await blockUser(targetName);
+    }
+  };
+  
+  const handleMute = async () => {
+    if (muted) {
+      await unmuteUser(targetName);
+    } else {
+      await muteUser(targetName);
+    }
+  };
+
+  const handleFriend = async () => {
+    if (friend) {
+      await removeFriend(targetName);
+    } else if (incomingRequest) {
+      await acceptFriendRequest(incomingRequest.id);
+    } else if (outgoingRequest) {
+      await rejectFriendRequest(outgoingRequest.id);
+    } else {
+      await sendFriendRequest(targetName);
+    }
+  };
+
+  const handleDM = () => { onClose(); onOpenDM?.(targetName); };
 
   return (
     <div 
@@ -54,28 +88,57 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
         <div className="px-5 pb-5">
           {/* Avatar + nom */}
           <div className="-mt-7 mb-4 flex items-end justify-between">
-            <Avatar avatarClass={target.avatar} initials={target.initials} size="lg" />
-            <div className="flex gap-2 mb-1">
+            <div className="relative">
+              <Avatar avatarClass={target.avatar} initials={target.initials} size="lg" />
+              <div className="absolute -bottom-2 -right-2">
+                <DiamondBadge level={lvl} size="sm" specialBadge={getSpecialBadgeForUser(target) || undefined} />
+              </div>
+              <GenderIcon gender={(target as any).gender} size={14} className="absolute -top-1 -right-1" />
+            </div>
+            <div className="flex gap-2 flex-wrap justify-end">
               {user?.name !== targetName && (
                 <>
                   <button 
                     onClick={handleDM}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-medium hover:bg-primary/25 transition-colors"
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-medium hover:bg-primary/25 transition-all active:scale-95 cursor-pointer min-h-[32px]"
                     aria-label={`Envoyer un message à ${targetName}`}>
-                    <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" /> Message
+                    <MessageSquare className="w-3.5 h-3.5 pointer-events-none" aria-hidden="true" /> Message
                   </button>
-                  {!blocked ? (
-                    <button 
-                      onClick={handleBlock}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors"
-                      aria-label={`Bloquer ${targetName}`}>
-                      <UserX className="w-3.5 h-3.5" aria-hidden="true" /> Bloquer
-                    </button>
-                  ) : (
-                    <span className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-border text-muted-foreground/50 text-xs" role="status" aria-live="polite">
-                      <UserX className="w-3.5 h-3.5" aria-hidden="true" /> Bloqué
-                    </span>
-                  )}
+                  <button 
+                    onClick={handleFriend}
+                    className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-95 cursor-pointer min-h-[32px] ${
+                      friend 
+                        ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20' 
+                        : incomingRequest
+                        ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                        : outgoingRequest
+                        ? 'bg-white/5 border border-border text-muted-foreground hover:bg-white/10'
+                        : 'bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20'
+                    }`}
+                    aria-label={friend ? `Retirer ${targetName} des amis` : incomingRequest ? `Accepter la demande de ${targetName}` : outgoingRequest ? `Annuler la demande envoyée à ${targetName}` : `Ajouter ${targetName} en ami`}>
+                    {friend ? <UserCheck className="w-3.5 h-3.5 pointer-events-none" aria-hidden="true" /> : outgoingRequest ? <UserMinus className="w-3.5 h-3.5 pointer-events-none" aria-hidden="true" /> : <UserPlus className="w-3.5 h-3.5 pointer-events-none" aria-hidden="true" />}
+                    {friend ? 'Ami' : incomingRequest ? 'Accepter' : outgoingRequest ? 'Envoyée' : 'Ajouter'}
+                  </button>
+                  <button 
+                    onClick={handleMute}
+                    className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-95 cursor-pointer min-h-[32px] ${
+                      muted 
+                        ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20' 
+                        : 'bg-white/5 border border-border/30 text-muted-foreground hover:bg-white/10'
+                    }`}
+                    aria-label={muted ? `Rétablir le son de ${targetName}` : `Rendre ${targetName} muet`}>
+                    <VolumeX className="w-3.5 h-3.5 pointer-events-none" aria-hidden="true" /> {muted ? 'Désilencer' : 'Muet'}
+                  </button>
+                  <button 
+                    onClick={handleBlock}
+                    className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-95 cursor-pointer min-h-[32px] ${
+                      blocked 
+                        ? 'bg-white/5 border border-border text-muted-foreground/50' 
+                        : 'bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20'
+                    }`}
+                    aria-label={blocked ? `Débloquer ${targetName}` : `Bloquer ${targetName}`}>
+                    <UserX className="w-3.5 h-3.5 pointer-events-none" aria-hidden="true" /> {blocked ? 'Débloquer' : 'Bloquer'}
+                  </button>
                 </>
               )}
             </div>
@@ -85,7 +148,7 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
           <div className="mb-3">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-[17px] font-bold text-foreground" id={`profile-title-${targetName}`}>{target.name}</span>
-              <DiamondBadge level={lvl} size="sm" showLabel />
+              <DiamondBadge level={lvl} size="sm" showLabel specialBadge={getSpecialBadgeForUser(target) || undefined} />
               {targetSpecialBadges.map((specialId: string) => {
                 const special = SPECIAL_BADGES.find(b => b.id === specialId);
                 return special ? (
@@ -99,6 +162,27 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
                 Membre depuis {format(new Date((target as any).joinedAt), 'd MMMM yyyy', { locale: fr })}
               </div>
             )}
+          </div>
+
+          {/* Informations personnelles */}
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="bg-secondary/50 border border-border/30 rounded-xl px-2.5 py-2">
+              <div className="text-[9px] text-muted-foreground/50 uppercase tracking-wider mb-1">Âge</div>
+              <div className="text-sm font-medium text-foreground">{(target as any).age ? `${(target as any).age} ans` : '-'}</div>
+            </div>
+            <div className="bg-secondary/50 border border-border/30 rounded-xl px-2.5 py-2">
+              <div className="text-[9px] text-muted-foreground/50 uppercase tracking-wider mb-1">Ville</div>
+              <div className="text-sm font-medium text-foreground truncate">{(target as any).city || '-'}</div>
+            </div>
+            <div className="bg-secondary/50 border border-border/30 rounded-xl px-2.5 py-2">
+              <div className="text-[9px] text-muted-foreground/50 uppercase tracking-wider mb-1">Sexe</div>
+              <div className="text-sm font-medium text-foreground">
+                {(target as any).gender === 'male' ? 'H' : 
+                 (target as any).gender === 'female' ? 'F' : 
+                 (target as any).gender === 'other' ? 'A' : 
+                 '-'}
+              </div>
+            </div>
           </div>
 
           {/* Bio */}

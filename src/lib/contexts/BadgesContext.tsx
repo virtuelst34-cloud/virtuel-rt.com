@@ -15,7 +15,7 @@ interface BadgesContextType {
 
 const BadgesContext = createContext<BadgesContextType | null>(null);
 
-const BADGES_KEY = 'virtuel_st_custom_badges';
+const BADGES_KEY = 'virtuel_rt_custom_badges';
 
 export function BadgesProvider({ children }: { children: ReactNode }) {
   const [customBadges, setCustomBadges] = useState<CustomBadge[]>([]);

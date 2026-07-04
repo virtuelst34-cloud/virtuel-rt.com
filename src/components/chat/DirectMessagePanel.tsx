@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, ChangeEvent, KeyboardEvent } from 'react';
-import { useUser, useModeration, useNotifications, useXP, useDM } from '@/lib/contexts';
+import { useUser, useNotifications, useXP, useDM, useMuteBlock } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import { Send, X, MessageSquare, Search } from 'lucide-react';
@@ -26,19 +26,9 @@ function TypingDots() {
 export default function DirectMessagePanel({ onClose, initialUser }: DirectMessagePanelProps) {
   const { user, profiles } = useUser();
   const { addNotification } = useNotifications();
-  const { isBlocked } = useModeration();
+  const { isMuted, isBlocked } = useMuteBlock();
   const { sounds } = useXP();
   const { sendDM, getConversation, markRead, getUnreadCount } = useDM();
-
-  if (!user) {
-    return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[1500]" onClick={onClose}>
-        <div className="bg-card border border-border rounded-2xl p-6 text-center">
-          <p className="text-sm text-muted-foreground">Vous devez être connecté pour envoyer des messages</p>
-        </div>
-      </div>
-    );
-  }
 
   const [selectedUser, setSelectedUser] = useState<string | null>(typeof initialUser === 'string' ? initialUser : (initialUser?.name || null));
   const [text, setText]                 = useState('');
@@ -75,7 +65,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
     typingTimerRef.current = setTimeout(() => setRemoteTyping(false), 2500);
   };
 
-  const contacts = Object.values(profiles).filter(p => p.name !== user?.name && !isBlocked(p.name));
+  const contacts = Object.values(profiles).filter(p => p.name !== user?.name && !isMuted(p.name) && !isBlocked(p.name));
   const filteredContacts = contacts.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()));
 
   const unreadFor = useCallback((name: string) => {
@@ -85,6 +75,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
 
   const handleSend = () => {
     if (!text.trim() || !selectedUser || !user) return;
+    if (isMuted(selectedUser) || isBlocked(selectedUser)) return;
     sendDM(user, selectedUser, text.trim());
     addNotification({ type: 'dm', message: `💬 Message envoyé à ${selectedUser}` });
     sounds?.dm();
@@ -107,6 +98,16 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
+
+  if (!user) {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[1500]" onClick={onClose}>
+        <div className="bg-card border border-border rounded-2xl p-6 text-center">
+          <p className="text-sm text-muted-foreground">Vous devez être connecté pour envoyer des messages</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[1500] animate-in fade-in duration-300 p-4" onClick={onClose}>

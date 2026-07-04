@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { QUICK_REACTIONS, EMOJIS } from '@/lib/chatConfig';
+import { getCustomEmojis } from '@/lib/customEmojis';
 
 interface Position {
   x?: number;
@@ -10,10 +11,12 @@ interface ReactionPickerProps {
   position: Position | null;
   onSelect: (emoji: string) => void;
   onClose: () => void;
+  salonId?: string;
 }
 
-export default function ReactionPicker({ position, onSelect, onClose }: ReactionPickerProps) {
+export default function ReactionPicker({ position, onSelect, onClose, salonId }: ReactionPickerProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const customEmojis = salonId ? getCustomEmojis(salonId) : EMOJIS;
 
   useEffect(() => {
     if (!position) return;
@@ -56,7 +59,7 @@ export default function ReactionPicker({ position, onSelect, onClose }: Reaction
       {/* Tous les emojis */}
       <div className="p-2 max-h-[180px] overflow-y-auto">
         <div className="grid grid-cols-8 gap-0.5">
-          {EMOJIS.map((em, index) => (
+          {customEmojis.map((em, index) => (
             <button key={em} onClick={() => { onSelect(em); onClose(); }}
               className="text-lg w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.08] hover:scale-110 transition-all duration-200 active:scale-95"
               style={{ animationDelay: `${index * 5}ms` }}>

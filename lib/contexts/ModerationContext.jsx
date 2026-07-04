@@ -4,7 +4,7 @@ import { useUser } from './UserContext';
 
 const ModerationContext = createContext(null);
 
-const BLOCKED_KEY = 'virtuel_st_blocked';
+const BLOCKED_KEY = 'virtuel_rt_blocked';
 
 export function ModerationProvider({ children }) {
   const [blockedUsers, setBlockedUsers] = useState([]);

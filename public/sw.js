@@ -1,4 +1,4 @@
-const CACHE_NAME = 'virtuel-st-v1';
+const CACHE_NAME = 'virtuel-rt-v1';
 const urlsToCache = [
   '/',
   '/index.html',

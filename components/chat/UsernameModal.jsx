@@ -19,7 +19,10 @@ export default function UsernameModal() {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-7 w-[320px] flex flex-col gap-5 shadow-2xl">
-        <h2 className="text-base font-semibold text-foreground">Bienvenue sur Virtuel-ST</h2>
+        <div className="flex justify-center mb-2">
+          <img src="/logo.png" alt="Virtuel-RT" className="w-12 h-12" />
+        </div>
+        <h2 className="text-base font-semibold text-foreground">Bienvenue sur Virtuel-RT</h2>
         <p className="text-sm text-muted-foreground -mt-2">Choisissez un pseudo et un avatar pour commencer.</p>
         <div className="flex gap-2 flex-wrap">
           {AVATARS.map(av => (

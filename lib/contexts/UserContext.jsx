@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 
 const UserContext = createContext(null);
 
-const PROFILES_KEY = 'virtuel_st_profiles';
+const PROFILES_KEY = 'virtuel_rt_profiles';
 
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);

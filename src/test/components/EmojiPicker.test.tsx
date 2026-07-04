@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import EmojiPicker from '@/components/chat/EmojiPicker';
+import { CustomEmojisProvider } from '@/lib/contexts/CustomEmojisContext';
 
 describe('EmojiPicker', () => {
   const mockOnSelect = vi.fn();
@@ -11,24 +12,30 @@ describe('EmojiPicker', () => {
     onClose: mockOnClose,
   };
 
+  const renderEmojiPicker = () => render(
+    <CustomEmojisProvider>
+      <EmojiPicker {...defaultProps} />
+    </CustomEmojisProvider>
+  );
+
   it('devrait rendre le composant EmojiPicker', () => {
-    render(<EmojiPicker {...defaultProps} />);
+    renderEmojiPicker();
     // Vérifier que le composant est rendu en cherchant des boutons d'emoji
     const buttons = screen.getAllByRole('button');
     expect(buttons.length).toBeGreaterThan(0);
   });
 
   it('devrait appeler onSelect quand on clique sur un emoji', () => {
-    render(<EmojiPicker {...defaultProps} />);
+    renderEmojiPicker();
     
-    const emojiButton = screen.getAllByRole('button')[0];
+    const emojiButton = screen.getAllByRole('button')[2];
     fireEvent.click(emojiButton);
     
     expect(mockOnSelect).toHaveBeenCalled();
   });
 
   it('devrait appeler onClose quand on clique sur le bouton de fermeture', () => {
-    render(<EmojiPicker {...defaultProps} />);
+    renderEmojiPicker();
     
     // Chercher un bouton qui pourrait être un bouton de fermeture
     const buttons = screen.getAllByRole('button');
@@ -40,7 +47,7 @@ describe('EmojiPicker', () => {
   });
 
   it('devrait afficher une grille d\'emojis', () => {
-    render(<EmojiPicker {...defaultProps} />);
+    renderEmojiPicker();
     
     const buttons = screen.getAllByRole('button');
     expect(buttons.length).toBeGreaterThan(0);

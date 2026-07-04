@@ -1,11 +1,20 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 
+interface NotificationAction {
+  label: string;
+  onClick: () => void;
+  primary?: boolean;
+}
+
 interface Notification {
-  id: number;
+  id: number | string;
   type: string;
   message: string;
   timestamp: string;
   read?: boolean;
+  actions?: NotificationAction[];
+  groupKey?: string; // Pour grouper les notifications similaires
+  groupCount?: number; // Nombre de notifications dans le groupe
 }
 
 interface NotificationsContextType {
@@ -14,6 +23,7 @@ interface NotificationsContextType {
   markAllRead: () => void;
   clearNotifications: () => void;
   unreadCount: number;
+  removeNotification: (id: number | string) => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | null>(null);
@@ -29,11 +39,41 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp'>) => {
     const id = Date.now();
-    setNotifications(prev => [...prev, { ...notification, id, timestamp: new Date().toISOString() }]);
-    timersRef.current[id] = setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
+    
+    // Vérifier si on doit grouper avec une notification existante
+    if (notification.groupKey) {
+      setNotifications(prev => {
+        const existingGroup = prev.find(n => n.groupKey === notification.groupKey && !n.read);
+        if (existingGroup) {
+          // Mettre à jour le groupe existant
+          return prev.map(n => 
+            n.id === existingGroup.id 
+              ? { ...n, message: notification.message, timestamp: new Date().toISOString(), groupCount: (n.groupCount || 1) + 1 }
+              : n
+          );
+        }
+        // Créer un nouveau groupe
+        return [...prev, { ...notification, id, timestamp: new Date().toISOString(), groupCount: 1 }];
+      });
+    } else {
+      setNotifications(prev => [...prev, { ...notification, id, timestamp: new Date().toISOString() }]);
+    }
+    
+    // Auto-suppression après 15 secondes (sauf si actions sont présentes)
+    if (!notification.actions || notification.actions.length === 0) {
+      timersRef.current[id] = setTimeout(() => {
+        setNotifications(prev => prev.filter(n => n.id !== id));
+        delete timersRef.current[id];
+      }, 15000);
+    }
+  }, []);
+
+  const removeNotification = useCallback((id: number | string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    if (typeof id === 'number' && timersRef.current[id]) {
+      clearTimeout(timersRef.current[id]);
       delete timersRef.current[id];
-    }, 5000);
+    }
   }, []);
 
   const markAllRead = useCallback(() => {
@@ -42,12 +82,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const clearNotifications = useCallback(() => {
     setNotifications([]);
+    Object.values(timersRef.current).forEach(clearTimeout);
+    timersRef.current = {};
   }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const value: NotificationsContextType = {
-    notifications, addNotification, markAllRead, clearNotifications, unreadCount
+    notifications, addNotification, markAllRead, clearNotifications, unreadCount, removeNotification
   };
 
   return (

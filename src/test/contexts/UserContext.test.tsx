@@ -1,18 +1,22 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { UserProvider, useUser } from '@/lib/contexts/UserContext'
+import { NotificationsProvider } from '@/lib/contexts/NotificationsContext'
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <NotificationsProvider>
+      <UserProvider>{children}</UserProvider>
+    </NotificationsProvider>
+  )
+}
 
 describe('UserContext', () => {
   beforeEach(() => {
-    // Reset localStorage before each test
     localStorage.clear()
   })
 
   it('should provide user context', () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <UserProvider>{children}</UserProvider>
-    )
-
     const { result } = renderHook(() => useUser(), { wrapper })
 
     expect(result.current).toBeDefined()
@@ -20,10 +24,6 @@ describe('UserContext', () => {
   })
 
   it('should allow setting user via login', () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <UserProvider>{children}</UserProvider>
-    )
-
     const { result } = renderHook(() => useUser(), { wrapper })
 
     act(() => {
@@ -35,10 +35,6 @@ describe('UserContext', () => {
   })
 
   it('should allow updating profile', () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <UserProvider>{children}</UserProvider>
-    )
-
     const { result } = renderHook(() => useUser(), { wrapper })
 
     act(() => {

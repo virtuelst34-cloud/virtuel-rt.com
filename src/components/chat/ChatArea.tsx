@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useRef, useCallback, ChangeEvent, KeyboardEvent } from 'react';
-import { useUser, useSalons, useXP, useModeration, useMessages, useNotifications } from '@/lib/contexts';
-import { SALONS, SCENE_MEMBERS } from '@/lib/chatConfig';
-import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown } from 'lucide-react';
-import MessageBubble from './MessageBubble';
+import { useUser, useSalons, useXP, useModeration, useMessages, useNotifications, useMuteBlock } from '@/lib/contexts';
+import { SALONS } from '@/lib/chatConfig';
+import { Message } from '@/lib/searchUtils';
 import Avatar from './Avatar';
 import ChatInput from './ChatInput';
 import ReactionPicker from './ReactionPicker';
 import LevelUpToast from './LevelUpToast';
 import ScenePanel from './ScenePanel';
 import UserProfileView from './UserProfileView';
+import { FilterPanel } from './FilterPanel';
+import { ExportPanel } from './ExportPanel';
+import { ReportPanel } from './ReportPanel';
+import TypingIndicator from './TypingIndicator';
+import MembersPanel from './MembersPanel';
+import MessageBubble from './MessageBubble';
+import OfflineBanner from './OfflineBanner';
+import { presenceService } from '@/lib/presenceService';
+import { recordMessageSent, recordReaction } from '@/lib/userActivity';
+import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown, Filter as FilterIcon, Download } from 'lucide-react';
 
 interface JoinToastProps {
   name: string;
@@ -22,24 +31,6 @@ function JoinToast({ name, onDone }: JoinToastProps) {
       <div className="bg-primary/20 border border-primary/40 text-primary text-xs px-4 py-2 rounded-full backdrop-blur-sm flex items-center gap-2 shadow-lg">
         🎉 <span className="font-medium">{name}</span> a rejoint le salon
       </div>
-    </div>
-  );
-}
-
-interface TypingIndicatorProps {
-  names: string[];
-}
-
-function TypingIndicator({ names }: TypingIndicatorProps) {
-  if (!names.length) return null;
-  return (
-    <div className="flex items-center gap-2 px-4 py-1 text-[11px] text-muted-foreground/50 italic">
-      <span className="flex gap-0.5">
-        {[0,1,2].map(i => (
-          <span key={i} className="w-1 h-1 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-        ))}
-      </span>
-      {names.join(', ')} {names.length === 1 ? "est en train d'écrire..." : "sont en train d'écrire..."}
     </div>
   );
 }
@@ -68,7 +59,8 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const { currentSalon, setCurrentSalon, customSalons, hiddenSalons } = useSalons();
   const { awardXP, sounds } = useXP();
   const { isUserBanned, isUserMuted, isBlocked } = useModeration();
-  const { addMessage, getMessages, deleteMessage, pinMessage, updateReaction } = useMessages();
+  const { isMuted: isLocallyMuted, isBlocked: isLocallyBlocked } = useMuteBlock();
+  const { getMessages, addMessage, deleteMessage, pinMessage, updateReaction, setCurrentSalonId, loadMoreMessages } = useMessages();
   const { addNotification } = useNotifications();
 
   const scrollRef                           = useRef<HTMLDivElement>(null);
@@ -89,10 +81,20 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const [replyTo, setReplyTo]               = useState<any>(null);
   const [isAtBottom, setIsAtBottom]         = useState(true);
   const [unreadNew, setUnreadNew]           = useState(0);
+  const [showFilter, setShowFilter]         = useState(false);
+  const [filteredMessages, setFilteredMessages] = useState<Message[] | null>(null);
+  const [showExport, setShowExport]         = useState(false);
+  const [showReport, setShowReport]         = useState(false);
+  const [salonWelcome, setSalonWelcome] = useState<string | null>(null);
+  const [reportTarget, setReportTarget]     = useState<{ id: string; type: 'message' | 'user'; name?: string; content?: string } | null>(null);
+  const [, setPresenceTick]                 = useState(0);
 
   const allSalons    = [...SALONS, ...(customSalons || [])].filter(s => !(hiddenSalons || []).includes(s.id));
   const salon        = allSalons.find(s => s.id === currentSalon);
-  const sceneMembers = SCENE_MEMBERS[currentSalon || ''] || [];
+  const onlineUsers  = currentSalon
+    ? presenceService.getOnlineUsersInSalon(currentSalon).filter(u => !isLocallyMuted(u.name) && !isLocallyBlocked(u.name))
+    : [];
+  const sceneMembers = onlineUsers.map(u => ({ name: u.name, avatar: u.avatar || 'av1', initials: u.initials || u.name.slice(0,2).toUpperCase(), speaking: false }));
   const hasScene     = salon?.type === 'vocal' || salon?.type === 'chat vocal' || salon?.type === 'video';
   const messages     = currentSalon ? getMessages(currentSalon) : [];
   const pinnedMsg    = messages.find(m => m.pinned);
@@ -100,9 +102,31 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   // Demander permission push au montage
   useEffect(() => { requestPushPermission(); }, []);
 
+  useEffect(() => {
+    return presenceService.subscribe(() => {
+      setPresenceTick(tick => tick + 1);
+    });
+  }, []);
+
   // Navigation hash
   useEffect(() => {
     window.location.hash = currentSalon ? `salon/${currentSalon}` : '';
+  }, [currentSalon]);
+
+  // Synchroniser le salon actif avec MessagesContext pour charger/souscrire les messages
+  useEffect(() => {
+    setCurrentSalonId(currentSalon);
+  }, [currentSalon, setCurrentSalonId]);
+
+  useEffect(() => {
+    let active=true;
+    if(!currentSalon){ setSalonWelcome(null); return; }
+    import('../../lib/salonSettings').then(({getSalonSettings})=>{
+      getSalonSettings(currentSalon).then((data:any)=>{
+        if(active) setSalonWelcome(data?.welcome_enabled ? data?.welcome_message : null);
+      });
+    });
+    return ()=>{active=false};
   }, [currentSalon]);
 
   useEffect(() => {
@@ -120,23 +144,6 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     setSearchQuery(''); setSearchOpen(false); setShowMembers(false);
     setReplyTo(null); setUnreadNew(0); setIsAtBottom(true);
     prevMsgCountRef.current = messages.length;
-    if (salon.welcome) {
-      const welcomeId = 'welcome-' + salon.id;
-      const already = currentSalon ? getMessages(currentSalon).some(m => m.id === welcomeId) : false;
-      if (!already && currentSalon) {
-        addMessage(currentSalon, {
-          id: welcomeId,
-          is_system: true, is_announcement: true,
-          text: salon.welcome,
-          created_date: new Date().toISOString(),
-          author_name: 'System',
-          author_avatar: 'av1',
-          author_initials: 'SY',
-          salon: currentSalon,
-          reactions: {},
-        } as any);
-      }
-    }
     if (user) {
       setJoinToast(user.name);
       sounds?.join();
@@ -196,14 +203,19 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchOpen]);
 
-  // Détecter si l'utilisateur est en bas du scroll
+  // Détecter si l'utilisateur est en bas du scroll et charger plus de messages en haut
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
     setIsAtBottom(atBottom);
     if (atBottom) setUnreadNew(0);
-  }, []);
+    
+    // Charger plus de messages quand on est près du haut
+    if (el.scrollTop < 100 && currentSalon) {
+      loadMoreMessages(currentSalon);
+    }
+  }, [currentSalon, loadMoreMessages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -211,7 +223,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     setIsAtBottom(true);
   };
 
-  const handleSend = useCallback((text: string, imageUrl: string | null, reply: any = null) => {
+  const handleSend = useCallback(async (text: string, imageUrl: string | null, reply: any = null) => {
     if (!user || !currentSalon) return;
     if (isUserBanned(user.name) || isUserMuted(user.name)) return;
     const newMsg = {
@@ -229,9 +241,12 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     addMessage(currentSalon, newMsg);
     sounds?.message();
     setReplyTo(null);
-    const newLevel = awardXP();
+    recordMessageSent(user.name, (achievement) => {
+      addNotification({ type: 'achievement', message: `${achievement.icon} Succès débloqué : ${achievement.name}` });
+    });
+    const newLevel = await awardXP();
     if (newLevel) setLevelUp(newLevel);
-  }, [user, currentSalon, isUserBanned, isUserMuted, addMessage, sounds, awardXP]);
+  }, [user, currentSalon, isUserBanned, isUserMuted, addMessage, sounds, awardXP, addNotification]);
 
   const handleReact = useCallback((msgId: string, event: { clientX: number; clientY: number } | null, emoji?: string) => {
     if (emoji) {
@@ -241,7 +256,12 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
       const reactions = { ...(msg.reactions || {}) };
       const users = [...(reactions[emoji] || [])];
       const idx = users.indexOf(user.name);
-      if (idx >= 0) users.splice(idx, 1); else users.push(user.name);
+      if (idx >= 0) users.splice(idx, 1); else {
+        users.push(user.name);
+        recordReaction(user.name, (achievement) => {
+          addNotification({ type: 'achievement', message: `${achievement.icon} Succès débloqué : ${achievement.name}` });
+        });
+      }
       if (users.length === 0) delete reactions[emoji]; else reactions[emoji] = users;
       if (currentSalon) updateReaction(currentSalon, msgId, reactions);
     } else if (event) {
@@ -253,6 +273,10 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const handlePin         = useCallback((msgId: string) => { if (currentSalon) pinMessage(currentSalon, msgId); }, [currentSalon, pinMessage]);
   const handleViewProfile = useCallback((name: string) => { if (name !== user?.name) setViewProfile(name); }, [user]);
   const handleReply       = useCallback((msg: any) => setReplyTo(msg), []);
+  const handleReport      = useCallback((targetId: string, targetType: 'message' | 'user', targetName?: string, targetContent?: string) => {
+    setReportTarget({ id: targetId, type: targetType, name: targetName, content: targetContent });
+    setShowReport(true);
+  }, []);
 
   const handleTyping = () => {
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
@@ -264,9 +288,10 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const banned = user && isUserBanned(user.name);
   const muted  = user && isUserMuted(user.name);
 
-  const visibleMessages = messages.filter(msg => {
+  const visibleMessages = (filteredMessages || messages).filter(msg => {
     if (msg.is_system) return true;
     if (isBlocked(msg.author_name)) return false;
+    if (isLocallyMuted(msg.author_name) || isLocallyBlocked(msg.author_name)) return false;
     if (searchQuery.trim()) {
       return msg.text?.toLowerCase().includes(searchQuery.toLowerCase()) ||
              msg.author_name?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -276,7 +301,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
 
   // Membres réels du salon : membres sur scène + profils connectés (hors utilisateur courant)
   const realProfiles = Object.values(profiles || {})
-    .filter(p => p.status !== 'offline' && p.name !== user?.name)
+    .filter(p => p.status !== 'offline' && p.name !== user?.name && !isLocallyMuted(p.name) && !isLocallyBlocked(p.name))
     .map(p => ({ name: p.name, avatar: p.avatar, initials: p.initials }));
 
   const allMembers = [
@@ -288,6 +313,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     <div className="flex-1 flex flex-col min-h-0 relative" onClick={() => setReactionPicker(null)}>
 
       {joinToast && <JoinToast name={joinToast} onDone={() => setJoinToast(null)} />}
+      <OfflineBanner />
 
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-border flex items-center gap-2.5 shrink-0 bg-card">
@@ -308,11 +334,23 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
           </div>
         </div>
         <button onClick={() => setSearchOpen(o => !o)}
-          className={`p-1.5 rounded-lg border transition-colors ${searchOpen ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}>
+          className={`p-1.5 rounded-lg border transition-colors ${searchOpen ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+          title="Rechercher" aria-label="Rechercher dans le salon">
           <Search className="w-4 h-4" />
         </button>
+        <button onClick={() => setShowFilter(true)}
+          className={`p-1.5 rounded-lg border transition-colors ${filteredMessages ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+          title="Filtres" aria-label="Filtrer les messages">
+          <FilterIcon className="w-4 h-4" />
+        </button>
+        <button onClick={() => setShowExport(true)}
+          className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 transition-colors"
+          title="Exporter" aria-label="Exporter les messages">
+          <Download className="w-4 h-4" />
+        </button>
         <button onClick={() => setShowMembers(o => !o)}
-          className={`p-1.5 rounded-lg border transition-colors ${showMembers ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}>
+          className={`p-1.5 rounded-lg border transition-colors ${showMembers ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+          title="Membres" aria-label="Voir les membres du salon">
           <Users className="w-4 h-4" />
         </button>
       </div>
@@ -396,7 +434,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
             </button>
           )}
 
-          <TypingIndicator names={typing} />
+          <TypingIndicator />
 
           <ChatInput
             onSend={handleSend}
@@ -409,33 +447,43 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
         </div>
 
         {/* Panneau membres */}
-        {showMembers && (
-          <div className="w-[180px] border-l border-border bg-card flex flex-col shrink-0">
-            <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-foreground">Membres ({allMembers.length})</span>
-              <button onClick={() => setShowMembers(false)} className="text-muted-foreground/40 hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto py-1">
-              {allMembers.map((m, i) => (
-                <button key={m.name + i} onClick={() => handleViewProfile(m.name)}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 transition-colors text-left">
-                  <Avatar avatarClass={m.avatar || 'av1'} initials={m.initials} size="xs" />
-                  <span className="text-[11px] text-muted-foreground/80 truncate flex-1">{m.name}</span>
-                  {(m as any).speaking && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {showMembers && <MembersPanel onClose={() => setShowMembers(false)} onOpenDM={onOpenDM} />}
       </div>
 
       <ReactionPicker
         position={reactionPicker}
+        salonId={currentSalon || undefined}
         onSelect={(emoji) => { if (reactionPicker) { handleReact(reactionPicker.msgId, null, emoji); setReactionPicker(null); } }}
         onClose={() => setReactionPicker(null)}
       />
 
       {levelUp && <LevelUpToast level={levelUp} onDone={() => setLevelUp(null)} />}
+
+      {showFilter && (
+        <FilterPanel
+          messages={messages.map(m => ({ ...m, salon: currentSalon || '' })) as Message[]}
+          onFilteredMessages={setFilteredMessages}
+          onClose={() => setShowFilter(false)}
+        />
+      )}
+
+      {showExport && (
+        <ExportPanel
+          messages={messages.map(m => ({ ...m, salon: currentSalon || '' })) as Message[]}
+          salonName={salon.name}
+          onClose={() => setShowExport(false)}
+        />
+      )}
+
+      {showReport && reportTarget && (
+        <ReportPanel
+          onClose={() => setShowReport(false)}
+          targetId={reportTarget.id}
+          targetType={reportTarget.type}
+          targetName={reportTarget.name}
+          targetContent={reportTarget.content}
+        />
+      )}
 
       {viewProfile && (
         <UserProfileView

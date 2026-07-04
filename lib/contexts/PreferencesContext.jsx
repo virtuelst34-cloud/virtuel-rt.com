@@ -3,10 +3,10 @@ import { useNotifications } from './NotificationsContext';
 
 const PreferencesContext = createContext(null);
 
-const THEME_KEY   = 'virtuel_st_theme';
-const PARTY_KEY   = 'virtuel_st_party';
-const PREMIUM_KEY = 'virtuel_st_premium';
-const ACCENT_KEY  = 'virtuel_st_accent';
+const THEME_KEY   = 'virtuel_rt_theme';
+const PARTY_KEY   = 'virtuel_rt_party';
+const PREMIUM_KEY = 'virtuel_rt_premium';
+const ACCENT_KEY  = 'virtuel_rt_accent';
 
 const ACCENT_COLORS = [
   { id: 'purple', label: 'Violet',  value: '263 70% 50%' },

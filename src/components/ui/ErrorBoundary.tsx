@@ -1,14 +1,17 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { captureError } from '@/lib/sentry';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  errorId: string | null;
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -18,6 +21,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       hasError: false,
       error: null,
       errorInfo: null,
+      errorId: null,
     };
   }
 
@@ -25,6 +29,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return {
       hasError: true,
       error,
+      errorId: crypto.randomUUID(),
     };
   }
 
@@ -38,6 +43,20 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if ((import.meta as any).env?.DEV) {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
+
+    // Capture error in Sentry (production only)
+    if (import.meta.env.PROD) {
+      captureError(error, {
+        componentStack: errorInfo.componentStack,
+        errorBoundary: true,
+        errorId: this.state.errorId,
+      });
+    }
+
+    // Call custom error handler if provided
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo);
+    }
   }
 
   handleReset = (): void => {
@@ -45,7 +64,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       hasError: false,
       error: null,
       errorInfo: null,
+      errorId: null,
     });
+  };
+
+  handleReload = (): void => {
+    window.location.reload();
   };
 
   render(): ReactNode {
@@ -88,15 +112,34 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   <pre className="text-xs text-red-400 overflow-auto max-h-32">
                     {this.state.error.toString()}
                   </pre>
+                  {this.state.errorInfo && (
+                    <pre className="text-xs text-muted-foreground mt-2 overflow-auto max-h-32">
+                      {this.state.errorInfo.componentStack}
+                    </pre>
+                  )}
                 </div>
               )}
 
-              <button
-                onClick={this.handleReset}
-                className="w-full bg-primary text-primary-foreground rounded-lg px-4 py-2.5 font-medium hover:bg-primary/90 transition-colors"
-              >
-                Réessayer
-              </button>
+              { import.meta.env.PROD && this.state.errorId && (
+                <p className="text-xs text-muted-foreground mb-4">
+                  ID de l'erreur: {this.state.errorId}
+                </p>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={this.handleReset}
+                  className="flex-1 bg-primary text-primary-foreground rounded-lg px-4 py-2.5 font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Réessayer
+                </button>
+                <button
+                  onClick={this.handleReload}
+                  className="flex-1 bg-secondary text-secondary-foreground rounded-lg px-4 py-2.5 font-medium hover:bg-secondary/90 transition-colors"
+                >
+                  Recharger
+                </button>
+              </div>
             </div>
           </div>
         </div>

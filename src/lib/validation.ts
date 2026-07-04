@@ -1,13 +1,32 @@
+/**
+ * Service de Validation des Données
+ * 
+ * Ce module fournit des schémas de validation pour toutes les entrées utilisateur
+ * en utilisant la bibliothèque Zod. Il garantit que les données sont valides
+ * avant d'être envoyées à la base de données ou traitées par l'application.
+ * 
+ * Les validations incluent:
+ * - Longueur des champs
+ * - Format des données (URL, regex)
+ * - Protection contre les injections XSS
+ * - Validation des types
+ */
+
 import { z } from 'zod';
 
-// Schéma de validation pour les messages
+/**
+ * Schéma de validation pour les messages
+ * Valide le texte du message, les images et les réponses
+ */
 export const messageSchema = z.object({
   text: z.string()
     .min(1, 'Le message ne peut pas être vide')
     .max(1000, 'Le message ne peut pas dépasser 1000 caractères')
     .trim()
-    .refine(val => val.trim().length > 0, 'Le message ne peut pas être vide'),
-  image: z.string().nullable().optional(),
+    .refine(val => val.trim().length > 0, 'Le message ne peut pas être vide')
+    .refine(val => !/<script[^>]*>.*?<\/script>/gi.test(val), 'Le message contient du contenu non autorisé')
+    .refine(val => !/javascript:/gi.test(val), 'Le message contient du contenu non autorisé'),
+  image: z.string().url('L\'URL de l\'image doit être valide').nullable().optional(),
   replyTo: z.object({
     id: z.string().optional(),
     author_name: z.string(),
@@ -15,15 +34,20 @@ export const messageSchema = z.object({
   }).nullable().optional(),
 });
 
-// Schéma de validation pour les salons
+/**
+ * Schéma de validation pour les salons
+ * Valide l'ID, le nom, l'emoji, le type et le mot de passe des salons
+ */
 export const salonSchema = z.object({
   id: z.string()
     .min(1, 'L\'ID du salon ne peut pas être vide')
     .max(50, 'L\'ID du salon ne peut pas dépasser 50 caractères')
-    .regex(/^[a-z0-9_-]+$/, 'L\'ID ne peut contenir que des lettres minuscules, chiffres, tirets et underscores'),
+    .regex(/^[a-z0-9_-]+$/, 'L\'ID ne peut contenir que des lettres minuscules, chiffres, tirets et underscores')
+    .refine(val => !/<script[^>]*>.*?<\/script>/gi.test(val), 'L\'ID contient du contenu non autorisé'),
   name: z.string()
     .min(1, 'Le nom du salon ne peut pas être vide')
-    .max(100, 'Le nom du salon ne peut pas dépasser 100 caractères'),
+    .max(100, 'Le nom du salon ne peut pas dépasser 100 caractères')
+    .refine(val => !/<script[^>]*>.*?<\/script>/gi.test(val), 'Le nom contient du contenu non autorisé'),
   emoji: z.string()
     .max(2, 'L\'emoji ne peut pas dépasser 2 caractères')
     .optional(),
@@ -35,7 +59,10 @@ export const salonSchema = z.object({
     .optional(),
 });
 
-// Schéma de validation pour les profils utilisateur
+/**
+ * Schéma de validation pour les profils utilisateur
+ * Valide le nom, l'avatar, les initiales et le statut
+ */
 export const userProfileSchema = z.object({
   name: z.string()
     .min(2, 'Le nom doit contenir au moins 2 caractères')
@@ -50,7 +77,10 @@ export const userProfileSchema = z.object({
   status: z.enum(['online', 'away', 'busy', 'offline']).optional(),
 });
 
-// Schéma de validation pour les badges
+/**
+ * Schéma de validation pour les badges
+ * Valide l'ID, le label, la couleur et le niveau minimum des badges
+ */
 export const badgeSchema = z.object({
   id: z.string()
     .min(1, 'L\'ID du badge ne peut pas être vide')

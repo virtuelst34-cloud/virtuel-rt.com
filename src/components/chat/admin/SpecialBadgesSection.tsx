@@ -5,13 +5,15 @@ import { SPECIAL_BADGES } from '@/lib/diamondBadges';
 import Avatar from '../Avatar';
 import { SectionTitle } from './AdminComponents';
 
-export default function SpecialBadgesSection() {
+interface Props { readOnly?: boolean; }
+
+export default function SpecialBadgesSection({ readOnly = false }: Props) {
   const { profiles, setProfiles } = useUser();
   const [search, setSearch] = useState('');
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const all = Object.values(profiles).filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
 
   const toggleSpecialBadge = (userName: string, badgeId: string) => {
+    if (readOnly) return;
     setProfiles(prev => {
       const user = prev[userName];
       if (!user) return prev;
@@ -28,7 +30,6 @@ export default function SpecialBadgesSection() {
       <SectionTitle icon={Award}>Badges spéciaux</SectionTitle>
       <p className="text-[11px] text-muted-foreground/50 mb-4">Assignez des badges spéciaux (fondateur, modérateur, VIP) aux utilisateurs.</p>
 
-      {/* Liste des badges spéciaux disponibles */}
       <div className="flex flex-wrap gap-2 mb-5 p-3 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl">
         {SPECIAL_BADGES.map(badge => (
           <span key={badge.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-semibold"
@@ -39,7 +40,6 @@ export default function SpecialBadgesSection() {
         ))}
       </div>
 
-      {/* Recherche utilisateur */}
       <div className="relative mb-4">
         <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-muted-foreground/40" />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un utilisateur..."
@@ -61,11 +61,10 @@ export default function SpecialBadgesSection() {
                     return badge ? <span key={badgeId} className="text-sm" title={badge.label}>{badge.icon}</span> : null;
                   })}
                 </div>
-                <div className="text-[10px] text-muted-foreground/50">Nv.{profile.level||1} · {(profile.xp||0).toLocaleString()} XP</div>
+                <div className="text-[10px] text-muted-foreground/50">Nv.{profile.level || 1} · {(profile.xp || 0).toLocaleString()} XP</div>
               </div>
             </div>
 
-            {/* Boutons d'assignation */}
             <div className="flex gap-1.5 flex-wrap">
               {SPECIAL_BADGES.map(badge => {
                 const hasBadge = ((profile as any).specialBadges || []).includes(badge.id);
@@ -73,7 +72,8 @@ export default function SpecialBadgesSection() {
                   <button
                     key={badge.id}
                     onClick={() => toggleSpecialBadge(profile.name, badge.id)}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-medium transition-all ${
+                    disabled={readOnly}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
                       hasBadge
                         ? 'bg-primary/20 border border-primary/40 text-primary'
                         : 'bg-white/5 border border-white/10 text-muted-foreground/60 hover:bg-white/10'

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 
 interface UserProfile {
   isAdmin?: boolean;
+  isFounder?: boolean;
 }
 
 interface UIContextType {
@@ -18,9 +19,9 @@ export function UIProvider({ children }: { children: ReactNode }) {
   const [showAdmin, setShowAdmin] = useState<boolean>(false);
   const [showProfile, setShowProfile] = useState<boolean>(false);
 
-  // Ouverture sécurisée : nécessite que l'utilisateur soit admin
+  // Ouverture sécurisée : nécessite que l'utilisateur soit admin ou fondateur
   const openAdmin = useCallback((user: UserProfile | null) => {
-    if (user?.isAdmin) setShowAdmin(true);
+    if (user?.isAdmin || user?.isFounder) setShowAdmin(true);
   }, []);
 
   const value: UIContextType = {

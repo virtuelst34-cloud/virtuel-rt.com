@@ -5,13 +5,16 @@ import { getMergedBadges } from '@/lib/diamondBadges';
 import DiamondBadge from '../DiamondBadge';
 import { SectionTitle } from './AdminComponents';
 
-export default function BadgesSection() {
+interface Props { readOnly?: boolean; }
+
+export default function BadgesSection({ readOnly = false }: Props) {
   const { customBadges, setCustomBadges } = useBadges();
   const badges = getMergedBadges(customBadges || []);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, any>>({});
 
   const handleEdit = (badge: any) => {
+    if (readOnly) return;
     setEditing(badge.id);
     setDraft({ label: badge.label, color: badge.color, minLevel: badge.minLevel });
   };
@@ -53,7 +56,6 @@ export default function BadgesSection() {
           return (
             <div key={badge.id} className="bg-secondary border border-border rounded-xl px-3 py-2.5">
               <div className="flex items-center gap-3">
-                {/* Aperçu diamant */}
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                   style={{ background: badge.color + '18', border: `1px solid ${badge.color}40` }}>
                   <DiamondBadge level={badge.minLevel} size="xs" />
@@ -106,8 +108,11 @@ export default function BadgesSection() {
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => handleEdit(badge)}
-                      className="px-2 py-1 rounded-lg bg-primary/15 border border-primary/30 text-primary text-[10px] hover:bg-primary/25 transition-colors">
+                    <button
+                      onClick={() => handleEdit(badge)}
+                      disabled={readOnly}
+                      className="px-2 py-1 rounded-lg bg-primary/15 border border-primary/30 text-primary text-[10px] hover:bg-primary/25 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
                       Modifier
                     </button>
                   )}

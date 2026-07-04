@@ -9,6 +9,7 @@ export default function StatsSection() {
   const { salonMessages } = useMessages();
   const { monthlyXP } = useXP();
   const { customSalons } = useSalons();
+
   const all = Object.values(profiles);
   const totalSalons = SALONS.length + (customSalons?.length || 0);
   const allSalons = [...SALONS, ...(customSalons || [])];
@@ -35,16 +36,16 @@ export default function StatsSection() {
   return (
     <div>
       <SectionTitle icon={BarChart2}>Statistiques détaillées</SectionTitle>
-      
+
       {/* Statistiques générales */}
-      <div className="grid grid-cols-4 gap-2 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
         <StatCard value={all.length}        label="Profils"         color="blue" />
         <StatCard value={onlineUsers}      label="En ligne"        color="green" />
         <StatCard value={activeUsers}      label="Actifs"          color="emerald" />
         <StatCard value={premiumCount}     label="Premium"         color="yellow" />
       </div>
-      
-      <div className="grid grid-cols-4 gap-2 mb-6">
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
         <StatCard value={totalMessages.toLocaleString()}  label="Messages"        color="purple" />
         <StatCard value={totalXP.toLocaleString()}        label="XP total"        color="amber" />
         <StatCard value={avgLevel}                       label="Niveau moyen"    color="indigo" />
@@ -56,8 +57,8 @@ export default function StatsSection() {
       <div className="space-y-1.5 mb-6">
         {salonStats.map(s => (
           <div key={s.name} className="flex items-center justify-between bg-secondary border border-border rounded-xl px-3 py-2">
-            <span className="text-xs text-foreground">{s.name}</span>
-            <span className="text-[10px] text-purple-400 font-bold">{s.count} msgs</span>
+            <span className="text-xs text-foreground truncate flex-1 mr-2">{s.name}</span>
+            <span className="text-[10px] text-purple-400 font-bold shrink-0">{s.count} msgs</span>
           </div>
         ))}
       </div>
@@ -68,8 +69,8 @@ export default function StatsSection() {
         {monthlyRanked.length === 0 && <p className="text-[11px] text-muted-foreground/40 italic">Aucune activité ce mois.</p>}
         {monthlyRanked.map((r, i) => (
           <div key={r.name} className="flex items-center justify-between bg-secondary border border-border rounded-xl px-3 py-2">
-            <span className="text-xs text-foreground">{r.name}</span>
-            <span className="text-[10px] text-purple-400 font-bold">{r.xp.toLocaleString()} XP</span>
+            <span className="text-xs text-foreground truncate flex-1 mr-2">{r.name}</span>
+            <span className="text-[10px] text-purple-400 font-bold shrink-0">{r.xp.toLocaleString()} XP</span>
           </div>
         ))}
       </div>

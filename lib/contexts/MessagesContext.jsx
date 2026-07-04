@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 
 const MessagesContext = createContext(null);
 
-const MESSAGES_KEY = 'virtuel_st_messages';
+const MESSAGES_KEY = 'virtuel_rt_messages';
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 jours
 const MAX_PER_SALON = 200;
 

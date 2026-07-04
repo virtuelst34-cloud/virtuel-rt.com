@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useUser, useSalons, useUI, usePreferences, useNotifications } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
-import { Home, MessageSquare, Bell, Star, ShieldAlert, Settings, Sun, Moon, LucideIcon } from 'lucide-react';
+import { SearchPanel } from './SearchPanel';
+import { StatsPanel } from './StatsPanel';
+import { Home, MessageSquare, Bell, Star, ShieldAlert, Settings, Sun, Moon, Search, TrendingUp, LucideIcon, LogOut } from 'lucide-react';
+import { getSpecialBadgeForUser } from '@/lib/diamondBadges';
 
 interface SidebarProps {
   onOpenDM: () => void;
@@ -18,21 +21,25 @@ interface IconBtnProps {
 }
 
 export default function Sidebar({ onOpenDM, onOpenNotifications, onOpenSettings }: SidebarProps) {
-  const { user } = useUser();
+  const { user, logout, supabaseUser } = useUser();
   const { setCurrentSalon } = useSalons();
   const { openAdmin } = useUI();
   const { theme, toggleTheme, isPremium, activatePremium } = usePreferences();
   const { unreadCount } = useNotifications();
+  const [showSearch, setShowSearch] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   return (
-    <div className="w-[60px] bg-card flex flex-col items-center border-r border-border shrink-0 h-full py-3 gap-1">
+    <div className="hidden sm:flex w-[60px] bg-card flex-col items-center border-r border-border shrink-0 h-full py-3 gap-1">
 
       {/* Logo */}
-      <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white text-[15px] font-bold border border-primary/60 mb-3">
-        V
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
+        <img src="/logo.png" alt="Virtuel-RT" className="w-full h-full object-cover" />
       </div>
 
       <IconBtn icon={Home} title="Accueil" onClick={() => setCurrentSalon(null)} />
+      <IconBtn icon={Search} title="Recherche" onClick={() => setShowSearch(true)} />
+      <IconBtn icon={TrendingUp} title="Statistiques" onClick={() => setShowStats(true)} />
       <IconBtn icon={MessageSquare} title="Messages privés" onClick={onOpenDM} />
       <IconBtn icon={Bell} title="Notifications" onClick={onOpenNotifications} badge={unreadCount > 0 ? unreadCount : null} />
 
@@ -48,8 +55,8 @@ export default function Sidebar({ onOpenDM, onOpenNotifications, onOpenSettings 
         <Star className="w-4 h-4" />
       </button>
 
-      {/* Admin — visible uniquement si l'utilisateur est admin */}
-      {user?.isAdmin && (
+      {/* Admin — visible uniquement si l'utilisateur est admin ou fondateur */}
+      {(user?.isAdmin || user?.isFounder) && (
         <button onClick={() => openAdmin(user)} title="Administration"
           className="w-9 h-9 rounded-xl flex items-center justify-center bg-red-500/10 border border-red-500/25 text-red-400 hover:bg-red-500/20 transition-colors">
           <ShieldAlert className="w-4 h-4" />
@@ -63,6 +70,20 @@ export default function Sidebar({ onOpenDM, onOpenNotifications, onOpenSettings 
           <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-card rounded-full" />
         </button>
       )}
+
+      {/* Déconnexion - visible uniquement si connecté à Supabase */}
+      {supabaseUser && (
+        <button onClick={logout} title="Se déconnecter"
+          className="w-9 h-9 rounded-xl flex items-center justify-center bg-red-500/10 border border-red-500/25 text-red-400 hover:bg-red-500/20 transition-colors">
+          <LogOut className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* Search Panel */}
+      {showSearch && <SearchPanel onClose={() => setShowSearch(false)} />}
+
+      {/* Stats Panel */}
+      {showStats && <StatsPanel onClose={() => setShowStats(false)} />}
     </div>
   );
 }

@@ -7,8 +7,8 @@ const XPContext = createContext(null);
 
 const XP_PER_MESSAGE = 15;
 const XP_COOLDOWN_MS = 30000;
-const MONTHLY_KEY = 'virtuel_st_monthly';
-const MONTHLY_MONTH_KEY = 'virtuel_st_monthly_month';
+const MONTHLY_KEY = 'virtuel_rt_monthly';
+const MONTHLY_MONTH_KEY = 'virtuel_rt_monthly_month';
 
 function xpForLevel(lvl) { return lvl * lvl * 500; }
 

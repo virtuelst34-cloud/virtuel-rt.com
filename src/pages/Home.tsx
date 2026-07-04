@@ -1,14 +1,16 @@
 import React, { useState, useCallback, lazy, Suspense } from 'react';
 import { ChatProvider, useChat } from '@/lib/contexts';
 import Sidebar from '@/components/chat/Sidebar';
-import WelcomeScreen from '@/components/chat/WelcomeScreen';
-import ChatArea from '@/components/chat/ChatArea';
-import MediaBar from '@/components/chat/MediaBar';
-import RightPanel from '@/components/chat/RightPanel';
 import UsernameModal from '@/components/chat/UsernameModal';
 import { LazyLoadingFallback } from '@/lib/lazyLoad';
 
-// Lazy load des panneaux modaux pour améliorer le bundle initial
+// Lazy load des composants principaux pour améliorer le bundle initial
+const WelcomeScreen = lazy(() => import('@/components/chat/WelcomeScreen'));
+const ChatArea = lazy(() => import('@/components/chat/ChatArea'));
+const MediaBar = lazy(() => import('@/components/chat/MediaBar'));
+const RightPanel = lazy(() => import('@/components/chat/RightPanel'));
+
+// Lazy load des panneaux modaux
 const AdminPanel = lazy(() => import('@/components/chat/AdminPanel'));
 const NotificationsPanel = lazy(() => import('@/components/chat/NotificationsPanel'));
 const SettingsPanel = lazy(() => import('@/components/chat/SettingsPanel'));
@@ -48,14 +50,22 @@ function ChatApp() {
         /* ── Vue salon ── */
         <>
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <ChatArea micActive={micActive} micLevel={micLevel} onOpenDM={openDM} />
-            <MediaBar onMicChange={handleMicChange} />
+            <Suspense fallback={<LazyLoadingFallback />}>
+              <ChatArea micActive={micActive} micLevel={micLevel} onOpenDM={openDM} />
+            </Suspense>
+            <Suspense fallback={<LazyLoadingFallback />}>
+              <MediaBar onMicChange={handleMicChange} />
+            </Suspense>
           </div>
-          <RightPanel />
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <RightPanel onOpenDM={openDM} />
+          </Suspense>
         </>
       ) : (
         /* ── Accueil 3 colonnes ── */
-        <WelcomeScreen onOpenDM={openDM} />
+        <Suspense fallback={<LazyLoadingFallback />}>
+          <WelcomeScreen onOpenDM={openDM} />
+        </Suspense>
       )}
 
       {showAdmin    && <Suspense fallback={<LazyLoadingFallback />}><AdminPanel /></Suspense>}

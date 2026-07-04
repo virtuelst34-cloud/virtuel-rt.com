@@ -120,7 +120,7 @@ export default function WelcomeScreen({ onOpenDM }) {
       {/* ── Centre : épuré ── */}
       <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-8 select-none">
         <div className="text-5xl mb-2">💬</div>
-        <h2 className="text-xl font-bold text-foreground">Bienvenue sur Virtuel-ST</h2>
+        <h2 className="text-xl font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
         <p className="text-sm text-muted-foreground/50 max-w-xs leading-relaxed">
           Choisissez un salon à gauche pour rejoindre une discussion,<br />
           ou envoyez un message privé à quelqu'un à droite.

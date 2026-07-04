@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback, ChangeEvent, KeyboardEvent } from 'react';
 import { Smile, Send, X, Reply, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
-import { useUser } from '@/lib/contexts';
+import { useUser, useTyping, useSalons, useNotifications } from '@/lib/contexts';
 import { validateMessage, type MessageInput } from '@/lib/validation';
+import { detectSpam } from '@/lib/antiSpam';
 
 interface Member {
   name: string;
@@ -23,7 +24,10 @@ interface ChatInputProps {
 }
 
 export default function ChatInput({ onSend, onTyping, disabled = false, replyTo = null, onCancelReply, members = [] }: ChatInputProps) {
-  const { profiles } = useUser();
+  const { profiles, user } = useUser();
+  const { currentSalon } = useSalons();
+  const { setTyping } = useTyping();
+  const { addNotification } = useNotifications();
   const [text, setText]               = useState('');
   const [showEmojis, setShowEmojis]   = useState(false);
   const [mentions, setMentions]       = useState<string[]>([]); // suggestions @
@@ -35,6 +39,7 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
   const inputRef  = useRef<HTMLTextAreaElement>(null);
   const caretRef  = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<number | null>(null);
 
   // Construire la liste des gens mentionnables
   const allNames = [...new Set([
@@ -76,6 +81,22 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
     setText(val);
     detectMention(val, pos);
     onTyping?.();
+    
+    // Trigger typing indicator
+    if (user && currentSalon && val.trim()) {
+      setTyping(currentSalon, user.name, true);
+      
+      // Clear previous timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Set timeout to stop typing indicator
+      typingTimeoutRef.current = setTimeout(() => {
+        setTyping(currentSalon, user.name, false);
+      }, 3000);
+    }
+    
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
@@ -110,6 +131,21 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
     }
 
     if ((!text.trim() && !selectedImage) || disabled) return;
+
+    // Spam detection
+    if (user) {
+      const spamCheck = detectSpam(user.name, text.trim());
+      if (spamCheck.isSpam) {
+        if (spamCheck.warningMessage) {
+          addNotification({
+            type: 'block',
+            message: spamCheck.warningMessage
+          });
+        }
+        return;
+      }
+    }
+
     onSend(text.trim(), selectedImage, replyTo || null);
     setText('');
     setSelectedImage(null);

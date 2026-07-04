@@ -7,7 +7,7 @@ interface SectionTitleProps {
 }
 
 export function SectionTitle({ icon: Icon, children }: SectionTitleProps) {
-  return <h3 className="text-[13px] font-semibold text-foreground mb-4 flex items-center gap-2"><Icon className="w-4 h-4 text-red-400" />{children}</h3>;
+  return <h3 className="text-[15px] font-semibold text-foreground mb-4 flex items-center gap-2"><Icon className="w-5 h-5 text-red-400" />{children}</h3>;
 }
 
 interface StatCardProps {
@@ -23,9 +23,9 @@ export function StatCard({ value, label, color }: StatCardProps) {
     amber: 'text-amber-400', indigo: 'text-indigo-400', pink: 'text-pink-400'
   };
   return (
-    <div className="bg-secondary border border-border rounded-xl p-3 text-center">
-      <div className={`text-[18px] font-bold ${colors[color]}`}>{value}</div>
-      <div className="text-[9px] text-muted-foreground/50 mt-1 uppercase tracking-widest">{label}</div>
+    <div className="bg-secondary border border-border rounded-xl p-4 text-center">
+      <div className={`text-[22px] font-bold ${colors[color]}`}>{value}</div>
+      <div className="text-[11px] text-muted-foreground/50 mt-1 uppercase tracking-widest">{label}</div>
     </div>
   );
 }

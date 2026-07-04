@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -115,12 +116,14 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Deploy to Hostinger via FTP
+      - name: Deploy to Hostinger via SFTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          protocol: sftp
+          port: 65002
           local-dir: ./dist/
-          server-dir: ${{ secrets.FTP_SERVER_DIR || '/public_html' }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR || '/domains/virtuel-rt.com/public_html/' }}
           exclude: ''

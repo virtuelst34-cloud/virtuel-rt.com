@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
 import { DoorOpen, Plus, Trash2, Lock } from 'lucide-react';
-import { useSalons } from '@/lib/contexts';
 import { SALONS, SALON_TYPES, SALON_EMOJIS_LIST } from '@/lib/chatConfig';
 import { SectionTitle } from './AdminComponents';
 
-interface Props { readOnly?: boolean; }
+interface Props {
+  readOnly?: boolean;
+  customSalons: any[];
+  addSalon: (salon: any) => void;
+  deleteSalon: (id: string) => void;
+  hiddenSalons: string[];
+  setHiddenSalons: React.Dispatch<React.SetStateAction<string[]>>;
+}
 
-export default function SalonsSection({ readOnly = false }: Props) {
-  const { customSalons, addSalon, deleteSalon, hiddenSalons, setHiddenSalons } = useSalons();
-  const [form, setForm] = useState({ name: '', type: 'chat vocal', emoji: '💬', welcome: '', isPrivate: false, password: '' });
+export default function SalonsSection({ readOnly = false, customSalons, addSalon, deleteSalon, hiddenSalons, setHiddenSalons }: Props) {
+  const [form, setForm] = useState({ name: '', type: 'chat', emoji: '💬', welcome: '', isPrivate: false, password: '' });
   const [error, setError] = useState('');
 
   const handleCreate = () => {
@@ -25,7 +30,7 @@ export default function SalonsSection({ readOnly = false }: Props) {
       isPrivate: form.isPrivate,
       password: form.isPrivate ? form.password.trim() : undefined
     } as any);
-    setForm({ name: '', type: 'chat vocal', emoji: '💬', welcome: '', isPrivate: false, password: '' });
+    setForm({ name: '', type: 'chat', emoji: '💬', welcome: '', isPrivate: false, password: '' });
     setError('');
   };
 
@@ -85,7 +90,7 @@ export default function SalonsSection({ readOnly = false }: Props) {
 
       {/* Liste des salons personnalisés */}
       <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-2.5">Salons personnalisés</div>
-      {customSalons?.length === 0 && <p className="text-[11px] text-muted-foreground/40 italic mb-4">Aucun salon personnalisé.</p>}
+      {(!customSalons || customSalons.length === 0) && <p className="text-[11px] text-muted-foreground/40 italic mb-4">Aucun salon personnalisé.</p>}
       <div className="space-y-1.5 mb-5">
         {customSalons?.map(s => (
           <div key={s.id} className="flex items-center gap-2.5 bg-secondary border border-border rounded-xl px-3 py-2">

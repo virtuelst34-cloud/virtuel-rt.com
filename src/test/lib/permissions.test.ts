@@ -169,6 +169,11 @@ describe('permissionsService', () => {
   });
 
   describe('getUserIdentifier', () => {
+    it('should return founder when special_badges contains founder', () => {
+      const result = permissionsService.getUserIdentifier({ special_badges: ['founder'] });
+      expect(result).toEqual({ identifier: 'founder', type: 'badge' });
+    });
+
     it('should return founder when is_founder is true', () => {
       const result = permissionsService.getUserIdentifier({ is_founder: true });
       expect(result).toEqual({ identifier: 'founder', type: 'badge' });

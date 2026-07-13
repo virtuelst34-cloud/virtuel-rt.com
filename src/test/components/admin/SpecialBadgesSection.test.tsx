@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import SpecialBadgesSection from '@/components/chat/admin/SpecialBadgesSection'
 import { TestProviders } from '@/test/utils/testProviders'
 
@@ -40,8 +40,11 @@ describe('SpecialBadgesSection component', () => {
     expect(searchInput).toHaveValue('test')
   })
 
-  it('should show message when no profiles found', () => {
+  it('should show message when no profiles found', async () => {
     render(<SpecialBadgesSection />, { wrapper })
+    await waitFor(() => {
+      expect(screen.queryByText(/Chargement des profils/i)).not.toBeInTheDocument()
+    })
     const searchInput = screen.getByPlaceholderText(/Rechercher un utilisateur/i)
     fireEvent.change(searchInput, { target: { value: 'nonexistentuser12345' } })
     expect(screen.getByText(/Aucun profil trouvé/i)).toBeInTheDocument()

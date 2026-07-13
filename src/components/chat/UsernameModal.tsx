@@ -4,28 +4,34 @@ import { supabaseAuthService } from '@/lib/supabaseAuth';
 import Avatar from './Avatar';
 import { Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
-const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9', 'av10', 'av11', 'av12'];
+const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9', 'av10', 'av11', 'av12', 'av13', 'av14', 'av15', 'av16', 'av17', 'av18', 'av19', 'av20', 'av21', 'av22', 'av23', 'av24', 'av25', 'av26', 'av27', 'av28', 'av29', 'av30'];
 
 export default function UsernameModal() {
   const { login, loginWithSupabase } = useUser();
   const [mode, setMode] = useState<'guest' | 'login' | 'register'>('guest');
   
-  // Guest mode state
   const [name, setName] = useState('');
   const [selectedAv, setSelectedAv] = useState('av1');
   const initials = name.trim() ? name.trim().slice(0, 2).toUpperCase() : '??';
   
-  // Email mode state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleGuestSubmit = (e: FormEvent) => {
+  const handleGuestSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    login(name.trim(), selectedAv, name.trim().slice(0, 2).toUpperCase());
+    if (!name.trim() || name.trim().length < 3) return;
+
+    setLoading(true);
+    setError('');
+
+    const result = await login(name.trim(), selectedAv, name.trim().slice(0, 2).toUpperCase());
+    if (!result.success) {
+      setError(result.error || 'Impossible de se connecter en invité');
+    }
+    setLoading(false);
   };
 
   const handleLogin = async (e: FormEvent) => {
@@ -59,7 +65,6 @@ export default function UsernameModal() {
     try {
       const result = await supabaseAuthService.signUp(email, password, name, selectedAv);
       if (result.success) {
-        // Show success message and switch to login mode
         setError('Compte créé ! Vérifiez votre email pour confirmer.');
         setMode('login');
       } else {
@@ -83,7 +88,6 @@ export default function UsernameModal() {
           <p className="text-sm text-muted-foreground mt-1">Choisissez comment vous connecter</p>
         </div>
 
-        {/* Mode tabs */}
         <div className="flex gap-2 bg-secondary/50 rounded-xl p-1">
           <button
             type="button"
@@ -121,7 +125,6 @@ export default function UsernameModal() {
           </div>
         )}
 
-        {/* Guest mode */}
         {mode === 'guest' && (
           <form onSubmit={handleGuestSubmit} className="flex flex-col gap-4">
             <div className="flex gap-3 flex-wrap justify-center">
@@ -141,14 +144,20 @@ export default function UsernameModal() {
                 <span>{name.length}/20</span>
               </div>
             </div>
-            <button type="submit" disabled={!name.trim() || name.trim().length < 3}
+            <button type="submit" disabled={!name.trim() || name.trim().length < 3 || loading}
               className="w-full bg-gradient-to-r from-primary to-purple-600 rounded-xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:shadow-lg hover:shadow-primary/25 hover:scale-[1.02] active:scale-[0.98]">
-              Entrer en mode invité
+              {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Connexion...
+                </div>
+              ) : (
+                'Entrer en mode invité'
+              )}
             </button>
           </form>
         )}
 
-        {/* Login mode */}
         {mode === 'login' && (
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             <div className="space-y-1">
@@ -197,7 +206,6 @@ export default function UsernameModal() {
           </form>
         )}
 
-        {/* Register mode */}
         {mode === 'register' && (
           <form onSubmit={handleRegister} className="flex flex-col gap-4">
             <div className="space-y-1">

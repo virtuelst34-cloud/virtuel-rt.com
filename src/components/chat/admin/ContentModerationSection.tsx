@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { ShieldAlert, Save, RefreshCw, AlertTriangle, Bot, FileText, Trash2, Plus, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { SectionTitle } from './AdminComponents';
-import { isFounder } from '@/lib/utils/founderCheck';
-import { useUser } from '@/lib/contexts';
+import { hasAdminAccess } from '@/lib/utils/founderCheck';
 
 interface ContentModerationSettings {
+  id?: string;
   enable_auto_moderation: boolean;
   auto_moderation_threshold: number;
   enable_spam_detection: boolean;
@@ -41,10 +41,12 @@ const DEFAULT_SETTINGS: ContentModerationSettings = {
   approval_post_count: 3,
 };
 
-interface Props { readOnly?: boolean; }
+interface Props {
+  readOnly?: boolean;
+  user: any;
+}
 
-export default function ContentModerationSection({ readOnly = false }: Props) {
-  const { user } = useUser();
+export default function ContentModerationSection({ readOnly = false, user }: Props) {
   const [settings, setSettings] = useState<ContentModerationSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,7 +54,7 @@ export default function ContentModerationSection({ readOnly = false }: Props) {
   const [newWord, setNewWord] = useState('');
   const [newDomain, setNewDomain] = useState('');
 
-  const canModify = !readOnly && isFounder(user);
+  const canModify = hasAdminAccess(user, readOnly);
 
   useEffect(() => {
     loadSettings();
@@ -85,11 +87,14 @@ export default function ContentModerationSection({ readOnly = false }: Props) {
   const saveSettings = async () => {
     try {
       setSaving(true);
-      const { error } = await supabase
-        .from('content_moderation_settings')
-        .upsert(settings);
+      const { id, ...payload } = settings;
+      const { error } = id
+        ? await supabase.from('content_moderation_settings').update(payload).eq('id', id)
+        : await supabase.from('content_moderation_settings').insert(payload);
 
       if (error) throw error;
+
+      if (!id) await loadSettings();
 
       setHasChanges(false);
       alert('Paramètres de modération sauvegardés avec succès !');

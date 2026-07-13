@@ -4,6 +4,7 @@ import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import { Send, X, MessageSquare, Search } from 'lucide-react';
 import { format } from 'date-fns';
+import { dmTypingService } from '@/lib/dmTypingService';
 
 interface DirectMessagePanelProps {
   onClose: () => void;
@@ -24,18 +25,19 @@ function TypingDots() {
 }
 
 export default function DirectMessagePanel({ onClose, initialUser }: DirectMessagePanelProps) {
-  const { user, profiles } = useUser();
+  const { user, supabaseUser, profiles } = useUser();
   const { addNotification } = useNotifications();
   const { isMuted, isBlocked } = useMuteBlock();
   const { sounds } = useXP();
-  const { sendDM, getConversation, markRead, getUnreadCount } = useDM();
+  const { sendDM, getConversation, markRead, getUnreadCount, loadConversation } = useDM();
 
   const [selectedUser, setSelectedUser] = useState<string | null>(typeof initialUser === 'string' ? initialUser : (initialUser?.name || null));
   const [text, setText]                 = useState('');
   const [search, setSearch]             = useState('');
   const [remoteTyping, setRemoteTyping] = useState(false);
   const messagesEndRef  = useRef<HTMLDivElement>(null);
-  const typingTimerRef  = useRef<number | null>(null);
+  const typingBroadcastRef = useRef<number | null>(null);
+  const remoteTypingTimerRef = useRef<number | null>(null);
   const inputRef        = useRef<HTMLTextAreaElement>(null);
 
   const messages = user && selectedUser ? getConversation(user.name, selectedUser) : [];
@@ -47,23 +49,63 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedUser, remoteTyping, messages.length]);
 
+  // Charger la conversation à l'ouverture
+  useEffect(() => {
+    if (selectedUser && user) {
+      void loadConversation(user.name, selectedUser);
+    }
+  }, [selectedUser, user, loadConversation]);
+
   // Marquer comme lu quand on ouvre la conversation
   useEffect(() => {
-    if (selectedUser && user) markRead(user.name, selectedUser);
-  }, [selectedUser, user, markRead]);
+    if (selectedUser && user) void markRead(user.name, selectedUser);
+  }, [selectedUser, user, markRead, messages.length]);
 
-  useEffect(() => () => { if (typingTimerRef.current) clearTimeout(typingTimerRef.current); }, []);
+  useEffect(() => () => {
+    if (typingBroadcastRef.current) clearTimeout(typingBroadcastRef.current);
+    if (remoteTypingTimerRef.current) clearTimeout(remoteTypingTimerRef.current);
+  }, []);
 
-  // Focus input quand on sélectionne un contact
+  const myUserId = supabaseUser?.id ?? user?.name ?? '';
+  const contactUserId = selectedUser ? (profiles[selectedUser]?.id ?? selectedUser) : null;
+
+  useEffect(() => {
+    if (!myUserId || !contactUserId || !selectedUser) {
+      setRemoteTyping(false);
+      return;
+    }
+
+    return dmTypingService.subscribe(myUserId, contactUserId, (payload) => {
+      if (payload.userId === myUserId) return;
+      setRemoteTyping(payload.isTyping);
+      if (remoteTypingTimerRef.current) clearTimeout(remoteTypingTimerRef.current);
+      if (payload.isTyping) {
+        remoteTypingTimerRef.current = window.setTimeout(() => setRemoteTyping(false), 3000);
+      }
+    });
+  }, [myUserId, contactUserId, selectedUser, profiles]);
+
+  const broadcastTyping = useCallback((isTyping: boolean) => {
+    if (!myUserId || !contactUserId || !user?.name) return;
+    dmTypingService.broadcast(myUserId, contactUserId, {
+      userId: myUserId,
+      userName: user.name,
+      isTyping,
+    });
+  }, [myUserId, contactUserId, user?.name]);
+
+  const handleTextChange = (value: string) => {
+    setText(value);
+    if (!myUserId || !contactUserId) return;
+
+    broadcastTyping(true);
+    if (typingBroadcastRef.current) clearTimeout(typingBroadcastRef.current);
+    typingBroadcastRef.current = window.setTimeout(() => broadcastTyping(false), 2000);
+  };
+
   useEffect(() => {
     if (selectedUser) setTimeout(() => inputRef.current?.focus(), 50);
   }, [selectedUser]);
-
-  const simulateTyping = () => {
-    setRemoteTyping(true);
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    typingTimerRef.current = setTimeout(() => setRemoteTyping(false), 2500);
-  };
 
   const contacts = Object.values(profiles).filter(p => p.name !== user?.name && !isMuted(p.name) && !isBlocked(p.name));
   const filteredContacts = contacts.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()));
@@ -73,14 +115,21 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
     return getConversation(user.name, name).filter(m => !m.is_read && m.sender_name !== user.name).length;
   }, [user, getConversation]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!text.trim() || !selectedUser || !user) return;
     if (isMuted(selectedUser) || isBlocked(selectedUser)) return;
-    sendDM(user, selectedUser, text.trim());
-    addNotification({ type: 'dm', message: `💬 Message envoyé à ${selectedUser}` });
-    sounds?.dm();
-    setText('');
-    simulateTyping();
+
+    try {
+      await sendDM(user.name, selectedUser, text.trim());
+      addNotification({ type: 'dm', message: `💬 Message envoyé à ${selectedUser}` });
+      sounds?.dm();
+      setText('');
+      broadcastTyping(false);
+      if (typingBroadcastRef.current) clearTimeout(typingBroadcastRef.current);
+    } catch (error) {
+      console.error('Erreur envoi DM:', error);
+      addNotification({ type: 'error', message: 'Impossible d\'envoyer le message privé' });
+    }
   };
 
   // Notification push navigateur
@@ -103,7 +152,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[1500]" onClick={onClose}>
         <div className="bg-card border border-border rounded-2xl p-6 text-center">
-          <p className="text-sm text-muted-foreground">Vous devez être connecté pour envoyer des messages</p>
+          <p className="text-sm text-muted-foreground">Connectez-vous pour envoyer des messages privés</p>
         </div>
       </div>
     );
@@ -216,7 +265,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
 
               <div className="border-t border-border px-4 py-2.5 shrink-0">
                 <div className="flex items-center gap-2 bg-secondary border border-white/10 rounded-xl px-3 py-1.5 focus-within:border-primary/50 focus-within:shadow-lg focus-within:shadow-primary/10 transition-all duration-200">
-                  <textarea ref={inputRef} value={text} onChange={e => setText(e.target.value)} onKeyDown={handleKeyDown}
+                  <textarea ref={inputRef} value={text} onChange={e => handleTextChange(e.target.value)} onKeyDown={handleKeyDown}
                     placeholder={`Message à ${selectedUser}...`} rows={1}
                     className="flex-1 bg-transparent border-none outline-none text-[13px] text-foreground placeholder:text-muted-foreground/40 resize-none min-h-[22px] max-h-[80px] leading-relaxed py-0.5 transition-all duration-200"
                     style={{ height: 'auto' }}

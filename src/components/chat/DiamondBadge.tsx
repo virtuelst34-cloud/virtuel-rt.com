@@ -68,39 +68,49 @@ function DiamondSVG({ color, glow, px }: DiamondSVGProps) {
   );
 }
 
-// Diamant Iridescent avec animation de couleur changeante (effet ionisation)
+// Diamant Iridescent avec animation de couleur changeante et rotation (effet ionisation)
 function IridescentDiamond({ px }: { px: number }) {
   return (
     <svg width={px} height={px} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"
       className="animate-iridescent"
       style={{ 
         filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.6)) drop-shadow(0 0 4px rgba(168,85,247,0.5))',
-        flexShrink: 0 
+        flexShrink: 0,
+        animation: 'iridescent-rotate 8s linear infinite'
       }}>
+      <style>{`
+        @keyframes iridescent-rotate {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
       <defs>
-        {/* Gradient iridescent animé */}
+        {/* Gradient iridescent animé avec plus de couleurs */}
         <linearGradient id="iridescent-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#ff6b6b">
-            <animate attributeName="stopColor" values="#ff6b6b;#ffd700;#34d399;#60a5fa;#a78bfa;#ff6b6b" dur="4s" repeatCount="indefinite" />
+            <animate attributeName="stopColor" values="#ff6b6b;#ffd700;#34d399;#60a5fa;#a78bfa;#ff6b6b" dur="3s" repeatCount="indefinite" />
           </stop>
-          <stop offset="25%" stopColor="#ffd700">
-            <animate attributeName="stopColor" values="#ffd700;#34d399;#60a5fa;#a78bfa;#ff6b6b;#ffd700" dur="4s" repeatCount="indefinite" />
+          <stop offset="20%" stopColor="#ffd700">
+            <animate attributeName="stopColor" values="#ffd700;#34d399;#60a5fa;#a78bfa;#ff6b6b;#ffd700" dur="3s" repeatCount="indefinite" />
           </stop>
-          <stop offset="50%" stopColor="#34d399">
-            <animate attributeName="stopColor" values="#34d399;#60a5fa;#a78bfa;#ff6b6b;#ffd700;#34d399" dur="4s" repeatCount="indefinite" />
+          <stop offset="40%" stopColor="#34d399">
+            <animate attributeName="stopColor" values="#34d399;#60a5fa;#a78bfa;#ff6b6b;#ffd700;#34d399" dur="3s" repeatCount="indefinite" />
           </stop>
-          <stop offset="75%" stopColor="#60a5fa">
-            <animate attributeName="stopColor" values="#60a5fa;#a78bfa;#ff6b6b;#ffd700;#34d399;#60a5fa" dur="4s" repeatCount="indefinite" />
+          <stop offset="60%" stopColor="#60a5fa">
+            <animate attributeName="stopColor" values="#60a5fa;#a78bfa;#ff6b6b;#ffd700;#34d399;#60a5fa" dur="3s" repeatCount="indefinite" />
           </stop>
-          <stop offset="100%" stopColor="#a78bfa">
-            <animate attributeName="stopColor" values="#a78bfa;#ff6b6b;#ffd700;#34d399;#60a5fa;#a78bfa" dur="4s" repeatCount="indefinite" />
+          <stop offset="80%" stopColor="#a78bfa">
+            <animate attributeName="stopColor" values="#a78bfa;#ff6b6b;#ffd700;#34d399;#60a5fa;#a78bfa" dur="3s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="100%" stopColor="#ff6b6b">
+            <animate attributeName="stopColor" values="#ff6b6b;#ffd700;#34d399;#60a5fa;#a78bfa;#ff6b6b" dur="3s" repeatCount="indefinite" />
           </stop>
         </linearGradient>
         
-        {/* Gradient pour facettes avec animation */}
+        {/* Gradient pour facettes avec animation plus rapide */}
         <linearGradient id="iridescent-top" x1="10" y1="2" x2="22" y2="13" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95">
-            <animate attributeName="stopOpacity" values="0.95;0.85;0.95" dur="2s" repeatCount="indefinite" />
+            <animate attributeName="stopOpacity" values="0.95;0.75;0.95" dur="1.5s" repeatCount="indefinite" />
           </stop>
           <stop offset="100%" stopColor="url(#iridescent-gradient)" stopOpacity="0.8" />
         </linearGradient>
@@ -138,12 +148,15 @@ function IridescentDiamond({ px }: { px: number }) {
       <polygon points="10,15 22,15 16,30" fill="url(#iridescent-gradient)" opacity="0.7" />
       <polygon points="30,13 22,15 16,30" fill="url(#iridescent-right)" />
 
-      {/* Reflets animés */}
+      {/* Reflets animés avec pulsation */}
       <polygon points="10,4 14,6 11,10 8,8" fill="#ffffff" opacity="0.6">
-        <animate attributeName="opacity" values="0.6;0.8;0.6" dur="1.5s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.6;0.9;0.6" dur="1s" repeatCount="indefinite" />
       </polygon>
       <polygon points="18,3 20,4 19,6" fill="#ffffff" opacity="0.4">
-        <animate attributeName="opacity" values="0.4;0.6;0.4" dur="1.5s" repeatCount="indefinite" begin="0.5s" />
+        <animate attributeName="opacity" values="0.4;0.7;0.4" dur="1s" repeatCount="indefinite" begin="0.3s" />
+      </polygon>
+      <polygon points="14,7 16,8 15,10" fill="#ffffff" opacity="0.3">
+        <animate attributeName="opacity" values="0.3;0.6;0.3" dur="1s" repeatCount="indefinite" begin="0.6s" />
       </polygon>
     </svg>
   );
@@ -178,7 +191,9 @@ const DiamondBadge = memo(function DiamondBadge({ level, size = 'sm', showLabel 
   // Pour les badges de niveau, utiliser getBadgePreview
   const diamondBadge = isSpecial ? null : badge as DiamondBadgeType;
   const badgePreview = diamondBadge ? getBadgePreview(diamondBadge, size) : { size: size === 'sm' ? 24 : size === 'md' ? 32 : size === 'lg' ? 48 : 64, ...badge };
-  const px = badgePreview.size;
+  
+  // Réduire la taille de moitié pour le diamant iridescent uniquement
+  const px = isIridescent ? badgePreview.size / 2 : badgePreview.size;
   const showPing = size === 'md' || size === 'lg';
   
   // Animation CSS si spécifiée

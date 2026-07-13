@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS public.notification_settings (
 -- Activer RLS
 ALTER TABLE public.notification_settings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Founders can update notification settings" ON public.notification_settings;
+DROP POLICY IF EXISTS "Founders can insert notification settings" ON public.notification_settings;
+DROP POLICY IF EXISTS "Everyone can read notification settings" ON public.notification_settings;
+
 -- Politique : Seuls les fondateurs peuvent modifier les paramètres de notification
 CREATE POLICY "Founders can update notification settings"
   ON public.notification_settings
@@ -30,7 +34,7 @@ CREATE POLICY "Founders can update notification settings"
       SELECT 1 FROM public.profiles
       WHERE profiles.email = 'virtuelst34@gmail.com'
       AND profiles.is_founder = true
-      AND auth.uid()::text = profiles.id
+      AND auth.uid() = profiles.id
     )
   );
 
@@ -44,7 +48,7 @@ CREATE POLICY "Founders can insert notification settings"
       SELECT 1 FROM public.profiles
       WHERE profiles.email = 'virtuelst34@gmail.com'
       AND profiles.is_founder = true
-      AND auth.uid()::text = profiles.id
+      AND auth.uid() = profiles.id
     )
   );
 
@@ -65,6 +69,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_notification_settings_updated_at ON public.notification_settings;
 CREATE TRIGGER trigger_update_notification_settings_updated_at
   BEFORE UPDATE ON public.notification_settings
   FOR EACH ROW

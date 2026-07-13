@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { useUser, useSalons, useUI, usePreferences, useNotifications } from '@/lib/contexts';
+import React, { useState, memo } from 'react';
+import { useUser, useSalons, useUI, usePreferences, useNotifications, useDM } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import { SearchPanel } from './SearchPanel';
 import { StatsPanel } from './StatsPanel';
 import { Home, MessageSquare, Bell, Star, ShieldAlert, Settings, Sun, Moon, Search, TrendingUp, LucideIcon, LogOut } from 'lucide-react';
 import { getSpecialBadgeForUser } from '@/lib/diamondBadges';
+import { hasAdminAccess } from '@/lib/utils/founderCheck';
 
 interface SidebarProps {
   onOpenDM: () => void;
@@ -20,12 +21,14 @@ interface IconBtnProps {
   badge?: number | null;
 }
 
-export default function Sidebar({ onOpenDM, onOpenNotifications, onOpenSettings }: SidebarProps) {
+const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSettings }: SidebarProps) {
   const { user, logout, supabaseUser } = useUser();
   const { setCurrentSalon } = useSalons();
   const { openAdmin } = useUI();
   const { theme, toggleTheme, isPremium, activatePremium } = usePreferences();
   const { unreadCount } = useNotifications();
+  const { getUnreadCount } = useDM();
+  const dmUnread = user?.name ? getUnreadCount(user.name) : 0;
   const [showSearch, setShowSearch] = useState(false);
   const [showStats, setShowStats] = useState(false);
 
@@ -40,7 +43,7 @@ export default function Sidebar({ onOpenDM, onOpenNotifications, onOpenSettings 
       <IconBtn icon={Home} title="Accueil" onClick={() => setCurrentSalon(null)} />
       <IconBtn icon={Search} title="Recherche" onClick={() => setShowSearch(true)} />
       <IconBtn icon={TrendingUp} title="Statistiques" onClick={() => setShowStats(true)} />
-      <IconBtn icon={MessageSquare} title="Messages privés" onClick={onOpenDM} />
+      <IconBtn icon={MessageSquare} title="Messages privés" onClick={onOpenDM} badge={dmUnread > 0 ? dmUnread : null} />
       <IconBtn icon={Bell} title="Notifications" onClick={onOpenNotifications} badge={unreadCount > 0 ? unreadCount : null} />
 
       <div className="flex-1" />
@@ -55,8 +58,8 @@ export default function Sidebar({ onOpenDM, onOpenNotifications, onOpenSettings 
         <Star className="w-4 h-4" />
       </button>
 
-      {/* Admin — visible uniquement si l'utilisateur est admin ou fondateur */}
-      {(user?.isAdmin || user?.isFounder) && (
+      {/* Admin — visible uniquement pour les utilisateurs autorisés */}
+      {hasAdminAccess(user) && (
         <button onClick={() => openAdmin(user)} title="Administration"
           className="w-9 h-9 rounded-xl flex items-center justify-center bg-red-500/10 border border-red-500/25 text-red-400 hover:bg-red-500/20 transition-colors">
           <ShieldAlert className="w-4 h-4" />
@@ -86,9 +89,11 @@ export default function Sidebar({ onOpenDM, onOpenNotifications, onOpenSettings 
       {showStats && <StatsPanel onClose={() => setShowStats(false)} />}
     </div>
   );
-}
+});
 
-function IconBtn({ icon: Icon, title, onClick, badge }: IconBtnProps) {
+export default Sidebar;
+
+const IconBtn = memo(function IconBtn({ icon: Icon, title, onClick, badge }: IconBtnProps) {
   return (
     <button onClick={onClick} title={title}
       className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-secondary border border-border text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.06] transition-all duration-200 hover:scale-105 active:scale-95 group">
@@ -100,4 +105,4 @@ function IconBtn({ icon: Icon, title, onClick, badge }: IconBtnProps) {
       )}
     </button>
   );
-}
+});

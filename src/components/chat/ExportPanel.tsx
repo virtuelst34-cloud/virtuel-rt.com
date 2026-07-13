@@ -10,7 +10,7 @@ interface ExportPanelProps {
 }
 
 export function ExportPanel({ messages, salonName, onClose }: ExportPanelProps) {
-  const [format, setFormat] = useState<'json' | 'pdf'>('json');
+  const [format, setFormat] = useState<'json' | 'text'>('json');
   const [includeMetadata, setIncludeMetadata] = useState(false);
   const [includeReactions, setIncludeReactions] = useState(true);
   const [exported, setExported] = useState(false);
@@ -59,9 +59,9 @@ export function ExportPanel({ messages, salonName, onClose }: ExportPanelProps) 
                 <span>JSON</span>
               </button>
               <button
-                onClick={() => setFormat('pdf')}
+                onClick={() => setFormat('text')}
                 className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border transition-colors ${
-                  format === 'pdf'
+                  format === 'text'
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border hover:bg-muted'
                 }`}

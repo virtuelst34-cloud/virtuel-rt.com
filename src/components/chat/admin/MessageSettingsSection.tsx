@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, Save, RefreshCw, Clock, Trash2, Edit, Smile, Pin } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { SectionTitle } from './AdminComponents';
-import { isFounder } from '@/lib/utils/founderCheck';
-import { useUser } from '@/lib/contexts';
+import { hasAdminAccess } from '@/lib/utils/founderCheck';
 
 interface MessageSettings {
+  id?: string;
   max_message_length: number;
   min_message_length: number;
   message_cooldown_ms: number;
@@ -39,16 +39,18 @@ const DEFAULT_SETTINGS: MessageSettings = {
   enable_code_blocks: true,
 };
 
-interface Props { readOnly?: boolean; }
+interface Props {
+  readOnly?: boolean;
+  user: any;
+}
 
-export default function MessageSettingsSection({ readOnly = false }: Props) {
-  const { user } = useUser();
+export default function MessageSettingsSection({ readOnly = false, user }: Props) {
   const [settings, setSettings] = useState<MessageSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const canModify = !readOnly && isFounder(user);
+  const canModify = hasAdminAccess(user, readOnly);
 
   useEffect(() => {
     loadSettings();
@@ -81,11 +83,14 @@ export default function MessageSettingsSection({ readOnly = false }: Props) {
   const saveSettings = async () => {
     try {
       setSaving(true);
-      const { error } = await supabase
-        .from('message_settings')
-        .upsert(settings);
+      const { id, ...payload } = settings;
+      const { error } = id
+        ? await supabase.from('message_settings').update(payload).eq('id', id)
+        : await supabase.from('message_settings').insert(payload);
 
       if (error) throw error;
+
+      if (!id) await loadSettings();
 
       setHasChanges(false);
       alert('Paramètres de message sauvegardés avec succès !');

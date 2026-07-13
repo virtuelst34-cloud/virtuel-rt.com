@@ -90,9 +90,9 @@ export function XPProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(MONTHLY_MONTH_KEY, currentMonth);
         setMonthlyXP({});
       } else {
-        // Charger depuis Supabase
-        const xp = await supabaseDbService.getMonthlyXP(user.name, currentMonth);
-        setMonthlyXP({ [user.name]: xp });
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const allMonthly = await supabaseDbService.getAllMonthlyXP(currentMonth);
+        setMonthlyXP(Object.keys(allMonthly).length > 0 ? allMonthly : { [user.name]: 0 });
       }
     } catch (error) {
       console.error('Erreur lors du chargement de l\'XP mensuel:', error);

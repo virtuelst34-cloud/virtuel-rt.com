@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useMemo } from 'react';
 import { UserProvider, useUser } from './UserContext';
 import { MessagesProvider, useMessages } from './MessagesContext';
 import { ModerationProvider, useModeration } from './ModerationContext';
@@ -105,7 +105,7 @@ export function useChat() {
   const typingCtx        = useTyping();
   const customEmojisCtx   = useCustomEmojis();
 
-  return {
+  return useMemo(() => ({
     ...userCtx,
     ...messagesCtx,
     ...moderationCtx,
@@ -120,5 +120,9 @@ export function useChat() {
     ...muteBlockCtx,
     ...typingCtx,
     ...customEmojisCtx,
-  };
+  }), [
+    userCtx, messagesCtx, moderationCtx, notificationsCtx, preferencesCtx,
+    salonsCtx, uiCtx, xpCtx, badgesCtx, dmCtx, friendsCtx, muteBlockCtx,
+    typingCtx, customEmojisCtx
+  ]);
 }

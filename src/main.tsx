@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App'
 import '@/index.css'
+import '@/lib/sentry'
 
 // Enregistrement du service worker pour PWA
 if ('serviceWorker' in navigator) {

@@ -12,7 +12,7 @@ export interface OnlineUser {
   name: string;
   avatar: string;
   initials: string;
-  status: 'online' | 'away' | 'busy' | 'offline';
+  status: 'online' | 'away' | 'busy' | 'offline' | 'invisible';
   currentSalonId?: string;
   lastSeen: Date;
 }
@@ -110,6 +110,7 @@ class PresenceService {
           const lastSeen = new Date(presence.last_seen);
           if (!this.isFresh(lastSeen)) return;
           if (presence.status === 'offline') return;
+          if (presence.status === 'invisible') return; // Ne pas afficher les utilisateurs invisibles
 
           const onlineUser: OnlineUser = {
             userId: presence.user_id,
@@ -142,6 +143,13 @@ class PresenceService {
 
     if (eventType === 'INSERT' || eventType === 'UPDATE') {
       if (newRecord.status === 'offline') {
+        this.onlineUsers.delete(newRecord.user_id);
+        this.removeFromSalonPresence(newRecord.user_id);
+        this.notifyListeners();
+        return;
+      }
+
+      if (newRecord.status === 'invisible') {
         this.onlineUsers.delete(newRecord.user_id);
         this.removeFromSalonPresence(newRecord.user_id);
         this.notifyListeners();
@@ -237,43 +245,24 @@ class PresenceService {
     });
 
     try {
-      // Essayer d'abord d'insérer, si erreur de duplicate key, faire un update
-      const { error: insertError } = await supabase
+      const row = {
+        user_id: userId,
+        name: userData?.name || userId,
+        avatar: userData?.avatar || 'av1',
+        initials: userData?.initials || userId.slice(0, 2).toUpperCase(),
+        status,
+        current_salon_id: salonId ?? null,
+        last_seen: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
         .from('user_presence')
-        .insert({
-          user_id: userId,
-          name: userData?.name || userId,
-          avatar: userData?.avatar || 'av1',
-          initials: userData?.initials || userId.slice(0, 2).toUpperCase(),
-          status,
-          current_salon_id: salonId,
-          last_seen: new Date().toISOString()
-        });
+        .upsert(row, { onConflict: 'user_id' });
 
-      if (insertError && insertError.code === '23505') {
-        // Duplicate key - faire un update à la place
-        console.log('[PresenceService] Utilisateur existe déjà, mise à jour...');
-        const { error: updateError } = await supabase
-          .from('user_presence')
-          .update({
-            name: userData?.name || userId,
-            avatar: userData?.avatar || 'av1',
-            initials: userData?.initials || userId.slice(0, 2).toUpperCase(),
-            status,
-            current_salon_id: salonId,
-            last_seen: new Date().toISOString()
-          })
-          .eq('user_id', userId);
-
-        if (updateError) {
-          console.error('[PresenceService] Erreur lors de la mise à jour:', updateError);
-        } else {
-          console.log('[PresenceService] Utilisateur mis à jour avec succès');
-        }
-      } else if (insertError) {
-        console.error('[PresenceService] Erreur lors de la mise en ligne:', insertError);
+      if (error) {
+        console.error('[PresenceService] Erreur lors de la mise en ligne:', error);
       } else {
-        console.log('[PresenceService] Utilisateur mis en ligne avec succès');
+        console.log('[PresenceService] Présence enregistrée');
       }
     } catch (error) {
       console.error('[PresenceService] Erreur lors de la mise en ligne:', error);
@@ -304,12 +293,15 @@ class PresenceService {
     try {
       const { error } = await supabase
         .from('user_presence')
-        .update({
-          current_salon_id: salonId,
+        .upsert({
+          user_id: userId,
+          name: userData?.name || existing?.name || userId,
+          avatar: userData?.avatar || existing?.avatar || 'av1',
+          initials: userData?.initials || existing?.initials || userId.slice(0, 2).toUpperCase(),
           status,
-          last_seen: new Date().toISOString()
-        })
-        .eq('user_id', userId);
+          current_salon_id: salonId,
+          last_seen: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
 
       if (error) {
         console.error('Erreur lors de la mise à jour du salon:', error);

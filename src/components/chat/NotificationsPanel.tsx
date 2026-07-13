@@ -25,14 +25,21 @@ interface NotificationsPanelProps {
 }
 
 const TYPE_CONFIG: Record<string, { icon: LucideIcon; color: string; bg: string }> = {
-  levelup:  { icon: Zap,            color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/25' },
-  premium:  { icon: Star,           color: 'text-yellow-400',  bg: 'bg-yellow-500/10 border-yellow-500/25' },
-  friend:   { icon: UserCheck,      color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
-  dm:       { icon: MessageSquare,  color: 'text-blue-400',    bg: 'bg-blue-500/10 border-blue-500/25' },
-  mod:      { icon: Shield,         color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/25' },
-  block:    { icon: AlertTriangle,  color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/25' },
-  report:   { icon: AlertTriangle,  color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/25' },
-  default:  { icon: Bell,           color: 'text-purple-400',  bg: 'bg-purple-500/10 border-purple-500/25' },
+  levelup:        { icon: Zap,            color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/25' },
+  premium:        { icon: Star,           color: 'text-yellow-400',  bg: 'bg-yellow-500/10 border-yellow-500/25' },
+  friend:         { icon: UserCheck,      color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
+  friend_request: { icon: UserCheck,      color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
+  friend_accepted:{ icon: UserCheck,      color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
+  dm:             { icon: MessageSquare,  color: 'text-blue-400',    bg: 'bg-blue-500/10 border-blue-500/25' },
+  mention:        { icon: MessageSquare,  color: 'text-sky-400',     bg: 'bg-sky-500/10 border-sky-500/25' },
+  achievement:    { icon: Star,           color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/25' },
+  system:         { icon: Bell,           color: 'text-purple-400',  bg: 'bg-purple-500/10 border-purple-500/25' },
+  success:        { icon: CheckCheck,     color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
+  error:          { icon: AlertTriangle,  color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/25' },
+  mod:            { icon: Shield,         color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/25' },
+  block:          { icon: AlertTriangle,  color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/25' },
+  report:         { icon: AlertTriangle,  color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/25' },
+  default:        { icon: Bell,           color: 'text-purple-400',  bg: 'bg-purple-500/10 border-purple-500/25' },
 };
 
 export default function NotificationsPanel({ onClose }: NotificationsPanelProps) {

@@ -6,6 +6,7 @@ import DiamondBadge from './DiamondBadge';
 import { getBadgeForLevel, getUnlockedBadges } from '@/lib/diamondBadges';
 import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy } from 'lucide-react';
 import AchievementsSection from './AchievementsSection';
+import TwoFactorSection from './TwoFactorSection';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -34,10 +35,11 @@ interface StatusOption {
 }
 
 const STATUSES: StatusOption[] = [
-  { id: 'online',  label: 'En ligne',        color: 'bg-emerald-500' },
-  { id: 'away',    label: 'Absent',           color: 'bg-amber-500' },
-  { id: 'busy',    label: 'Ne pas déranger',  color: 'bg-red-500' },
-  { id: 'offline', label: 'Invisible',        color: 'bg-muted-foreground/40' },
+  { id: 'online',    label: 'En ligne',        color: 'bg-emerald-500' },
+  { id: 'away',      label: 'Absent',           color: 'bg-amber-500' },
+  { id: 'busy',      label: 'Ne pas déranger',  color: 'bg-red-500' },
+  { id: 'invisible', label: 'Invisible',        color: 'bg-slate-500' },
+  { id: 'offline',   label: 'Hors ligne',       color: 'bg-muted-foreground/40' },
 ];
 
 interface SettingsPanelProps {
@@ -500,6 +502,12 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                     </div>
                   )}
                 </div>
+
+                {supabaseUser && user.email && (
+                  <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
+                    <TwoFactorSection userId={supabaseUser.id} email={user.email} />
+                  </div>
+                )}
 
                 {/* Formulaire de liaison email (pour invités) */}
                 {!supabaseUser && (

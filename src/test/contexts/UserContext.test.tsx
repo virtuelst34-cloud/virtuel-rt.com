@@ -1,7 +1,21 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { UserProvider, useUser } from '@/lib/contexts/UserContext'
 import { NotificationsProvider } from '@/lib/contexts/NotificationsContext'
+
+vi.mock('@/lib/guestAuthService', () => ({
+  registerGuestSession: vi.fn(async (name: string, avatar: string, initials: string) => ({
+    success: true,
+    guestName: name,
+    avatar,
+    initials,
+    sessionToken: 'test-token',
+  })),
+  validateGuestSession: vi.fn(async () => ({ success: false })),
+  getStoredGuestToken: vi.fn(() => null),
+  clearGuestToken: vi.fn(),
+  storeGuestToken: vi.fn(),
+}))
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -23,22 +37,23 @@ describe('UserContext', () => {
     expect(result.current.user).toBeNull()
   })
 
-  it('should allow setting user via login', () => {
+  it('should allow setting user via login', async () => {
     const { result } = renderHook(() => useUser(), { wrapper })
 
-    act(() => {
-      result.current.login('TestUser', 'av1', 'TU')
+    await act(async () => {
+      await result.current.login('TestUser', 'av1', 'TU')
     })
 
-    expect(result.current.user).toBeDefined()
-    expect(result.current.user?.name).toBe('TestUser')
+    await waitFor(() => {
+      expect(result.current.user?.name).toBe('TestUser')
+    })
   })
 
-  it('should allow updating profile', () => {
+  it('should allow updating profile', async () => {
     const { result } = renderHook(() => useUser(), { wrapper })
 
-    act(() => {
-      result.current.login('TestUser', 'av1', 'TU')
+    await act(async () => {
+      await result.current.login('TestUser', 'av1', 'TU')
     })
 
     act(() => {

@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Save, RefreshCw, Lock, Ban, AlertTriangle, Fingerprint, Globe } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { SectionTitle } from './AdminComponents';
-import { isFounder } from '@/lib/utils/founderCheck';
-import { useUser } from '@/lib/contexts';
+import { hasAdminAccess } from '@/lib/utils/founderCheck';
 
 interface SecuritySettings {
+  id?: string;
   enable_2fa: boolean;
   require_2fa_for_admins: boolean;
   max_login_attempts: number;
@@ -45,16 +45,18 @@ const DEFAULT_SETTINGS: SecuritySettings = {
   captcha_threshold: 3,
 };
 
-interface Props { readOnly?: boolean; }
+interface Props {
+  readOnly?: boolean;
+  user: any;
+}
 
-export default function SecuritySettingsSection({ readOnly = false }: Props) {
-  const { user } = useUser();
+export default function SecuritySettingsSection({ readOnly = false, user }: Props) {
   const [settings, setSettings] = useState<SecuritySettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const canModify = !readOnly && isFounder(user);
+  const canModify = hasAdminAccess(user, readOnly);
 
   useEffect(() => {
     loadSettings();
@@ -87,11 +89,14 @@ export default function SecuritySettingsSection({ readOnly = false }: Props) {
   const saveSettings = async () => {
     try {
       setSaving(true);
-      const { error } = await supabase
-        .from('security_settings')
-        .upsert(settings);
+      const { id, ...payload } = settings;
+      const { error } = id
+        ? await supabase.from('security_settings').update(payload).eq('id', id)
+        : await supabase.from('security_settings').insert(payload);
 
       if (error) throw error;
+
+      if (!id) await loadSettings();
 
       setHasChanges(false);
       alert('Paramètres de sécurité sauvegardés avec succès !');

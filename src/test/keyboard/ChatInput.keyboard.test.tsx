@@ -28,7 +28,7 @@ describe('ChatInput keyboard navigation', () => {
     fireEvent.change(textarea, { target: { value: 'Test message' } });
     fireEvent.keyDown(textarea, { key: 'Enter' });
 
-    expect(mockOnSend).toHaveBeenCalledWith('Test message', null, null);
+    expect(mockOnSend).toHaveBeenCalledWith('Test message', null, null, null);
   });
 
   it('should be focusable with Tab key', () => {

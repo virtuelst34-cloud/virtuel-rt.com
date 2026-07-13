@@ -37,7 +37,7 @@ CREATE POLICY "Founders can update message settings"
       SELECT 1 FROM public.profiles
       WHERE profiles.email = 'virtuelst34@gmail.com'
       AND profiles.is_founder = true
-      AND auth.uid()::text = profiles.id
+      AND auth.uid() = profiles.id
     )
   );
 
@@ -51,7 +51,7 @@ CREATE POLICY "Founders can insert message settings"
       SELECT 1 FROM public.profiles
       WHERE profiles.email = 'virtuelst34@gmail.com'
       AND profiles.is_founder = true
-      AND auth.uid()::text = profiles.id
+      AND auth.uid() = profiles.id
     )
   );
 

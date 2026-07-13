@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { useNotifications } from './NotificationsContext';
 import { useUser } from './UserContext';
 import { supabaseDbService } from '../supabaseDb';
+import { prefsStorageKey, readPrefsField, writePrefsField } from '../utils/prefsStorage';
 
 interface AccentColor {
   id: string;
@@ -26,11 +27,6 @@ interface PreferencesContextType {
 
 const PreferencesContext = createContext<PreferencesContextType | null>(null);
 
-const THEME_KEY   = 'virtuel_rt_theme';
-const PARTY_KEY   = 'virtuel_rt_party';
-const ACCENT_KEY  = 'virtuel_rt_accent';
-const COMPACT_KEY = 'virtuel_rt_compact';
-
 const ACCENT_COLORS: AccentColor[] = [
   { id: 'purple', label: 'Violet',  value: '263 70% 50%' },
   { id: 'blue',   label: 'Bleu',    value: '217 91% 60%' },
@@ -42,6 +38,10 @@ const ACCENT_COLORS: AccentColor[] = [
 
 export { ACCENT_COLORS };
 
+function getSystemTheme(): string {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState]       = useState<string>('dark');
   const [partyMode, setPartyModeState] = useState<boolean>(false);
@@ -49,90 +49,105 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [accentColor, setAccentColor]  = useState<string>(ACCENT_COLORS[0].id);
   const [compactMode, setCompactMode]  = useState<boolean>(false);
   const { addNotification } = useNotifications();
-  const { user } = useUser();
+  const { user, supabaseUser } = useUser();
 
-  const applyAccent = (colorId: string) => {
+  const userKey = supabaseUser?.id || user?.name || 'anonymous';
+
+  const applyAccent = useCallback((colorId: string) => {
     const found = ACCENT_COLORS.find(c => c.id === colorId) || ACCENT_COLORS[0];
     document.documentElement.style.setProperty('--primary', found.value);
-  };
+  }, []);
 
-  const applyTheme = (themeValue: string) => {
+  const applyTheme = useCallback((themeValue: string) => {
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(themeValue);
     document.documentElement.style.setProperty('--theme-transition', 'background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease');
-  };
+  }, []);
 
-  const getSystemTheme = (): string => {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  };
+  const applyAll = useCallback((prefs: {
+    theme: string;
+    partyMode: boolean;
+    isPremium: boolean;
+    accentColor: string;
+    compactMode: boolean;
+  }) => {
+    setThemeState(prefs.theme);
+    applyTheme(prefs.theme);
+    setPartyModeState(prefs.partyMode);
+    document.documentElement.classList.toggle('party', prefs.partyMode);
+    setIsPremium(prefs.isPremium);
+    setAccentColor(prefs.accentColor);
+    applyAccent(prefs.accentColor);
+    setCompactMode(prefs.compactMode);
+    document.documentElement.classList.toggle('compact', prefs.compactMode);
+  }, [applyAccent, applyTheme]);
 
-  // Charger les préférences depuis Supabase
+  const loadFromLocal = useCallback((key: string) => {
+    const savedTheme = readPrefsField(key, 'theme');
+    const savedParty = readPrefsField(key, 'party') === 'true';
+    const savedAccent = readPrefsField(key, 'accent') || ACCENT_COLORS[0].id;
+    const savedCompact = readPrefsField(key, 'compact') === 'true';
+    const savedPremium = readPrefsField(key, 'premium') === 'true';
+
+    applyAll({
+      theme: savedTheme || getSystemTheme(),
+      partyMode: savedParty,
+      isPremium: savedPremium,
+      accentColor: savedAccent,
+      compactMode: savedCompact,
+    });
+  }, [applyAll]);
+
+  const persistLocal = useCallback((key: string, prefs: {
+    theme?: string;
+    partyMode?: boolean;
+    isPremium?: boolean;
+    accentColor?: string;
+    compactMode?: boolean;
+  }) => {
+    if (prefs.theme !== undefined) writePrefsField(key, 'theme', prefs.theme);
+    if (prefs.partyMode !== undefined) writePrefsField(key, 'party', String(prefs.partyMode));
+    if (prefs.isPremium !== undefined) writePrefsField(key, 'premium', String(prefs.isPremium));
+    if (prefs.accentColor !== undefined) writePrefsField(key, 'accent', prefs.accentColor);
+    if (prefs.compactMode !== undefined) writePrefsField(key, 'compact', String(prefs.compactMode));
+  }, []);
+
   const loadPreferences = useCallback(async () => {
     if (!user) {
-      // Pour les utilisateurs non connectés, utiliser le thème système
-      const systemTheme = getSystemTheme();
-      setThemeState(systemTheme);
-      applyTheme(systemTheme);
+      loadFromLocal('anonymous');
       return;
     }
 
     try {
       const prefs = await supabaseDbService.getPreferences(user.name);
       if (prefs) {
-        setThemeState(prefs.theme);
-        applyTheme(prefs.theme);
-        setPartyModeState(prefs.party_mode);
-        document.documentElement.classList.toggle('party', prefs.party_mode);
-        setIsPremium(prefs.is_premium);
-        setAccentColor(prefs.accent_color);
-        applyAccent(prefs.accent_color);
-        setCompactMode(prefs.compact_mode);
-        document.documentElement.classList.toggle('compact', prefs.compact_mode);
-      } else {
-        // Pas de préférences sauvegardées, utiliser le thème système
-        const systemTheme = getSystemTheme();
-        setThemeState(systemTheme);
-        applyTheme(systemTheme);
+        const merged = {
+          theme: prefs.theme,
+          partyMode: prefs.party_mode,
+          isPremium: prefs.is_premium,
+          accentColor: prefs.accent_color,
+          compactMode: prefs.compact_mode,
+        };
+        applyAll(merged);
+        persistLocal(userKey, merged);
+        return;
       }
     } catch (error) {
       console.error('Erreur lors du chargement des préférences:', error);
-      // Fallback vers localStorage ou thème système
-      try {
-        const savedTheme = localStorage.getItem(THEME_KEY);
-        if (savedTheme) {
-          setThemeState(savedTheme);
-          applyTheme(savedTheme);
-        } else {
-          const systemTheme = getSystemTheme();
-          setThemeState(systemTheme);
-          applyTheme(systemTheme);
-        }
-        const savedParty = localStorage.getItem(PARTY_KEY) === 'true';
-        setPartyModeState(savedParty);
-        document.documentElement.classList.toggle('party', savedParty);
-        const savedAccent = localStorage.getItem(ACCENT_KEY) || ACCENT_COLORS[0].id;
-        setAccentColor(savedAccent);
-        applyAccent(savedAccent);
-        const savedCompact = localStorage.getItem(COMPACT_KEY) === 'true';
-        setCompactMode(savedCompact);
-        document.documentElement.classList.toggle('compact', savedCompact);
-      } catch {}
     }
-  }, [user]);
 
-  // Charger les préférences au démarrage et quand l'utilisateur change
+    loadFromLocal(userKey);
+  }, [user, userKey, applyAll, loadFromLocal, persistLocal]);
+
   useEffect(() => {
-    loadPreferences();
+    void loadPreferences();
   }, [loadPreferences]);
 
-  // Écouter les changements de préférences système
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
-      const systemTheme = e.matches ? 'dark' : 'light';
-      // Ne changer que si l'utilisateur n'a pas de préférence explicite sauvegardée
-      const hasExplicitPreference = localStorage.getItem(THEME_KEY) !== null;
-      if (!hasExplicitPreference && !user) {
+      if (!user && readPrefsField('anonymous', 'theme') === null) {
+        const systemTheme = e.matches ? 'dark' : 'light';
         setThemeState(systemTheme);
         applyTheme(systemTheme);
       }
@@ -140,90 +155,61 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [user, applyTheme]);
+
+  const syncPreferences = useCallback(async (updates: {
+    theme?: 'dark' | 'light';
+    party_mode?: boolean;
+    is_premium?: boolean;
+    accent_color?: string;
+    compact_mode?: boolean;
+  }) => {
+    if (!user) return;
+    try {
+      await supabaseDbService.updatePreferences(user.name, updates);
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des préférences:', error);
+    }
   }, [user]);
 
   const toggleTheme = useCallback(async () => {
     const next = theme === 'dark' ? 'light' : 'dark';
-    setThemeState(next);
-    applyTheme(next);
-    localStorage.setItem(THEME_KEY, next);
-
-    // Synchroniser avec Supabase
-    if (user) {
-      try {
-        await supabaseDbService.updatePreferences(user.name, { theme: next as 'dark' | 'light' });
-      } catch (error) {
-        console.error('Erreur lors de la mise à jour du thème:', error);
-      }
-    }
-  }, [theme, user]);
+    applyAll({ theme: next, partyMode, isPremium, accentColor, compactMode });
+    persistLocal(userKey, { theme: next });
+    await syncPreferences({ theme: next as 'dark' | 'light' });
+  }, [theme, partyMode, isPremium, accentColor, compactMode, userKey, applyAll, persistLocal, syncPreferences]);
 
   const togglePartyMode = useCallback(async () => {
     const next = !partyMode;
-    setPartyModeState(next);
-    localStorage.setItem(PARTY_KEY, String(next));
-    document.documentElement.classList.toggle('party', next);
-
-    // Synchroniser avec Supabase
-    if (user) {
-      try {
-        await supabaseDbService.updatePreferences(user.name, { party_mode: next });
-      } catch (error) {
-        console.error('Erreur lors de la mise à jour du mode party:', error);
-      }
-    }
-  }, [partyMode, user]);
+    applyAll({ theme, partyMode: next, isPremium, accentColor, compactMode });
+    persistLocal(userKey, { partyMode: next });
+    await syncPreferences({ party_mode: next });
+  }, [theme, partyMode, isPremium, accentColor, compactMode, userKey, applyAll, persistLocal, syncPreferences]);
 
   const activatePremium = useCallback(async () => {
-    setIsPremium(true);
-    localStorage.setItem('virtuel_rt_premium', 'true');
+    applyAll({ theme, partyMode, isPremium: true, accentColor, compactMode });
+    persistLocal(userKey, { isPremium: true });
     addNotification({ type: 'premium', message: '🌟 Bienvenue dans le club Premium !' });
-
-    // Synchroniser avec Supabase
-    if (user) {
-      try {
-        await supabaseDbService.updatePreferences(user.name, { is_premium: true });
-      } catch (error) {
-        console.error('Erreur lors de l\'activation du premium:', error);
-      }
-    }
-  }, [addNotification, user]);
+    await syncPreferences({ is_premium: true });
+  }, [theme, partyMode, accentColor, compactMode, userKey, applyAll, persistLocal, addNotification, syncPreferences]);
 
   const changeAccent = useCallback(async (colorId: string) => {
-    setAccentColor(colorId);
-    applyAccent(colorId);
-    try { localStorage.setItem(ACCENT_KEY, colorId); } catch {}
-
-    // Synchroniser avec Supabase
-    if (user) {
-      try {
-        await supabaseDbService.updatePreferences(user.name, { accent_color: colorId });
-      } catch (error) {
-        console.error('Erreur lors de la mise à jour de l\'accent:', error);
-      }
-    }
-  }, [user]);
+    applyAll({ theme, partyMode, isPremium, accentColor: colorId, compactMode });
+    persistLocal(userKey, { accentColor: colorId });
+    await syncPreferences({ accent_color: colorId });
+  }, [theme, partyMode, isPremium, compactMode, userKey, applyAll, persistLocal, syncPreferences]);
 
   const toggleCompactMode = useCallback(async () => {
     const next = !compactMode;
-    setCompactMode(next);
-    localStorage.setItem(COMPACT_KEY, String(next));
-    document.documentElement.classList.toggle('compact', next);
-
-    // Synchroniser avec Supabase
-    if (user) {
-      try {
-        await supabaseDbService.updatePreferences(user.name, { compact_mode: next });
-      } catch (error) {
-        console.error('Erreur lors de la mise à jour du mode compact:', error);
-      }
-    }
-  }, [compactMode, user]);
+    applyAll({ theme, partyMode, isPremium, accentColor, compactMode: next });
+    persistLocal(userKey, { compactMode: next });
+    await syncPreferences({ compact_mode: next });
+  }, [theme, partyMode, isPremium, accentColor, compactMode, userKey, applyAll, persistLocal, syncPreferences]);
 
   const value: PreferencesContextType = {
     theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium,
     accentColor, changeAccent, ACCENT_COLORS, compactMode, toggleCompactMode,
-    loadPreferences
+    loadPreferences,
   };
 
   return (

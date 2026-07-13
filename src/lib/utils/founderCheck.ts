@@ -20,3 +20,14 @@ export function isFounder(user: UserProfile | null | undefined): boolean {
 export function hasFounderAccess(user: UserProfile | null | undefined): boolean {
   return isFounder(user);
 }
+
+/**
+ * Accès modification panneau admin (fondateur, direction, master OP, modérateur admin…)
+ */
+export function hasAdminAccess(
+  user: UserProfile | null | undefined,
+  readOnly = false
+): boolean {
+  if (readOnly || !user) return false;
+  return !!(user.isAdmin || user.isFounder || user.isDirection || user.isMasterOp);
+}

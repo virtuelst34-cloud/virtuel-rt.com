@@ -3,7 +3,8 @@ import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 const createQueryBuilder = () => {
-  const builder = {
+  const response = { data: [] as unknown[], error: null as null }
+  const builder: Record<string, unknown> = {
     select: vi.fn(() => builder),
     insert: vi.fn(() => builder),
     update: vi.fn(() => builder),
@@ -15,8 +16,10 @@ const createQueryBuilder = () => {
     limit: vi.fn(() => builder),
     single: vi.fn().mockResolvedValue({ data: null, error: null }),
     maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    then: undefined,
   }
+
+  builder.then = (onFulfilled: (value: typeof response) => unknown) =>
+    Promise.resolve(response).then(onFulfilled)
 
   return builder
 }

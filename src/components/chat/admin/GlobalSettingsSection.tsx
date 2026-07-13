@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Save, RefreshCw, Globe, Palette, Bell, Shield, Database, ToggleLeft, ToggleRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { SectionTitle } from './AdminComponents';
-import { isFounder } from '@/lib/utils/founderCheck';
-import { useUser } from '@/lib/contexts';
+import { hasAdminAccess } from '@/lib/utils/founderCheck';
 
 interface GlobalSettings {
+  id?: string;
   default_theme: string;
   default_party_mode: boolean;
   default_accent_color: string;
@@ -39,17 +39,18 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   auto_cleanup_days: 30,
 };
 
-interface Props { readOnly?: boolean; }
+interface Props {
+  readOnly?: boolean;
+  user: any;
+}
 
-export default function GlobalSettingsSection({ readOnly = false }: Props) {
-  const { user } = useUser();
+export default function GlobalSettingsSection({ readOnly = false, user }: Props) {
   const [settings, setSettings] = useState<GlobalSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Vérifier si l'utilisateur est le fondateur
-  const canModify = !readOnly && isFounder(user);
+  const canModify = hasAdminAccess(user, readOnly);
 
   useEffect(() => {
     loadSettings();
@@ -83,12 +84,14 @@ export default function GlobalSettingsSection({ readOnly = false }: Props) {
   const saveSettings = async () => {
     try {
       setSaving(true);
-      const { error } = await supabase
-        .from('global_settings')
-        .upsert(settings);
+      const { id, ...payload } = settings;
+      const { error } = id
+        ? await supabase.from('global_settings').update(payload).eq('id', id)
+        : await supabase.from('global_settings').insert(payload);
 
       if (error) throw error;
 
+      if (!id) await loadSettings();
       setHasChanges(false);
       alert('Paramètres globaux sauvegardés avec succès !');
     } catch (error) {
@@ -163,6 +166,12 @@ export default function GlobalSettingsSection({ readOnly = false }: Props) {
           <span className="text-xs text-yellow-400">
             Modifications non sauvegardées
           </span>
+        </div>
+      )}
+
+      {!canModify && !readOnly && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-400">
+          Vous n&apos;avez pas les droits pour modifier ces paramètres. Connectez-vous avec un compte administrateur.
         </div>
       )}
 

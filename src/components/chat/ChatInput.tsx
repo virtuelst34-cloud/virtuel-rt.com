@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, ChangeEvent, KeyboardEvent } from 'react';
-import { Smile, Send, X, Reply, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Smile, Send, X, Reply, AlertCircle } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
+import FileUpload from './FileUpload';
 import { useUser, useTyping, useSalons, useNotifications } from '@/lib/contexts';
 import { validateMessage, type MessageInput } from '@/lib/validation';
 import { detectSpam } from '@/lib/antiSpam';
@@ -15,7 +16,7 @@ interface Message {
 }
 
 interface ChatInputProps {
-  onSend: (text: string, image: string | null, replyTo: Message | null) => void;
+  onSend: (text: string, image: string | null, replyTo: Message | null, file?: File | null) => void;
   onTyping?: () => void;
   disabled?: boolean;
   replyTo?: Message | null;
@@ -34,8 +35,10 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionIndex, setMentionIndex] = useState(0);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [showFileUpload, setShowFileUpload] = useState(false);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
   const caretRef  = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -130,7 +133,7 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
       return;
     }
 
-    if ((!text.trim() && !selectedImage) || disabled) return;
+    if ((!text.trim() && !selectedImage && !selectedFile) || disabled) return;
 
     // Spam detection
     if (user) {
@@ -146,13 +149,27 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
       }
     }
 
-    onSend(text.trim(), selectedImage, replyTo || null);
+    onSend(text.trim(), selectedImage, replyTo || null, selectedFile);
     setText('');
     setSelectedImage(null);
+    setSelectedFile(null);
+    if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
     setMentions([]);
     if (onCancelReply) onCancelReply();
     if (inputRef.current) { inputRef.current.style.height = 'auto'; }
+  };
+
+  const setFilePreview = (file: File) => {
+    if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
+    setSelectedFile(file);
+    if (file.type.startsWith('image/')) {
+      setSelectedImage(null);
+      setImagePreview(URL.createObjectURL(file));
+    } else {
+      setSelectedImage(null);
+      setImagePreview(null);
+    }
   };
 
   const handleImageSelect = (e: ChangeEvent<HTMLInputElement>) => {
@@ -160,20 +177,27 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
     if (!file) return;
     
     if (file.size > 5 * 1024 * 1024) {
-      alert('L\'image ne doit pas dépasser 5MB');
+      addNotification({ type: 'block', message: 'Le fichier ne doit pas dépasser 5MB' });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setSelectedImage(event.target?.result as string);
-      setImagePreview(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    setFilePreview(file);
+  };
+
+  const handleFileSelect = (file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      addNotification({ type: 'block', message: 'Le fichier ne doit pas dépasser 5MB' });
+      return;
+    }
+
+    setFilePreview(file);
+    setShowFileUpload(false);
   };
 
   const removeImage = () => {
+    if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
     setSelectedImage(null);
+    setSelectedFile(null);
     setImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -272,26 +296,30 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
         />
       )}
 
+      {showFileUpload && !disabled && (
+        <div className="absolute bottom-full left-4 mb-2 z-20">
+          <FileUpload 
+            onFileSelect={handleFileSelect}
+            maxSize={5}
+            acceptedTypes={['image/*', '.pdf', '.doc', '.docx']}
+          />
+        </div>
+      )}
+
       <div 
         className={`flex items-end gap-2 bg-secondary border rounded-xl px-2 py-1.5 transition-all duration-200 ${disabled ? 'opacity-50 border-border' : 'border-white/10 focus-within:border-primary/50 focus-within:shadow-lg focus-within:shadow-primary/10'}`}
         role="group"
         aria-label="Formulaire d'envoi de message">
         <button 
-          onClick={(e) => { e.stopPropagation(); if (!disabled) fileInputRef.current?.click(); }}
+          onClick={(e) => { e.stopPropagation(); if (!disabled) setShowFileUpload(!showFileUpload); }}
           disabled={disabled}
-          className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.06] hover:text-muted-foreground transition-all duration-200 hover:scale-110 active:scale-95 disabled:pointer-events-none"
-          aria-label="Joindre une image"
-          title="Joindre une image">
-          <ImageIcon className="w-4 h-4" aria-hidden="true" />
+          className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 disabled:pointer-events-none ${showFileUpload ? 'bg-primary/20 text-primary' : 'text-muted-foreground/60 hover:bg-white/[0.06] hover:text-muted-foreground'}`}
+          aria-label={showFileUpload ? "Fermer le sélecteur de fichiers" : "Ouvrir le sélecteur de fichiers"}
+          aria-expanded={showFileUpload}
+          aria-haspopup="dialog"
+          title="Fichiers">
+          <AlertCircle className="w-4 h-4" aria-hidden="true" />
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleImageSelect}
-          className="hidden"
-          aria-label="Sélectionner une image"
-        />
         <button 
           onClick={(e) => { e.stopPropagation(); if (!disabled) setShowEmojis(!showEmojis); }}
           disabled={disabled}

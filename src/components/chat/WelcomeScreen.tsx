@@ -34,17 +34,6 @@ const SALON_EMOJI: Record<string, string> = {
   libre: '🚪', insulte: '😤', cameras: '📹', bar: '🍷',
 };
 
-// Membres connectés simulés (en vrai, viendrait du backend)
-const ONLINE_DEMO: DisplayOnlineUser[] = [
-  { name: 'Cantique', avatar: 'av6', initials: 'CA', level: 8,  salon: 'musique60' },
-  { name: 'PiCanna',  avatar: 'av3', initials: 'PC', level: 5,  salon: 'debat'     },
-  { name: 'Coeur',    avatar: 'av2', initials: 'CO', level: 12, salon: 'karaoke'   },
-  { name: 'Thierry',  avatar: 'av5', initials: 'TH', level: 3,  salon: 'bar'       },
-  { name: 'Mélanie',  avatar: 'av1', initials: 'ME', level: 18, salon: 'libre'     },
-  { name: 'Sasha',    avatar: 'av4', initials: 'SA', level: 25, salon: null        },
-];
-
-// Pulse animé pour les salons live ou actifs
 function PulseDot({ color = 'bg-emerald-500' }: { color?: string }) {
   return (
     <span className="relative flex h-2 w-2 shrink-0">
@@ -80,10 +69,6 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
         .filter(p => p.name !== user?.name && !isMuted(p.name) && !isBlocked(p.name));
       const salonPresence = presenceService.getAllSalonPresence();
 
-      console.log('[WelcomeScreen] Utilisateurs en ligne reçus:', presenceUsers);
-      console.log('[WelcomeScreen] Salon presence reçu:', Array.from(salonPresence.entries()));
-
-      // Convertir les utilisateurs de présence en format d'affichage
       const displayUsers: DisplayOnlineUser[] = presenceUsers.map(p => ({
         name: p.name,
         avatar: p.avatar,
@@ -95,7 +80,6 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
         isMasterOp: profiles[p.name]?.isMasterOp
       }));
 
-      console.log('[WelcomeScreen] Utilisateurs à afficher:', displayUsers);
       setOnlineUsers(displayUsers);
 
       // Extraire les counts par salon

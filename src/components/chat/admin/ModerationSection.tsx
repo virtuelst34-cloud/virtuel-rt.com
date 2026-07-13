@@ -1,16 +1,18 @@
 import React from 'react';
 import { Gavel, Ban, CheckCircle, VolumeX, Volume2 } from 'lucide-react';
-import { useUser, useModeration } from '@/lib/contexts';
 import Avatar from '../Avatar';
 import { SectionTitle } from './AdminComponents';
 
-interface Props { readOnly?: boolean; }
+interface Props {
+  readOnly?: boolean;
+  profiles: Record<string, any>;
+  unbanUser: (name: string) => void;
+  unmuteUser: (name: string) => void;
+}
 
-export default function ModerationSection({ readOnly = false }: Props) {
-  const { profiles } = useUser();
-  const { unbanUser, unmuteUser } = useModeration();
-  const banned = Object.values(profiles).filter(p => p.isBanned);
-  const muted  = Object.values(profiles).filter(p => p.isMuted);
+export default function ModerationSection({ readOnly = false, profiles, unbanUser, unmuteUser }: Props) {
+  const banned = Object.values(profiles || {}).filter(p => p.isBanned);
+  const muted  = Object.values(profiles || {}).filter(p => p.isMuted);
 
   return (
     <div>

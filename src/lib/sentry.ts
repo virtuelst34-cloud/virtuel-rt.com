@@ -1,22 +1,47 @@
 import * as Sentry from '@sentry/react';
 
-if (process.env.NODE_ENV === 'production') {
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+
+if (import.meta.env.PROD && sentryDsn) {
   Sentry.init({
-    dsn: process.env.VITE_SENTRY_DSN || '',
-    environment: process.env.NODE_ENV,
+    dsn: sentryDsn,
+    environment: import.meta.env.MODE,
     tracesSampleRate: 0.1,
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,
     integrations: [
-      Sentry.replayIntegration(),
+      Sentry.replayIntegration({
+        maskAllText: true,
+        blockAllMedia: true,
+      }),
     ],
+    beforeSend(event, hint) {
+      if (event.exception) {
+        const error = hint.originalException;
+        if (error instanceof Error) {
+          if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+            return null;
+          }
+        }
+      }
+      return event;
+    },
   });
 }
 
-export const captureError = (error: Error, context?: Record<string, any>) => {
-  Sentry.captureException(error, { extra: context });
+export const captureError = (error: Error, context?: Record<string, unknown>) => {
+  if (sentryDsn) Sentry.captureException(error, { extra: context });
+  else console.error(error, context);
 };
 
 export const captureMessage = (message: string, level: 'info' | 'warning' | 'error' = 'info') => {
-  Sentry.captureMessage(message, { level });
+  if (sentryDsn) Sentry.captureMessage(message, { level });
+};
+
+export const setUserContext = (user: { id?: string; username?: string; email?: string }) => {
+  if (sentryDsn) Sentry.setUser(user);
+};
+
+export const clearUserContext = () => {
+  if (sentryDsn) Sentry.setUser(null);
 };

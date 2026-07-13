@@ -10,6 +10,7 @@
  */
 
 import { supabase } from './supabase';
+import { badgesFromProfile } from './utils/profileBadges';
 
 /**
  * Types d'identifiants utilisateur
@@ -212,11 +213,15 @@ export const permissionsService = {
     is_founder?: boolean;
     is_direction?: boolean;
     is_master_op?: boolean;
+    special_badges?: string[];
     email?: string;
   }): { identifier: UserIdentifier; type: IdentifierType } {
-    if (profile.is_founder) return { identifier: 'founder', type: 'badge' };
-    if (profile.is_master_op) return { identifier: 'master_op', type: 'badge' };
-    if (profile.is_direction) return { identifier: 'direction', type: 'badge' };
+    const badges = badgesFromProfile(profile);
+    if (badges.includes('founder')) return { identifier: 'founder', type: 'badge' };
+    if (badges.includes('master_op')) return { identifier: 'master_op', type: 'badge' };
+    if (badges.includes('direction')) return { identifier: 'direction', type: 'badge' };
+    if (badges.includes('moderator')) return { identifier: 'moderator', type: 'badge' };
+    if (badges.includes('vip')) return { identifier: 'vip', type: 'badge' };
     if (profile.email) return { identifier: 'authenticated', type: 'user_type' };
     return { identifier: 'guest', type: 'user_type' };
   },

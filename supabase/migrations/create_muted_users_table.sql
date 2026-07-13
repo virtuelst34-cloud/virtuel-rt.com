@@ -18,13 +18,14 @@ ALTER TABLE public.muted_users ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage their own muted users" ON public.muted_users;
 
 -- Politique : Les utilisateurs peuvent gérer leurs propres utilisateurs rendus muets
+-- Cette politique utilise les pseudos (user_id est un TEXT)
 CREATE POLICY "Users can manage their own muted users"
   ON public.muted_users
   FOR ALL
   TO authenticated
   USING (
-    auth.uid()::text = user_id
+    user_id IN (SELECT name FROM public.profiles WHERE id = auth.uid())
   )
   WITH CHECK (
-    auth.uid()::text = user_id
+    user_id IN (SELECT name FROM public.profiles WHERE id = auth.uid())
   );

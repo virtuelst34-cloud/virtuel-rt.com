@@ -8,6 +8,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Ne pas injecter de SW pendant `npm run dev`
+      devOptions: { enabled: false },
       includeAssets: ['logo.png', 'manifest.json'],
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],

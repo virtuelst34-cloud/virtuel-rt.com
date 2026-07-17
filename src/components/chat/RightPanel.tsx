@@ -1,14 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { Diamond, Flame, Trophy, MapPin, Calendar, MessageSquare, User } from 'lucide-react';
+import { Diamond, Flame, Trophy, MapPin, MessageSquare, User } from 'lucide-react';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
+import GenderIcon from './GenderIcon';
 import UserProfileView from './UserProfileView';
 import { useChat } from '@/lib/contexts';
 import { getSpecialBadgeForUser } from '@/lib/diamondBadges';
 import { presenceService, OnlineUser } from '@/lib/presenceService';
 
-const COLORS = ['#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 const MEDAL  = ['🥇', '🥈', '🥉'];
+
+const STATUS_DOT: Record<string, string> = {
+  online: 'bg-emerald-400',
+  away: 'bg-yellow-400',
+  busy: 'bg-red-400',
+  offline: 'bg-muted-foreground/40',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  online: 'En ligne',
+  away: 'Absent',
+  busy: 'Occupé',
+  offline: 'Hors ligne',
+};
 
 interface RightPanelProps {
   onOpenDM?: (name: string) => void;
@@ -61,12 +75,6 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
           <div className="bg-secondary rounded h-[3px] mt-2">
             <div className="h-[3px] rounded xp-gradient transition-all duration-500" style={{ width: `${prog}%` }} />
           </div>
-        </div>
-        <div className="text-[9px] text-muted-foreground/50 uppercase tracking-widest mt-3 mb-1.5">Couleur évolutive</div>
-        <div className="flex gap-1.5 flex-wrap">
-          {COLORS.map(c => (
-            <button key={c} className="w-[15px] h-[15px] rounded-full border border-white/14 hover:scale-125 transition-transform cursor-pointer" style={{ background: c }} />
-          ))}
         </div>
       </div>
 
@@ -128,41 +136,64 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
 
       {/* En ligne */}
       <div className="p-3">
-        <div className="text-[9.5px] text-muted-foreground/50 uppercase tracking-widest mb-2">En ligne ({onlineUsers.length})</div>
+        <div className="text-[9.5px] text-muted-foreground/50 uppercase tracking-widest mb-2.5">En ligne ({onlineUsers.length})</div>
         {onlineUsers.length === 0 ? (
           <p className="text-[10px] text-muted-foreground/40 italic">Aucun utilisateur en ligne.</p>
         ) : (
           onlineUsers.map((onlineUser) => {
             const userProfile = profiles[onlineUser.name];
+            const status = onlineUser.status || 'online';
+            const statusDot = STATUS_DOT[status] || STATUS_DOT.online;
+            const statusLabel = STATUS_LABEL[status] || STATUS_LABEL.online;
+
             return (
-              <div key={onlineUser.userId} className="flex items-center gap-2 py-1.5 px-1 rounded-lg hover:bg-white/[0.03] transition-colors group cursor-pointer">
-                <Avatar avatarClass={onlineUser.avatar} initials={onlineUser.initials} size="xs" />
+              <div
+                key={onlineUser.userId}
+                className="flex items-start gap-2.5 py-2 px-1.5 rounded-lg hover:bg-white/[0.04] transition-colors group cursor-pointer"
+              >
+                <div className="relative shrink-0 mt-0.5">
+                  <Avatar avatarClass={onlineUser.avatar} initials={onlineUser.initials} size="sm" />
+                  <span
+                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card ${statusDot}`}
+                    title={statusLabel}
+                  />
+                </div>
+
                 <div className="flex-1 min-w-0">
-                  <span className="text-[12px] text-foreground font-medium truncate block">{onlineUser.name}</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    {userProfile?.age && (
-                      <span className="text-[9px] text-muted-foreground/40">{userProfile.age} ans</span>
-                    )}
-                    {userProfile?.city && (
-                      <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground/40">
-                        <MapPin className="w-2.5 h-2.5" />
-                        {userProfile.city}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <GenderIcon gender={userProfile?.gender} size={12} className="shrink-0" />
+                    <span
+                      className="text-[13px] leading-snug font-semibold text-foreground break-words"
+                      title={onlineUser.name}
+                    >
+                      {onlineUser.name}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[10px] text-muted-foreground/65">
+                    {userProfile?.gender && userProfile.gender !== 'prefer_not_to_say' && (
+                      <span>
+                        {userProfile.gender === 'male' ? 'Homme' : userProfile.gender === 'female' ? 'Femme' : 'Autre'}
                       </span>
                     )}
+                    {userProfile?.age != null && (
+                      <span>{userProfile.age} ans</span>
+                    )}
+                    {userProfile?.city && (
+                      <span className="inline-flex items-center gap-0.5 max-w-full">
+                        <MapPin className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate">{userProfile.city}</span>
+                      </span>
+                    )}
+                    <span className={`inline-flex items-center gap-1 ${status === 'online' ? 'text-emerald-400' : status === 'away' ? 'text-yellow-400' : 'text-red-400'}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
+                      {statusLabel}
+                    </span>
                   </div>
                 </div>
-                <span className={`text-[9px] rounded-full px-2 py-px border shrink-0 ${
-                  onlineUser.status === 'online' 
-                    ? 'bg-emerald-500/12 text-emerald-400 border-emerald-500/22' 
-                    : onlineUser.status === 'away'
-                    ? 'bg-yellow-500/12 text-yellow-400 border-yellow-500/22'
-                    : 'bg-red-500/12 text-red-400 border-red-500/22'
-                }`}>
-                  {onlineUser.status === 'online' ? 'En ligne' : onlineUser.status === 'away' ? 'Absent' : 'Occupé'}
-                </span>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
                   {onOpenDM && (
-                    <button 
+                    <button
                       onClick={() => onOpenDM(onlineUser.name)}
                       className="p-1 rounded hover:bg-primary/20 text-primary/60 hover:text-primary transition-all active:scale-95 cursor-pointer"
                       title="Message"
@@ -170,7 +201,7 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
                       <MessageSquare className="w-3 h-3 pointer-events-none" />
                     </button>
                   )}
-                  <button 
+                  <button
                     onClick={() => setViewProfile(onlineUser.name)}
                     className="p-1 rounded hover:bg-primary/20 text-primary/60 hover:text-primary transition-all active:scale-95 cursor-pointer"
                     title="Profil"
@@ -185,7 +216,7 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
       </div>
     </div>
     {viewProfile && (
-      <UserProfileView userName={viewProfile} onClose={() => setViewProfile(null)} />
+      <UserProfileView targetName={viewProfile} onClose={() => setViewProfile(null)} onOpenDM={onOpenDM} />
     )}
   </>
   );

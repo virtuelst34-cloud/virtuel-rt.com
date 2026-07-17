@@ -4,6 +4,8 @@
  * Gère les accomplissements des utilisateurs avec des badges et des récompenses.
  */
 
+import { supabaseDbService } from './supabaseDb';
+
 export interface Achievement {
   id: string;
   name: string;
@@ -273,6 +275,9 @@ class AchievementService {
     if (newAchievements.length > 0) {
       this.userAchievements.set(userId, user);
       this.saveToStorage();
+      for (const a of newAchievements) {
+        void supabaseDbService.unlockAchievement(userId, a.id);
+      }
     }
 
     return newAchievements;
@@ -330,6 +335,7 @@ class AchievementService {
 
     this.userAchievements.set(userId, user);
     this.saveToStorage();
+    void supabaseDbService.unlockAchievement(userId, achievementId);
 
     return unlockedAchievement;
   }

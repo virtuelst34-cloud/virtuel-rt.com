@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '../supabase';
 import { useUser } from './UserContext';
 import { useNotifications } from './NotificationsContext';
+import { supabaseDbService } from '../supabaseDb';
+import { formatSupabaseError } from '../utils/notificationNavigation';
+import { isValidUuid } from '../utils/uuid';
 
 interface FriendRequest {
   id: string;
@@ -16,27 +19,32 @@ interface FriendsContextType {
   friends: FriendRequest[];
   pendingRequests: FriendRequest[];
   outgoingRequests: FriendRequest[];
-  sendFriendRequest: (friendId: string) => Promise<void>;
+  sendFriendRequest: (friendName: string) => Promise<void>;
   acceptFriendRequest: (requestId: string) => Promise<void>;
   rejectFriendRequest: (requestId: string) => Promise<void>;
-  removeFriend: (friendId: string) => Promise<void>;
+  acceptRequestFromSender: (senderName: string) => Promise<void>;
+  rejectRequestFromSender: (senderName: string) => Promise<void>;
+  removeFriend: (friendName: string) => Promise<void>;
   cancelFriendRequest: (requestId: string) => Promise<void>;
-  isFriend: (friendId: string) => boolean;
+  cancelRequestToRecipient: (friendName: string) => Promise<void>;
+  isFriend: (friendName: string) => boolean;
+  reloadFriends: () => Promise<void>;
 }
 
 const FriendsContext = createContext<FriendsContextType | null>(null);
 
-const createFriendId = (userId: string, friendId: string) => `${userId}:${friendId}`;
 const nowIso = () => new Date().toISOString();
 
 export function FriendsProvider({ children }: { children: ReactNode }) {
   const { user, supabaseUser } = useUser();
   const { addNotification } = useNotifications();
   const [friends, setFriends] = useState<FriendRequest[]>([]);
-  const [subscription, setSubscription] = useState<any>(null);
 
-  const currentUserId = user?.name || supabaseUser?.name || null;
+  const currentUserId = supabaseUser?.name || user?.name || null;
   const currentSupabaseId = supabaseUser?.id || null;
+
+  const acceptRef = useRef<(id: string) => Promise<void>>(async () => {});
+  const rejectRef = useRef<(id: string) => Promise<void>>(async () => {});
 
   const upsertLocalFriend = useCallback((friend: FriendRequest) => {
     setFriends(prev => {
@@ -54,147 +62,298 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
         .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
 
       if (error) throw error;
-      if (Array.isArray(data)) setFriends(data);
+      if (Array.isArray(data)) {
+        setFriends(data.filter(row => isValidUuid(row.id)));
+      }
     } catch (error) {
       console.error('Erreur lors du chargement des amis:', error);
     }
   }, []);
 
   const acceptFriendRequest = useCallback(async (requestId: string) => {
+    if (!isValidUuid(requestId)) {
+      throw new Error('Demande d\'ami invalide — rechargez l\'onglet Amis');
+    }
+
+    const request = friends.find(f => f.id === requestId);
     setFriends(prev => prev.map(f => f.id === requestId ? { ...f, status: 'accepted', updated_at: nowIso() } : f));
 
     if (currentSupabaseId) {
       const { error } = await supabase.from('friends').update({ status: 'accepted' }).eq('id', requestId);
-      if (error) console.error('Erreur lors de l\'acceptation de la demande d\'ami:', error);
+      if (error) {
+        console.error('Erreur lors de l\'acceptation de la demande d\'ami:', error);
+        void loadFriends(currentUserId!);
+        throw new Error(formatSupabaseError(error));
+      }
     }
-  }, [currentSupabaseId]);
+
+    if (request && currentUserId) {
+      void supabaseDbService.notifyUserByName(
+        request.user_id,
+        'friend_accepted',
+        `🤝 ${currentUserId} a accepté votre demande d'ami`,
+        `friend-accepted:${currentUserId}`,
+      );
+    }
+  }, [currentSupabaseId, currentUserId, friends, loadFriends]);
 
   const rejectFriendRequest = useCallback(async (requestId: string) => {
+    if (!isValidUuid(requestId)) {
+      throw new Error('Demande d\'ami invalide — rechargez l\'onglet Amis');
+    }
+
     setFriends(prev => prev.filter(f => f.id !== requestId));
 
     if (currentSupabaseId) {
       const { error } = await supabase.from('friends').delete().eq('id', requestId);
-      if (error) console.error('Erreur lors du rejet de la demande d\'ami:', error);
+      if (error) {
+        console.error('Erreur lors du rejet de la demande d\'ami:', error);
+        void loadFriends(currentUserId!);
+        throw new Error(formatSupabaseError(error));
+      }
     }
-  }, [currentSupabaseId]);
+  }, [currentSupabaseId, currentUserId, loadFriends]);
 
-  const removeFriend = useCallback(async (friendId: string) => {
+  acceptRef.current = acceptFriendRequest;
+  rejectRef.current = rejectFriendRequest;
+
+  const removeFriend = useCallback(async (friendName: string) => {
     if (!currentUserId) return;
 
     setFriends(prev => prev.filter(f => !(
-      (f.user_id === currentUserId && f.friend_id === friendId) ||
-      (f.user_id === friendId && f.friend_id === currentUserId)
+      (f.user_id === currentUserId && f.friend_id === friendName) ||
+      (f.user_id === friendName && f.friend_id === currentUserId)
     )));
 
     if (currentSupabaseId) {
       const { error } = await supabase
         .from('friends')
         .delete()
-        .or(`and(user_id.eq.${currentUserId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${currentUserId})`);
+        .or(`and(user_id.eq.${currentUserId},friend_id.eq.${friendName}),and(user_id.eq.${friendName},friend_id.eq.${currentUserId})`);
       if (error) console.error('Erreur lors de la suppression de l\'ami:', error);
     }
   }, [currentUserId, currentSupabaseId]);
 
   const cancelFriendRequest = useCallback(async (requestId: string) => {
-    setFriends(prev => prev.filter(f => f.id !== requestId));
+    await rejectFriendRequest(requestId);
+  }, [rejectFriendRequest]);
 
-    if (currentSupabaseId) {
-      const { error } = await supabase.from('friends').delete().eq('id', requestId);
-      if (error) console.error('Erreur lors de l\'annulation de la demande d\'ami:', error);
+  const cancelRequestToRecipient = useCallback(async (friendName: string) => {
+    if (!currentUserId || !currentSupabaseId) {
+      throw new Error('Connectez-vous avec un compte email pour annuler une demande');
     }
-  }, [currentSupabaseId]);
 
-  const isFriend = useCallback((friendId: string): boolean => {
+    let request = friends.find(
+      f => f.status === 'pending' && f.user_id === currentUserId && f.friend_id === friendName,
+    );
+    if (!request || !isValidUuid(request.id)) {
+      const { data, error } = await supabase
+        .from('friends')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .eq('friend_id', friendName)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (error) throw new Error(formatSupabaseError(error));
+      if (data) request = data as FriendRequest;
+    }
+    if (!request) throw new Error('Demande d\'ami introuvable');
+    await rejectFriendRequest(request.id);
+  }, [currentUserId, currentSupabaseId, friends, rejectFriendRequest]);
+
+  const isFriend = useCallback((friendName: string): boolean => {
     if (!currentUserId) return false;
     return friends.some(f =>
       f.status === 'accepted' &&
-      ((f.user_id === currentUserId && f.friend_id === friendId) ||
-       (f.user_id === friendId && f.friend_id === currentUserId))
+      ((f.user_id === currentUserId && f.friend_id === friendName) ||
+       (f.user_id === friendName && f.friend_id === currentUserId))
     );
   }, [currentUserId, friends]);
 
   useEffect(() => {
-    if (!currentSupabaseId) return;
+    if (!currentUserId) return;
 
-    loadFriends(currentUserId!);
-
-    if (subscription) supabase.removeChannel(subscription);
+    if (currentSupabaseId) {
+      void loadFriends(currentUserId);
+    }
 
     const channel = supabase
-      .channel(`friends:${currentSupabaseId}`)
+      .channel(`friends:${currentUserId}`)
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'friends',
-        },
+        { event: '*', schema: 'public', table: 'friends' },
         (payload) => {
-          const friend = payload.new as FriendRequest;
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const friend = payload.new as FriendRequest;
+            if (!friend?.id || !isValidUuid(friend.id)) return;
             upsertLocalFriend(friend);
+
             if (friend.status === 'pending' && friend.friend_id === currentUserId) {
               addNotification({
-                type: 'friend',
+                type: 'friend_request',
                 message: `${friend.user_id} vous a envoyé une demande d'ami`,
                 groupKey: `friend-request:${friend.user_id}`,
                 actions: [
                   {
                     label: 'Accepter',
-                    onClick: () => acceptFriendRequest(friend.id),
-                    primary: true
+                    onClick: () => {
+                      void acceptRef.current(friend.id).catch((error: unknown) => {
+                        addNotification({
+                          type: 'system',
+                          message: error instanceof Error ? error.message : 'Impossible d\'accepter la demande',
+                        });
+                      });
+                    },
+                    primary: true,
                   },
                   {
                     label: 'Refuser',
-                    onClick: () => rejectFriendRequest(friend.id)
-                  }
-                ]
+                    onClick: () => {
+                      void rejectRef.current(friend.id).catch((error: unknown) => {
+                        addNotification({
+                          type: 'system',
+                          message: error instanceof Error ? error.message : 'Impossible de refuser la demande',
+                        });
+                      });
+                    },
+                  },
+                ],
+              });
+            } else if (
+              friend.status === 'accepted' &&
+              friend.user_id === currentUserId &&
+              payload.eventType === 'UPDATE'
+            ) {
+              addNotification({
+                type: 'friend_accepted',
+                message: `🤝 ${friend.friend_id} a accepté votre demande d'ami`,
+                groupKey: `friend-accepted:${friend.friend_id}`,
               });
             }
           } else if (payload.eventType === 'DELETE') {
             const deleted = payload.old as FriendRequest;
-            setFriends(prev => prev.filter(f => f.id !== deleted.id));
+            if (deleted?.id) {
+              setFriends(prev => prev.filter(f => f.id !== deleted.id));
+            }
           }
-        }
+        },
       )
       .subscribe();
-
-    setSubscription(channel);
 
     return () => {
       supabase.removeChannel(channel);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSupabaseId, currentUserId, loadFriends, upsertLocalFriend, addNotification, acceptFriendRequest, rejectFriendRequest]);
+  }, [currentSupabaseId, currentUserId, loadFriends, upsertLocalFriend, addNotification]);
 
-  const sendFriendRequest = useCallback(async (friendId: string) => {
+  const reloadFriends = useCallback(async () => {
+    if (!currentUserId || !currentSupabaseId) return;
+    await loadFriends(currentUserId);
+  }, [currentUserId, currentSupabaseId, loadFriends]);
+
+  const findPendingFromSender = useCallback((senderName: string) => {
+    if (!currentUserId) return undefined;
+    return friends.find(
+      f => f.status === 'pending' && f.user_id === senderName && f.friend_id === currentUserId,
+    );
+  }, [currentUserId, friends]);
+
+  const acceptRequestFromSender = useCallback(async (senderName: string) => {
+    if (!currentUserId || !currentSupabaseId) {
+      throw new Error('Connectez-vous avec un compte email pour accepter une demande');
+    }
+
+    let request = findPendingFromSender(senderName);
+    if (!request) {
+      const { data, error } = await supabase
+        .from('friends')
+        .select('*')
+        .eq('user_id', senderName)
+        .eq('friend_id', currentUserId)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (error) throw new Error(formatSupabaseError(error));
+      if (data) {
+        request = data as FriendRequest;
+        upsertLocalFriend(request);
+      }
+    }
+    if (!request) throw new Error('Demande d\'ami introuvable');
+    await acceptFriendRequest(request.id);
+  }, [currentUserId, currentSupabaseId, findPendingFromSender, upsertLocalFriend, acceptFriendRequest]);
+
+  const rejectRequestFromSender = useCallback(async (senderName: string) => {
+    if (!currentUserId || !currentSupabaseId) {
+      throw new Error('Connectez-vous avec un compte email pour refuser une demande');
+    }
+
+    let request = findPendingFromSender(senderName);
+    if (!request) {
+      const { data, error } = await supabase
+        .from('friends')
+        .select('*')
+        .eq('user_id', senderName)
+        .eq('friend_id', currentUserId)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (error) throw new Error(formatSupabaseError(error));
+      if (data) request = data as FriendRequest;
+    }
+    if (!request) throw new Error('Demande d\'ami introuvable');
+    await rejectFriendRequest(request.id);
+  }, [currentUserId, currentSupabaseId, findPendingFromSender, rejectFriendRequest]);
+
+  const sendFriendRequest = useCallback(async (friendName: string) => {
     if (!currentUserId) throw new Error('Utilisateur non connecté');
+    if (friendName === currentUserId) throw new Error('Impossible de s\'ajouter soi-même');
+
+    if (!currentSupabaseId) {
+      throw new Error('Connectez-vous avec un compte email pour envoyer des demandes d\'amis');
+    }
 
     const timestamp = nowIso();
-    const localFriend: FriendRequest = {
-      id: '', // Sera remplacé par l'UUID généré par Supabase
-      user_id: currentUserId,
-      friend_id: friendId,
-      status: currentSupabaseId ? 'pending' : 'accepted',
-      created_at: timestamp,
-      updated_at: timestamp,
-    };
 
-    if (currentSupabaseId) {
-      const { data, error } = await supabase.from('friends').insert(localFriend).select().single();
-      if (error) {
-        console.error('Erreur lors de la demande d\'ami:', error);
-        throw error;
-      }
-      if (data) {
-        upsertLocalFriend(data as FriendRequest);
-      }
-    } else {
-      // Mode invité
-      localFriend.id = createFriendId(currentUserId, friendId);
-      upsertLocalFriend(localFriend);
+    const existing = friends.find(
+      f =>
+        (f.user_id === currentUserId && f.friend_id === friendName) ||
+        (f.user_id === friendName && f.friend_id === currentUserId),
+    );
+    if (existing) {
+      if (existing.status === 'pending') throw new Error('Une demande est déjà en cours');
+      if (existing.status === 'accepted') throw new Error('Vous êtes déjà amis');
     }
-  }, [currentUserId, currentSupabaseId, upsertLocalFriend]);
+
+    const { data, error } = await supabase
+      .from('friends')
+      .insert({
+        user_id: currentUserId,
+        friend_id: friendName,
+        status: 'pending',
+        created_at: timestamp,
+        updated_at: timestamp,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erreur lors de la demande d\'ami:', error);
+      throw new Error(formatSupabaseError(error));
+    }
+    if (data) {
+      upsertLocalFriend(data as FriendRequest);
+    }
+
+    addNotification({
+      type: 'system',
+      message: `Demande d'ami envoyée à ${friendName}`,
+    });
+
+    void supabaseDbService.notifyUserByName(
+      friendName,
+      'friend_request',
+      `👋 ${currentUserId} vous a envoyé une demande d'ami`,
+      `friend-request:${currentUserId}`,
+    );
+  }, [currentUserId, currentSupabaseId, friends, upsertLocalFriend, addNotification]);
 
   const pendingRequests = currentUserId
     ? friends.filter(f => f.status === 'pending' && f.friend_id === currentUserId)
@@ -205,7 +364,21 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
     : [];
 
   return (
-    <FriendsContext.Provider value={{ friends, pendingRequests, outgoingRequests, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, removeFriend, cancelFriendRequest, isFriend }}>
+    <FriendsContext.Provider value={{
+      friends,
+      pendingRequests,
+      outgoingRequests,
+      sendFriendRequest,
+      acceptFriendRequest,
+      rejectFriendRequest,
+      acceptRequestFromSender,
+      rejectRequestFromSender,
+      removeFriend,
+      cancelFriendRequest,
+      cancelRequestToRecipient,
+      isFriend,
+      reloadFriends,
+    }}>
       {children}
     </FriendsContext.Provider>
   );

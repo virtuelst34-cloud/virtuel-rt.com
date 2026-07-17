@@ -3,6 +3,7 @@ import { useNotifications } from './NotificationsContext';
 import { useUser } from './UserContext';
 import { supabaseDbService, Salon as SupabaseSalon } from '../supabaseDb';
 import { presenceService } from '../presenceService';
+import { supabase } from '../supabase';
 
 interface Salon {
   id: string;
@@ -40,12 +41,22 @@ function convertSupabaseSalon(supabaseSalon: SupabaseSalon): Salon {
     id: supabaseSalon.id,
     name: supabaseSalon.name,
     type: supabaseSalon.type,
+    emoji: supabaseSalon.icon || '💬',
     isPrivate: !!supabaseSalon.password,
     password: supabaseSalon.password || undefined,
     live: supabaseSalon.live || undefined,
     count: supabaseSalon.count || undefined,
     welcome: supabaseSalon.welcome,
   };
+}
+
+function mergeSalonLists(existing: Salon[], incoming: Salon[]): Salon[] {
+  const map = new Map<string, Salon>();
+  for (const salon of incoming) map.set(salon.id, salon);
+  for (const salon of existing) {
+    if (!map.has(salon.id)) map.set(salon.id, salon);
+  }
+  return Array.from(map.values());
 }
 
 export function SalonsProvider({ children }: { children: ReactNode }) {
@@ -55,11 +66,9 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
   const [currentSalon, setCurrentSalonRaw] = useState<string | null>(null);
   const { user, supabaseUser } = useUser();
 
-  // Nettoyer currentSalon quand il est mis à null (déconnexion ou quitter)
   const setCurrentSalon = useCallback((id: string | null) => {
     setCurrentSalonRaw(id);
-    
-    // Mettre à jour la présence quand on change de salon
+
     const userId = supabaseUser?.id || user?.name;
     if (userId) {
       presenceService.updateCurrentSalon(userId, id, {
@@ -71,23 +80,15 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
     }
   }, [supabaseUser, user]);
 
-  // Reset du salon courant à chaque montage (pas de salon fantôme persistant)
-  // REMOVED: This was causing users to lose their salon on page reload
-  // useEffect(() => {
-  //   setCurrentSalonRaw(null);
-  // }, []);
-
   const { addNotification } = useNotifications();
 
-  // Charger depuis localStorage (hiddenSalons et unlockedSalons restent locaux)
   useEffect(() => {
     try {
       const savedHidden = localStorage.getItem(HIDDEN_SALONS_KEY);
       if (savedHidden) setHiddenSalons(JSON.parse(savedHidden));
       const savedUnlocked = localStorage.getItem(UNLOCKED_SALONS_KEY);
       if (savedUnlocked) setUnlockedSalons(JSON.parse(savedUnlocked));
-      
-      // Restaurer le dernier salon actif depuis le hash ou localStorage
+
       const hash = window.location.hash.replace('#', '');
       if (hash.startsWith('salon/')) {
         setCurrentSalonRaw(hash.replace('salon/', ''));
@@ -95,36 +96,58 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
-  // Persister hiddenSalons avec debouncing
   useEffect(() => {
     try {
       localStorage.setItem(HIDDEN_SALONS_KEY, JSON.stringify(hiddenSalons));
     } catch {}
   }, [hiddenSalons]);
 
-  // Persister unlockedSalons avec debouncing
   useEffect(() => {
     try {
       localStorage.setItem(UNLOCKED_SALONS_KEY, JSON.stringify(unlockedSalons));
     } catch {}
   }, [unlockedSalons]);
 
-  // Charger les salons personnalisés depuis Supabase
   const loadCustomSalons = useCallback(async () => {
     try {
       const salons = await supabaseDbService.getSalons();
-      setCustomSalons(salons.map(convertSupabaseSalon));
+      setCustomSalons(prev => mergeSalonLists(prev, salons.map(convertSupabaseSalon)));
     } catch (error) {
       console.error('Erreur lors du chargement des salons:', error);
     }
   }, []);
 
-  // Charger les salons au démarrage
   useEffect(() => {
     loadCustomSalons();
   }, [loadCustomSalons]);
 
-  // Écouter l'événement de navigation vers un salon depuis l'URL
+  useEffect(() => {
+    const channel = supabase
+      .channel('salons-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'salons' },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const deleted = payload.old as SupabaseSalon;
+            if (deleted?.id) {
+              setCustomSalons(prev => prev.filter(s => s.id !== deleted.id));
+            }
+            return;
+          }
+          const row = payload.new as SupabaseSalon;
+          if (!row?.id) return;
+          const salon = convertSupabaseSalon(row);
+          setCustomSalons(prev => mergeSalonLists(prev, [salon]));
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   useEffect(() => {
     const handleSetSalonFromUrl = (event: CustomEvent) => {
       const { salonId } = event.detail;
@@ -139,24 +162,31 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addSalon = useCallback(async (salon: Salon) => {
-    setCustomSalons(prev => [...prev, salon]);
-    addNotification({ type: 'system', message: `✅ Salon « ${salon.name} » créé.` });
+    setCustomSalons(prev => mergeSalonLists(prev, [salon]));
 
     try {
-      const supabaseSalon: Omit<SupabaseSalon, 'id' | 'created_at'> = {
+      const supabaseSalon: Omit<SupabaseSalon, 'created_at'> = {
+        id: salon.id,
         name: salon.name,
         type: salon.type || 'chat',
-        icon: salon.emoji || 'MessageSquare',
+        icon: salon.emoji || '💬',
         count: salon.count,
         live: salon.live,
         welcome: salon.welcome || '',
         password: salon.password,
       };
-      await supabaseDbService.addSalon(supabaseSalon);
+      const saved = await supabaseDbService.addSalon(supabaseSalon, user?.name);
+      setCustomSalons(prev => mergeSalonLists(prev, [convertSupabaseSalon(saved)]));
+      addNotification({ type: 'system', message: `✅ Salon « ${salon.name} » créé.` });
     } catch (error) {
+      setCustomSalons(prev => prev.filter(s => s.id !== salon.id));
       console.error('Erreur lors de l\'ajout du salon:', error);
+      addNotification({
+        type: 'error',
+        message: error instanceof Error ? error.message : `Impossible de créer le salon « ${salon.name} ».`,
+      });
     }
-  }, [addNotification]);
+  }, [addNotification, user?.name]);
 
   const deleteSalon = useCallback(async (salonId: string) => {
     setCustomSalons(prev => prev.filter(s => s.id !== salonId));
@@ -170,14 +200,12 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isSalonLocked = useCallback((salonId: string): boolean => {
-    const allSalons = [...customSalons];
-    const salon = allSalons.find(s => s.id === salonId);
+    const salon = customSalons.find(s => s.id === salonId);
     return Boolean(salon?.isPrivate && !unlockedSalons[salonId]);
   }, [customSalons, unlockedSalons]);
 
   const verifySalonPassword = useCallback((salonId: string, password: string) => {
-    const allSalons = [...customSalons];
-    const salon = allSalons.find(s => s.id === salonId);
+    const salon = customSalons.find(s => s.id === salonId);
     if (!salon?.isPrivate) return true;
     if (salon.password === password) {
       setUnlockedSalons(prev => ({ ...prev, [salonId]: true }));

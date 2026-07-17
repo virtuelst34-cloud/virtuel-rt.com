@@ -4,8 +4,17 @@ import { supabaseAuthService, UserProfile as SupabaseUserProfile } from '../supa
 import { presenceService } from '../presenceService';
 import { useNotifications } from './NotificationsContext';
 import { recordLogin } from '../userActivity';
+import { mapSupabaseProfile } from '../utils/profileBadges';
+import {
+  registerGuestSession,
+  validateGuestSession,
+  getStoredGuestToken,
+  clearGuestToken,
+} from '../guestAuthService';
+import { saveGuestProfileCache, loadGuestProfileCache } from '../utils/prefsStorage';
 
 export interface UserProfile {
+  id?: string;
   name: string;
   avatar: string;
   initials: string;
@@ -18,7 +27,7 @@ export interface UserProfile {
   banReason: string;
   isPremium: boolean;
   isAdmin: boolean;
-  status: 'online' | 'away' | 'busy' | 'offline';
+  status: 'online' | 'away' | 'busy' | 'offline' | 'invisible';
   joinedAt: string;
   statusText?: string;
   email?: string;
@@ -27,6 +36,7 @@ export interface UserProfile {
   isDirection?: boolean;
   isMasterOp?: boolean;
   isIridescent?: boolean;
+  specialBadges?: string[];
   age?: number;
   city?: string;
   gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
@@ -35,7 +45,7 @@ export interface UserProfile {
 interface UserContextType {
   user: UserProfile | null;
   supabaseUser: SupabaseUserProfile | null;
-  login: (name: string, avatar: string, initials: string) => void;
+  login: (name: string, avatar: string, initials: string) => Promise<{ success: boolean; error?: string }>;
   loginWithSupabase: (supabaseUser: SupabaseUserProfile) => void;
   logout: () => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
@@ -48,35 +58,42 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | null>(null);
 
 const GUEST_SESSION_KEY = 'virtuel_rt_guest_session';
-const GUEST_SESSION_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
+const GUEST_SESSION_DURATION = 30 * 60 * 1000;
 
-function profileFromSupabase(profile: SupabaseUserProfile): UserProfile {
+function mergeGuestProfile(base: UserProfile, cached: Record<string, unknown> | null): UserProfile {
+  if (!cached || cached.name !== base.name) return base;
   return {
-    name: profile.name,
-    avatar: profile.avatar,
-    initials: profile.initials,
-    bio: profile.bio || '',
-    xp: profile.xp,
-    level: profile.level,
+    ...base,
+    bio: typeof cached.bio === 'string' ? cached.bio : base.bio,
+    avatar: typeof cached.avatar === 'string' ? cached.avatar : base.avatar,
+    initials: typeof cached.initials === 'string' ? cached.initials : base.initials,
+    statusText: typeof cached.statusText === 'string' ? cached.statusText : base.statusText,
+    age: typeof cached.age === 'number' ? cached.age : base.age,
+    city: typeof cached.city === 'string' ? cached.city : base.city,
+    gender: (cached.gender as UserProfile['gender']) || base.gender,
+    status: (cached.status as UserProfile['status']) || base.status,
+  };
+}
+
+function buildGuestProfile(name: string, avatar: string, initials: string): UserProfile {
+  const base: UserProfile = {
+    name,
+    avatar,
+    initials,
+    bio: '',
+    xp: 0,
+    level: 1,
     monthlyXP: 0,
     isBanned: false,
     isMuted: false,
     banReason: '',
-    isPremium: profile.is_premium,
-    isAdmin: !!(profile as any).is_admin || !!profile.is_founder || !!profile.is_direction || !!profile.is_master_op || !!(profile as any).special_badges?.includes('founder'),
-    status: profile.status,
-    joinedAt: profile.created_at,
-    statusText: profile.status_text || '',
-    email: profile.email,
-    emailVerified: profile.email_confirmed_at ? true : false,
-    isFounder: profile.is_founder,
-    isDirection: profile.is_direction,
-    isMasterOp: profile.is_master_op,
-    isIridescent: profile.is_iridescent || false,
-    age: profile.age,
-    city: profile.city,
-    gender: profile.gender,
+    isPremium: false,
+    isAdmin: false,
+    status: 'online',
+    joinedAt: new Date().toISOString(),
+    statusText: '',
   };
+  return mergeGuestProfile(base, loadGuestProfileCache());
 }
 
 export function UserProvider({ children }: { children: ReactNode }) {
@@ -95,61 +112,62 @@ export function UserProvider({ children }: { children: ReactNode }) {
     });
   }, [addNotification]);
 
-  // Charger la session invité depuis localStorage
-  const loadGuestSession = useCallback(() => {
-    try {
-      const guestSessionData = localStorage.getItem(GUEST_SESSION_KEY);
-      if (guestSessionData && isMountedRef.current) {
-        const session = JSON.parse(guestSessionData);
-        const now = Date.now();
-        
-        // Vérifier si la session est encore valide (30 minutes)
-        if (now - session.timestamp < GUEST_SESSION_DURATION) {
-          // Restaurer la session invité
-          if (isMountedRef.current) {
-            setUser(session.user);
-            setProfiles(prev => ({ ...prev, [session.user.name]: session.user }));
-            trackLogin(session.user.name);
-            
-            // Initialiser le service de présence
-            console.log('[UserContext] Initialisation du service de présence pour invité:', session.user.name);
-            presenceService.initialize(session.user.name).then(() => {
-              presenceService.setOnline(session.user.name, undefined, { 
-                name: session.user.name, 
-                avatar: session.user.avatar, 
-                initials: session.user.initials,
-                status: session.user.status || 'online',
-              });
-            }).catch(err => {
-              console.error('[UserContext] Erreur initialisation présence invité:', err);
-            });
-          }
-          return true;
-        } else {
-          // Session expirée, supprimer
-          localStorage.removeItem(GUEST_SESSION_KEY);
-        }
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement de la session invité:', error);
-    }
-    return false;
-  }, [trackLogin]);
-
-  // Sauvegarder la session invité dans localStorage
   const saveGuestSession = useCallback((guestUser: UserProfile) => {
     try {
-      const session = {
-        user: guestUser,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(GUEST_SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem(GUEST_SESSION_KEY, JSON.stringify({ user: guestUser, timestamp: Date.now() }));
     } catch (error) {
       console.error('Erreur lors de la sauvegarde de la session invité:', error);
     }
   }, []);
 
-  // Nettoyage lors du démontage
+  const restoreGuestUser = useCallback((guestUser: UserProfile) => {
+    if (!isMountedRef.current) return;
+    setUser(guestUser);
+    setProfiles(prev => ({ ...prev, [guestUser.name]: guestUser }));
+    trackLogin(guestUser.name);
+    void presenceService.initialize(guestUser.name).then(() => {
+      presenceService.setOnline(guestUser.name, undefined, {
+        name: guestUser.name,
+        avatar: guestUser.avatar,
+        initials: guestUser.initials,
+        status: guestUser.status || 'online',
+      });
+    });
+  }, [trackLogin]);
+
+  const loadGuestSession = useCallback(async (): Promise<boolean> => {
+    const token = getStoredGuestToken();
+    if (token) {
+      const validated = await validateGuestSession(token);
+      if (validated.success && validated.guestName) {
+        const guestUser = buildGuestProfile(
+          validated.guestName,
+          validated.avatar || 'av1',
+          validated.initials || validated.guestName.slice(0, 2).toUpperCase(),
+        );
+        saveGuestSession(guestUser);
+        restoreGuestUser(guestUser);
+        return true;
+      }
+      clearGuestToken();
+    }
+
+    try {
+      const guestSessionData = localStorage.getItem(GUEST_SESSION_KEY);
+      if (guestSessionData && isMountedRef.current) {
+        const session = JSON.parse(guestSessionData);
+        if (Date.now() - session.timestamp < GUEST_SESSION_DURATION) {
+          restoreGuestUser(session.user);
+          return true;
+        }
+        localStorage.removeItem(GUEST_SESSION_KEY);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement de la session invité:', error);
+    }
+    return false;
+  }, [restoreGuestUser, saveGuestSession]);
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -157,48 +175,45 @@ export function UserProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Charger la session Supabase au démarrage
   useEffect(() => {
     const loadSession = async () => {
       try {
-        console.log('Chargement de la session Supabase...');
         const currentUser = await supabaseAuthService.getCurrentUser();
-        console.log('Utilisateur Supabase chargé:', currentUser);
         if (currentUser) {
           setSupabaseUser(currentUser);
-          const mappedUser = profileFromSupabase(currentUser);
+          const mappedUser = mapSupabaseProfile({
+            ...currentUser,
+            status: currentUser.status === 'offline' ? 'online' : currentUser.status,
+          });
           setUser(mappedUser);
           setProfiles(prev => ({ ...prev, [mappedUser.name]: mappedUser }));
           trackLogin(currentUser.id);
-          
-          // Initialiser le service de présence
-          console.log('[UserContext] Initialisation du service de présence pour utilisateur Supabase:', currentUser.id);
-          presenceService.initialize(currentUser.id).then(() => {
-            console.log('[UserContext] Service initialisé, mise en ligne...');
-            presenceService.setOnline(currentUser.id, undefined, { name: currentUser.name, avatar: currentUser.avatar, initials: currentUser.initials, status: currentUser.status });
-          }).catch(err => {
-            console.error('[UserContext] Erreur initialisation présence:', err);
+          void presenceService.initialize(currentUser.name).then(() => {
+            presenceService.setOnline(currentUser.name, undefined, {
+              name: currentUser.name,
+              avatar: currentUser.avatar,
+              initials: currentUser.initials,
+              status: currentUser.status || 'online',
+            });
           });
         } else {
-          console.log('Aucun utilisateur Supabase, chargement session invité');
-          // Essayer de charger la session invité
-          loadGuestSession();
+          await loadGuestSession();
         }
       } catch (error) {
         console.error('Erreur lors du chargement de la session:', error);
-        // En cas d'erreur, essayer de charger la session invité
-        loadGuestSession();
+        await loadGuestSession();
       }
     };
 
-    loadSession();
+    void loadSession();
 
-    // Écouter les changements d'authentification
     const { data: { subscription } } = supabaseAuthService.onAuthStateChange((profile) => {
-      console.log('Changement d\'authentification:', profile);
       if (profile) {
         setSupabaseUser(profile);
-        const mappedUser = profileFromSupabase(profile);
+        const mappedUser = mapSupabaseProfile({
+          ...profile,
+          status: profile.status === 'offline' ? 'online' : profile.status,
+        });
         setUser(mappedUser);
         setProfiles(prev => ({ ...prev, [mappedUser.name]: mappedUser }));
       } else {
@@ -208,83 +223,24 @@ export function UserProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadGuestSession, trackLogin]);
 
-  // S'abonner aux changements de profils en temps réel
   useEffect(() => {
     const channel = supabase
       .channel('profiles_changes')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-        },
+        { event: '*', schema: 'public', table: 'profiles' },
         async (payload) => {
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
             const updatedProfile = payload.new as SupabaseUserProfile;
-            setProfiles(prev => ({
-              ...prev,
-              [updatedProfile.name]: {
-                name: updatedProfile.name,
-                avatar: updatedProfile.avatar,
-                initials: updatedProfile.initials,
-                bio: updatedProfile.bio || '',
-                xp: updatedProfile.xp,
-                level: updatedProfile.level,
-                monthlyXP: 0,
-                isBanned: false,
-                isMuted: false,
-                banReason: '',
-                isPremium: updatedProfile.is_premium,
-                isAdmin: !!updatedProfile.is_admin || !!updatedProfile.is_founder || !!updatedProfile.is_direction || !!updatedProfile.is_master_op,
-                status: updatedProfile.status,
-                joinedAt: updatedProfile.created_at,
-                statusText: updatedProfile.status_text || '',
-                email: updatedProfile.email,
-                emailVerified: updatedProfile.email_confirmed_at ? true : false,
-                isFounder: updatedProfile.is_founder,
-                isDirection: updatedProfile.is_direction,
-                isMasterOp: updatedProfile.is_master_op,
-                isIridescent: updatedProfile.is_iridescent || false,
-                age: updatedProfile.age,
-                city: updatedProfile.city,
-                gender: updatedProfile.gender,
-              },
-            }));
-
-            // Mettre à jour l'utilisateur actuel si c'est lui
-            if (user && user.name === updatedProfile.name) {
-              setUser({
-                name: updatedProfile.name,
-                avatar: updatedProfile.avatar,
-                initials: updatedProfile.initials,
-                bio: updatedProfile.bio || '',
-                xp: updatedProfile.xp,
-                level: updatedProfile.level,
-                monthlyXP: 0,
-                isBanned: false,
-                isMuted: false,
-                banReason: '',
-                isPremium: updatedProfile.is_premium,
-                isAdmin: !!updatedProfile.is_admin || !!updatedProfile.is_founder || !!updatedProfile.is_direction || !!updatedProfile.is_master_op,
-                status: updatedProfile.status,
-                joinedAt: updatedProfile.created_at,
-                statusText: updatedProfile.status_text || '',
-                email: updatedProfile.email,
-                emailVerified: updatedProfile.email_confirmed_at ? true : false,
-                isFounder: updatedProfile.is_founder,
-                isDirection: updatedProfile.is_direction,
-                isMasterOp: updatedProfile.is_master_op,
-                isIridescent: updatedProfile.is_iridescent || false,
-                age: updatedProfile.age,
-                city: updatedProfile.city,
-                gender: updatedProfile.gender,
-              });
+            const mappedProfile = mapSupabaseProfile(updatedProfile);
+            setProfiles(prev => ({ ...prev, [mappedProfile.name]: mappedProfile }));
+            if (user && user.name === mappedProfile.name) {
+              setUser(mappedProfile);
             }
           }
-        }
+        },
       )
       .subscribe();
 
@@ -293,97 +249,50 @@ export function UserProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  const login = useCallback((name: string, avatar: string, initials: string) => {
-    console.log('[UserContext] login appelé avec:', { name, avatar, initials });
-    
-    // Pour le mode invité/local, garder le comportement actuel
-    const existingProfile = profiles[name];
-    const profile: UserProfile = existingProfile || {
-      name, avatar, initials, bio: '',
-      xp: 0, level: 1, monthlyXP: 0,
-      isBanned: false, isMuted: false, banReason: '',
-      isPremium: false, isAdmin: false, status: 'online',
-      joinedAt: new Date().toISOString(),
-    };
-    const updated = { ...profile, avatar, initials, status: 'online' as const };
-    setProfiles(prev => ({ ...prev, [name]: updated }));
-    setUser(updated);
-    trackLogin(name);
-    
-    // Sauvegarder la session invité
-    saveGuestSession(updated);
+  const login = useCallback(async (name: string, avatar: string, initials: string) => {
+    const trimmed = name.trim();
+    const result = await registerGuestSession(trimmed, avatar, initials);
+    if (!result.success) {
+      return { success: false, error: result.error || 'Impossible de créer la session invité' };
+    }
 
-    console.log('[UserContext] Initialisation du service de présence pour:', name);
-    // Initialiser le service de présence avec les données utilisateur
-    presenceService.initialize(name).then(() => {
-      console.log('[UserContext] Service initialisé, mise en ligne...');
-      presenceService.setOnline(name, undefined, { name, avatar, initials, status: updated.status });
-    }).catch(err => {
-      console.error('[UserContext] Erreur initialisation présence:', err);
+    const guestName = result.guestName || trimmed;
+    const profile = buildGuestProfile(
+      guestName,
+      result.avatar || avatar,
+      result.initials || initials,
+    );
+
+    setProfiles(prev => ({ ...prev, [guestName]: profile }));
+    setUser(profile);
+    saveGuestSession(profile);
+    trackLogin(guestName);
+
+    void presenceService.initialize(guestName).then(() => {
+      presenceService.setOnline(guestName, undefined, {
+        name: guestName,
+        avatar: profile.avatar,
+        initials: profile.initials,
+        status: profile.status,
+      });
     });
-  }, [profiles, saveGuestSession, trackLogin]);
+
+    return { success: true };
+  }, [saveGuestSession, trackLogin]);
 
   const loginWithSupabase = useCallback((sbUser: SupabaseUserProfile) => {
+    clearGuestToken();
     setSupabaseUser(sbUser);
-    setUser({
-      name: sbUser.name,
-      avatar: sbUser.avatar,
-      initials: sbUser.initials,
-      bio: sbUser.bio || '',
-      xp: sbUser.xp,
-      level: sbUser.level,
-      monthlyXP: 0,
-      isBanned: false,
-      isMuted: false,
-      banReason: '',
-      isPremium: sbUser.is_premium,
-      isAdmin: !!sbUser.is_admin || !!sbUser.is_founder || !!sbUser.is_direction || !!sbUser.is_master_op,
-      status: sbUser.status,
-      joinedAt: sbUser.created_at,
-      statusText: sbUser.status_text || '',
-      email: sbUser.email,
-      emailVerified: sbUser.email_confirmed_at ? true : false,
-      isFounder: sbUser.is_founder,
-      isDirection: sbUser.is_direction,
-      isMasterOp: sbUser.is_master_op,
-      isIridescent: sbUser.is_iridescent || false,
-      age: sbUser.age,
-      city: sbUser.city,
-      gender: sbUser.gender,
-    });
-    setProfiles(prev => ({
-      ...prev,
-      [sbUser.name]: {
+    const mappedUser = mapSupabaseProfile(sbUser);
+    setUser(mappedUser);
+    setProfiles(prev => ({ ...prev, [mappedUser.name]: mappedUser }));
+    void presenceService.initialize(sbUser.id).then(() => {
+      presenceService.setOnline(sbUser.id, undefined, {
         name: sbUser.name,
         avatar: sbUser.avatar,
         initials: sbUser.initials,
-        bio: sbUser.bio || '',
-        xp: sbUser.xp,
-        level: sbUser.level,
-        monthlyXP: 0,
-        isBanned: false,
-        isMuted: false,
-        banReason: '',
-        isPremium: sbUser.is_premium,
-        isAdmin: !!sbUser.is_admin || !!sbUser.is_founder || !!sbUser.is_direction || !!sbUser.is_master_op,
-        status: sbUser.status,
-        joinedAt: sbUser.created_at,
-        statusText: sbUser.status_text || '',
-        email: sbUser.email,
-        emailVerified: sbUser.email_confirmed_at ? true : false,
-        isFounder: sbUser.is_founder,
-        isDirection: sbUser.is_direction,
-        isMasterOp: sbUser.is_master_op,
-        isIridescent: sbUser.is_iridescent || false,
-        age: sbUser.age,
-        city: sbUser.city,
-        gender: sbUser.gender,
-      },
-    }));
-
-    // Initialiser le service de présence avec les données utilisateur
-    presenceService.initialize(sbUser.id).then(() => {
-      presenceService.setOnline(sbUser.id, undefined, { name: sbUser.name, avatar: sbUser.avatar, initials: sbUser.initials, status: sbUser.status });
+        status: sbUser.status || 'online',
+      });
     });
   }, []);
 
@@ -407,44 +316,49 @@ export function UserProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('pagehide', markOffline);
       window.removeEventListener('beforeunload', markOffline);
     };
-  }, [supabaseUser?.id, user?.name]);
+  }, [supabaseUser?.id, user?.name, user?.status]);
 
   const logout = useCallback(async () => {
-    // Déconnecter le service de présence
     const userId = supabaseUser?.id || user?.name;
     if (userId) {
       presenceService.setOffline(userId);
     }
-    
+
+    if (user && !supabaseUser) {
+      saveGuestProfileCache(user as unknown as Record<string, unknown>);
+    }
+
     if (supabaseUser) {
       await supabaseAuthService.signOut(supabaseUser.id);
     }
     setUser(null);
     setSupabaseUser(null);
-    // Supprimer la session invité
     localStorage.removeItem(GUEST_SESSION_KEY);
+    clearGuestToken();
   }, [supabaseUser, user]);
 
   const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
-    setUser(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev, ...updates };
-      setProfiles(p => ({ ...p, [prev.name]: updated }));
+    if (!user) return;
 
-      if (!supabaseUser) {
-        saveGuestSession(updated);
-      }
+    const updated = { ...user, ...updates };
+    setUser(updated);
+    setProfiles(p => ({ ...p, [updated.name]: updated }));
 
-      const presenceUserId = supabaseUser?.id || updated.name;
-      void presenceService.updateStatus(presenceUserId, updated.status || 'online', {
-        name: updated.name,
-        avatar: updated.avatar,
-        initials: updated.initials,
-      });
+    if (!supabaseUser) {
+      saveGuestSession(updated);
+      saveGuestProfileCache(updated as unknown as Record<string, unknown>);
+    }
 
-      // Synchroniser avec Supabase si l'utilisateur est connecté
-      if (supabaseUser) {
-        supabaseAuthService.updateProfile(supabaseUser.id, {
+    const presenceUserId = supabaseUser?.id || updated.name;
+    void presenceService.updateStatus(presenceUserId, (updated.status || 'online') as UserProfile['status'], {
+      name: updated.name,
+      avatar: updated.avatar,
+      initials: updated.initials,
+    });
+
+    if (supabaseUser) {
+      try {
+        await supabaseAuthService.updateProfile(supabaseUser.id, {
           name: updated.name,
           avatar: updated.avatar,
           initials: updated.initials,
@@ -457,17 +371,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
           age: updated.age,
           city: updated.city,
           gender: updated.gender,
-        }).catch(err => console.error('Erreur lors de la mise à jour du profil:', err));
+        });
+      } catch (err) {
+        console.error('Erreur lors de la mise à jour du profil:', err);
       }
-
-      return updated;
-    });
-  }, [supabaseUser, saveGuestSession]);
+    }
+  }, [user, supabaseUser, saveGuestSession]);
 
   const setStatus = useCallback((status: UserProfile['status']) => {
     updateProfile({ status });
-    
-    // Mettre à jour la présence Supabase
+
     if (supabaseUser) {
       if (status === 'offline') {
         presenceService.setOffline(supabaseUser.id);
@@ -475,18 +388,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
         presenceService.updateStatus(supabaseUser.id, status, {
           name: user?.name || '',
           avatar: user?.avatar || 'av1',
-          initials: user?.initials || ''
+          initials: user?.initials || '',
         });
       }
     } else if (user) {
-      // Pour les invités, utiliser le nom comme identifiant
       if (status === 'offline') {
         presenceService.setOffline(user.name);
       } else {
         presenceService.updateStatus(user.name, status, {
           name: user.name,
           avatar: user.avatar,
-          initials: user.initials
+          initials: user.initials,
         });
       }
     }
@@ -501,7 +413,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value: UserContextType = {
-    user, supabaseUser, login, loginWithSupabase, logout, updateProfile, setStatus, setUserStatusAdmin, profiles, setProfiles
+    user,
+    supabaseUser,
+    login,
+    loginWithSupabase,
+    logout,
+    updateProfile,
+    setStatus,
+    setUserStatusAdmin,
+    profiles,
+    setProfiles,
   };
 
   return (
@@ -513,6 +434,21 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
 export function useUser(): UserContextType {
   const context = useContext(UserContext);
-  if (!context) throw new Error('useUser must be used inside UserProvider');
-  return context;
+  if (context) return context;
+
+  // Fallback défensif: évite un crash complet si l'arbre de providers
+  // est momentanément incohérent (ex: duplication de module / hot-reload).
+  // Les composants verront un état "déconnecté".
+  return {
+    user: null,
+    supabaseUser: null,
+    profiles: {},
+    setProfiles: () => {},
+    login: async () => ({ success: false, error: 'UserProvider manquant' }),
+    loginWithSupabase: () => {},
+    logout: () => {},
+    updateProfile: () => {},
+    setStatus: () => {},
+    setUserStatusAdmin: () => {},
+  };
 }

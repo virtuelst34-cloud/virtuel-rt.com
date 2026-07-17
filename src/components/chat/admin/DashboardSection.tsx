@@ -1,16 +1,18 @@
 import React from 'react';
 import { LayoutDashboard } from 'lucide-react';
-import { useUser, useSalons, useMessages, useXP } from '@/lib/contexts';
 import { SALONS } from '@/lib/chatConfig';
 import Avatar from '../Avatar';
 import DiamondBadge from '../DiamondBadge';
 import { SectionTitle, StatCard } from './AdminComponents';
 
-export default function DashboardSection() {
-  const { profiles } = useUser();
-  const { customSalons } = useSalons();
-  const { salonMessages } = useMessages();
-  const { monthlyXP } = useXP();
+interface Props {
+  profiles: Record<string, any>;
+  customSalons: any[];
+  salonMessages: Record<string, any[]>;
+  monthlyXP: Record<string, number>;
+}
+
+export default function DashboardSection({ profiles, customSalons, salonMessages, monthlyXP }: Props) {
   const all = Object.values(profiles);
   const top = [...all].sort((a, b) => (b.xp || 0) - (a.xp || 0)).slice(0, 5);
   const totalSalons = SALONS.length + (customSalons?.length || 0);

@@ -6,7 +6,7 @@ export interface UserProfile {
   avatar: string;
   initials: string;
   bio?: string;
-  status: 'online' | 'offline' | 'away' | 'busy';
+  status: 'online' | 'offline' | 'away' | 'busy' | 'invisible';
   status_text?: string;
   level: number;
   xp: number;
@@ -62,8 +62,19 @@ export const supabaseAuthService = {
 
         if (profileError) {
           console.error('Erreur RLS lors de la création du profil:', profileError);
-          // Ne pas bloquer l'inscription si le profil échoue - le profil sera créé via trigger
-          // L'utilisateur peut continuer, mais le profil sera manquant jusqu'à ce que le trigger soit configuré
+        }
+
+        // Session immédiate si la confirmation email n'est pas requise
+        if (data.session) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .maybeSingle();
+
+          if (profile) {
+            return { success: true, user: profile as UserProfile };
+          }
         }
 
         return { success: true };
@@ -176,12 +187,6 @@ export const supabaseAuthService = {
   // Déconnexion
   async signOut(userId: string): Promise<void> {
     try {
-      // Mettre à jour le statut hors ligne
-      await supabase
-        .from('profiles')
-        .update({ status: 'offline' })
-        .eq('id', userId);
-
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error);
@@ -229,10 +234,12 @@ export const supabaseAuthService = {
       if (updates.city !== undefined) dbUpdates.city = updates.city;
       if (updates.gender !== undefined) dbUpdates.gender = updates.gender;
       
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update(dbUpdates)
         .eq('id', userId);
+
+      if (error) throw error;
     } catch (error) {
       console.error('Erreur lors de la mise à jour du profil:', error);
     }

@@ -61,7 +61,7 @@ describe('ChatInput', () => {
     const sendButton = screen.getByRole('button', { name: /Envoyer le message/i });
     fireEvent.click(sendButton);
 
-    expect(mockOnSend).toHaveBeenCalledWith('Test message', null, null);
+    expect(mockOnSend).toHaveBeenCalledWith('Test message', null, null, null);
   });
 
   it('devrait appeler onTyping quand on tape', () => {
@@ -125,7 +125,7 @@ describe('ChatInput', () => {
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true });
     
     // Le composant envoie quand même avec Shift+Enter
-    expect(mockOnSend).toHaveBeenCalledWith('Test message', null, null);
+    expect(mockOnSend).toHaveBeenCalledWith('Test message', null, null, null);
   });
 
   it('devrait envoyer avec Enter sans Shift', () => {
@@ -140,7 +140,7 @@ describe('ChatInput', () => {
     
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
     
-    expect(mockOnSend).toHaveBeenCalledWith('Test message', null, null);
+    expect(mockOnSend).toHaveBeenCalledWith('Test message', null, null, null);
   });
 
   it('devrait avoir des attributs ARIA appropriés', () => {

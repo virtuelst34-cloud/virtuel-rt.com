@@ -45,7 +45,7 @@ CREATE POLICY "Founders can update logs audit settings"
       SELECT 1 FROM public.profiles
       WHERE profiles.email = 'virtuelst34@gmail.com'
       AND profiles.is_founder = true
-      AND auth.uid()::text = profiles.id
+      AND auth.uid() = profiles.id
     )
   );
 
@@ -59,7 +59,7 @@ CREATE POLICY "Founders can insert logs audit settings"
       SELECT 1 FROM public.profiles
       WHERE profiles.email = 'virtuelst34@gmail.com'
       AND profiles.is_founder = true
-      AND auth.uid()::text = profiles.id
+      AND auth.uid() = profiles.id
     )
   );
 
@@ -87,7 +87,7 @@ CREATE POLICY "Founders can read audit logs"
       SELECT 1 FROM public.profiles
       WHERE profiles.email = 'virtuelst34@gmail.com'
       AND profiles.is_founder = true
-      AND auth.uid()::text = profiles.id
+      AND auth.uid() = profiles.id
     )
   );
 
@@ -101,7 +101,7 @@ CREATE POLICY "Founders can insert audit logs"
       SELECT 1 FROM public.profiles
       WHERE profiles.email = 'virtuelst34@gmail.com'
       AND profiles.is_founder = true
-      AND auth.uid()::text = profiles.id
+      AND auth.uid() = profiles.id
     )
   );
 

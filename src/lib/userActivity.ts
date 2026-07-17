@@ -97,6 +97,21 @@ export function recordReaction(
   return unlocked;
 }
 
+export function recordMention(
+  userId: string,
+  onUnlock?: (achievement: Achievement) => void
+): Achievement[] {
+  const store = loadStats();
+  const stats = getOrCreateStats(userId);
+  stats.mentionCount += 1;
+  store[userId] = stats;
+  saveStats(store);
+
+  const unlocked = achievementService.checkAchievements(userId, buildAchievementStats(userId));
+  notifyAchievements(unlocked, onUnlock);
+  return unlocked;
+}
+
 export function getUnlockedAchievements(userId: string): Achievement[] {
   return achievementService.getUserAchievements(userId)?.achievements ?? [];
 }

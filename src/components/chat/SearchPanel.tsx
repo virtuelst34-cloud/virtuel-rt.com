@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { Search, X, Filter, MessageSquare, Users, Hash } from 'lucide-react';
+import { Search, X, Filter, MessageSquare, Users, Hash, Loader2 } from 'lucide-react';
 import { useMessages } from '@/lib/contexts/MessagesContext';
 import { useUser } from '@/lib/contexts/UserContext';
 import { SALONS } from '@/lib/chatConfig';
-import { globalSearch, filterMessages, SearchFilters, SearchResult } from '@/lib/searchUtils';
+import { globalSearch, SearchFilters, SearchResult } from '@/lib/searchUtils';
+import { supabaseDbService } from '@/lib/supabaseDb';
 
 interface SearchPanelProps {
   onClose: () => void;
@@ -21,8 +22,9 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
   const [salonFilter, setSalonFilter] = useState<string>('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSearch = useCallback(() => {
+  const handleSearch = useCallback(async () => {
     const filters: SearchFilters = {
       query,
       type: searchType,
@@ -32,8 +34,36 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
       salonId: salonFilter || undefined,
     };
 
-    const searchResults = globalSearch(salonMessages, profiles, SALONS, filters);
-    setResults(searchResults);
+    setLoading(true);
+    try {
+      let searchResults = globalSearch(salonMessages, profiles, SALONS, filters);
+
+      if (query.trim().length >= 2 && (searchType === 'all' || searchType === 'messages')) {
+        const remote = await supabaseDbService.searchMessages(query, {
+          salonId: salonFilter || undefined,
+          authorName: authorName || undefined,
+          limit: 100,
+        });
+        const remoteResults: SearchResult[] = remote.map(msg => ({
+          type: 'message' as const,
+          id: msg.id,
+          title: msg.author_name,
+          subtitle: msg.text?.slice(0, 120) || '',
+          meta: msg.salon_id,
+        }));
+        const seen = new Set(searchResults.map(r => r.id));
+        for (const r of remoteResults) {
+          if (!seen.has(r.id)) {
+            searchResults.push(r);
+            seen.add(r.id);
+          }
+        }
+      }
+
+      setResults(searchResults);
+    } finally {
+      setLoading(false);
+    }
   }, [query, searchType, dateFrom, dateTo, authorName, salonFilter, salonMessages, profiles]);
 
   const clearFilters = () => {

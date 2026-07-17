@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, KeyboardEvent } from 'react';
-import { useUI, useUser } from '@/lib/contexts';
+import { useUI, useUser, useSalons, useMessages, useXP, useModeration, useBadges } from '@/lib/contexts';
+import { hasAdminAccess } from '@/lib/utils/founderCheck';
 import { X, ShieldAlert, LayoutDashboard, Users, Gavel, DoorOpen, Diamond, Award, BarChart2, Lock, EyeOff, LucideIcon, Settings, Bell, MessageSquare, Shield, FileText, Activity } from 'lucide-react';
 import DashboardSection from './admin/DashboardSection';
 import StatsSection from './admin/StatsSection';
@@ -15,7 +16,6 @@ import MessageSettingsSection from './admin/MessageSettingsSection';
 import SecuritySettingsSection from './admin/SecuritySettingsSection';
 import ContentModerationSection from './admin/ContentModerationSection';
 import LogsAuditSection from './admin/LogsAuditSection';
-import { isFounder } from '@/lib/utils/founderCheck';
 
 interface Tab {
   id: string;
@@ -42,7 +42,12 @@ const TABS: Tab[] = [
 
 export default function AdminPanel() {
   const { setShowAdmin } = useUI();
-  const { user, supabaseUser } = useUser();
+  const { user, supabaseUser, profiles, setProfiles, setUserStatusAdmin } = useUser();
+  const { customSalons, addSalon, deleteSalon, hiddenSalons, setHiddenSalons } = useSalons();
+  const { salonMessages } = useMessages();
+  const { monthlyXP } = useXP();
+  const { banUser, unbanUser, muteUser, unmuteUser } = useModeration();
+  const { customBadges, setCustomBadges } = useBadges();
   const [activeTab, setActiveTab] = useState('dashboard');
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -52,15 +57,12 @@ export default function AdminPanel() {
   // Un invité (pas de session Supabase) ne peut qu'observer
   const isReadOnly = !supabaseUser;
 
-  // Sécurité : si l'utilisateur n'est pas admin/fondateur, fermer le panneau
+  // Sécurité : fermer si l'utilisateur n'a pas les droits admin
   useEffect(() => {
-    if (user && !user.isAdmin && !user.isFounder) {
+    if (user && !hasAdminAccess(user)) {
       setShowAdmin(false);
     }
   }, [user, setShowAdmin]);
-
-  // Le fondateur a toujours accès à tout, contournant le système de permissions
-  const isFounderWithFullAccess = user?.isFounder || user?.isAdmin;
 
   // Focus management
   useEffect(() => {
@@ -160,20 +162,20 @@ export default function AdminPanel() {
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-5" role="tabpanel" aria-live="polite">
-            {activeTab === 'dashboard'      && <DashboardSection />}
-            {activeTab === 'stats'          && <StatsSection />}
-            {activeTab === 'salons'         && <SalonsSection readOnly={isReadOnly} />}
-            {activeTab === 'users'          && <UsersSection readOnly={isReadOnly} />}
-            {activeTab === 'moderation'     && <ModerationSection readOnly={isReadOnly} />}
-            {activeTab === 'badges'         && <BadgesSection readOnly={isReadOnly} />}
-            {activeTab === 'special'        && <SpecialBadgesSection readOnly={isReadOnly} />}
-            {activeTab === 'permissions'    && <PermissionsSection readOnly={isReadOnly} />}
-            {activeTab === 'settings'       && <GlobalSettingsSection readOnly={isReadOnly} />}
-            {activeTab === 'notifications'  && <NotificationsSettingsSection readOnly={isReadOnly} />}
-            {activeTab === 'messages'       && <MessageSettingsSection readOnly={isReadOnly} />}
-            {activeTab === 'security'       && <SecuritySettingsSection readOnly={isReadOnly} />}
-            {activeTab === 'content'        && <ContentModerationSection readOnly={isReadOnly} />}
-            {activeTab === 'logs'           && <LogsAuditSection readOnly={isReadOnly} />}
+            {activeTab === 'dashboard'      && <DashboardSection profiles={profiles} customSalons={customSalons} salonMessages={salonMessages} monthlyXP={monthlyXP} />}
+            {activeTab === 'stats'          && <StatsSection profiles={profiles} customSalons={customSalons} salonMessages={salonMessages} monthlyXP={monthlyXP} />}
+            {activeTab === 'salons'         && <SalonsSection readOnly={isReadOnly} customSalons={customSalons} addSalon={addSalon} deleteSalon={deleteSalon} hiddenSalons={hiddenSalons} setHiddenSalons={setHiddenSalons} />}
+            {activeTab === 'users'          && <UsersSection readOnly={isReadOnly} profiles={profiles} setProfiles={setProfiles} setUserStatusAdmin={setUserStatusAdmin} banUser={banUser} unbanUser={unbanUser} muteUser={muteUser} unmuteUser={unmuteUser} />}
+            {activeTab === 'moderation'     && <ModerationSection readOnly={isReadOnly} profiles={profiles} unbanUser={unbanUser} unmuteUser={unmuteUser} />}
+            {activeTab === 'badges'         && <BadgesSection readOnly={isReadOnly} customBadges={customBadges} setCustomBadges={setCustomBadges} />}
+            {activeTab === 'special'        && <SpecialBadgesSection readOnly={isReadOnly} profiles={profiles} setProfiles={setProfiles} />}
+            {activeTab === 'permissions'    && <PermissionsSection readOnly={isReadOnly} user={user} />}
+            {activeTab === 'settings'       && <GlobalSettingsSection readOnly={isReadOnly} user={user} />}
+            {activeTab === 'notifications'  && <NotificationsSettingsSection readOnly={isReadOnly} user={user} />}
+            {activeTab === 'messages'       && <MessageSettingsSection readOnly={isReadOnly} user={user} />}
+            {activeTab === 'security'       && <SecuritySettingsSection readOnly={isReadOnly} user={user} />}
+            {activeTab === 'content'        && <ContentModerationSection readOnly={isReadOnly} user={user} />}
+            {activeTab === 'logs'           && <LogsAuditSection readOnly={isReadOnly} user={user} />}
           </div>
         </div>
       </div>

@@ -1,0 +1,16 @@
+# Supabase local / CLI — project ref depuis VITE_SUPABASE_URL
+project_id = "mqghveoldsidfxgvefts"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[functions.rate-limit]
+verify_jwt = false

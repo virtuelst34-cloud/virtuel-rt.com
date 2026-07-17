@@ -104,10 +104,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 Désolé, quelque chose s'est mal passé. L'application a rencontré une erreur inattendue.
               </p>
 
-              { (import.meta as any).env?.DEV && this.state.error && (
+              { this.state.error && (
                 <div className="bg-secondary border border-border rounded-lg p-4 mb-6 text-left">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">
-                    Détails de l'erreur (dev only):
+                    Détails de l'erreur:
                   </p>
                   <pre className="text-xs text-red-400 overflow-auto max-h-32">
                     {this.state.error.toString()}

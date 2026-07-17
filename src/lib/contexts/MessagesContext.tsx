@@ -1,23 +1,16 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '../supabase';
 import { supabaseDbService, Message as SupabaseMessage } from '../supabaseDb';
 import { offlineModeService } from '../offlineMode';
+import {
+  ChatMessage,
+  convertSupabaseMessage,
+  resolveReplyReferences,
+  toDbMessageUpdates,
+  dedupeAndSortMessages,
+} from '../utils/messageUtils';
 
-interface Message {
-  id: string;
-  author_name: string;
-  author_avatar: string;
-  author_initials: string;
-  text: string;
-  timestamp?: string;
-  created_date: string;
-  reactions?: Record<string, string[]>;
-  pinned?: boolean;
-  is_system?: boolean;
-  is_announcement?: boolean;
-  replyTo?: Message;
-  image_url?: string;
-}
+type Message = ChatMessage;
 
 interface MessagesContextType {
   salonMessages: Record<string, Message[]>;
@@ -25,10 +18,12 @@ interface MessagesContextType {
   getMessages: (salonId: string) => Message[];
   deleteMessage: (salonId: string, messageId: string) => void;
   pinMessage: (salonId: string, messageId: string) => void;
-  updateReaction: (salonId: string, messageId: string, reactions: Record<string, string[]>) => void;
+  updateMessage: (salonId: string, messageId: string, updates: Partial<Message>) => void;
+  updateReaction: (salonId: string, messageId: string, reactions: Record<string, string[]>, actorName?: string) => void;
   loadMessages: (salonId: string, limit?: number, offset?: number) => Promise<void>;
   loadMoreMessages: (salonId: string) => Promise<void>;
   setCurrentSalonId: (salonId: string | null) => void;
+  isLoadingHistory: boolean;
 }
 
 const MessagesContext = createContext<MessagesContextType | null>(null);
@@ -36,27 +31,20 @@ const MessagesContext = createContext<MessagesContextType | null>(null);
 const MAX_PER_SALON = 200;
 const PAGE_SIZE = 50;
 
-function convertSupabaseMessage(supabaseMsg: SupabaseMessage): Message {
-  return {
-    id: supabaseMsg.id,
-    author_name: supabaseMsg.author_name,
-    author_avatar: supabaseMsg.author_avatar,
-    author_initials: supabaseMsg.author_initials,
-    text: supabaseMsg.text,
-    created_date: supabaseMsg.created_date,
-    reactions: supabaseMsg.reactions || undefined,
-    pinned: supabaseMsg.pinned || undefined,
-    is_system: supabaseMsg.is_system || undefined,
-    is_announcement: supabaseMsg.is_announcement || undefined,
-    reply_to: supabaseMsg.reply_to || undefined,
-    image_url: supabaseMsg.image_url || undefined,
-  };
+function mergeIncomingMessage(existing: Message[], incoming: Message): Message[] {
+  const resolved = resolveReplyReferences([...existing, incoming]);
+  const incomingResolved = resolved[resolved.length - 1];
+  if (existing.some(m => m.id === incomingResolved.id)) return existing;
+  return [...existing, incomingResolved].slice(-MAX_PER_SALON);
 }
 
 export function MessagesProvider({ children }: { children: ReactNode }) {
   const [salonMessages, setSalonMessages] = useState<Record<string, Message[]>>({});
   const [currentSalonId, setCurrentSalonId] = useState<string | null>(null);
-  const [subscription, setSubscription] = useState<any>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const loadingHistoryRef = useRef(false);
+  const historyExhaustedRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     offlineModeService.setSyncHandler(async (action) => {
@@ -67,48 +55,41 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     return () => offlineModeService.setSyncHandler(null);
   }, []);
 
-  // Charger les messages depuis Supabase avec pagination
+  const applyLoadedMessages = useCallback((salonId: string, rawMessages: ReturnType<typeof convertSupabaseMessage>[], offset: number) => {
+    const resolved = resolveReplyReferences(rawMessages);
+    const sorted = dedupeAndSortMessages(resolved);
+
+    if (rawMessages.length < PAGE_SIZE) {
+      historyExhaustedRef.current[salonId] = true;
+    }
+
+    setSalonMessages(prev => {
+      if (offset === 0) {
+        return { ...prev, [salonId]: sorted.slice(0, MAX_PER_SALON) };
+      }
+
+      const existing = prev[salonId] || [];
+      const combined = dedupeAndSortMessages([...sorted, ...existing]);
+      return { ...prev, [salonId]: combined.slice(0, MAX_PER_SALON) };
+    });
+
+    resolved.forEach(msg => {
+      offlineModeService.cacheMessage({
+        id: msg.id,
+        salonId,
+        author: msg.author_name,
+        text: msg.text,
+        timestamp: new Date(msg.created_date),
+        synced: true,
+      });
+    });
+  }, []);
+
   const loadMessages = useCallback(async (salonId: string, limit: number = PAGE_SIZE, offset: number = 0) => {
     try {
       const messages = await supabaseDbService.getMessages(salonId, limit, offset);
       const converted = messages.map(convertSupabaseMessage);
-      // Garder les messages système/accueil en tête et éviter les doublons
-      const unique = converted.filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
-      const sorted = unique.sort((a, b) => {
-        if (a.is_announcement && !b.is_announcement) return -1;
-        if (!a.is_announcement && b.is_announcement) return 1;
-        return new Date(a.created_date).getTime() - new Date(b.created_date).getTime();
-      });
-      
-      if (offset === 0) {
-        setSalonMessages(prev => ({
-          ...prev,
-          [salonId]: sorted.slice(0, MAX_PER_SALON)
-        }));
-      } else {
-        setSalonMessages(prev => {
-          const existing = prev[salonId] || [];
-          const combined = [...sorted, ...existing];
-          const unique = combined.filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
-          const finalSorted = unique.sort((a, b) => {
-            if (a.is_announcement && !b.is_announcement) return -1;
-            if (!a.is_announcement && b.is_announcement) return 1;
-            return new Date(a.created_date).getTime() - new Date(b.created_date).getTime();
-          });
-          return { ...prev, [salonId]: finalSorted.slice(0, MAX_PER_SALON) };
-        });
-      }
-
-      converted.forEach(msg => {
-        offlineModeService.cacheMessage({
-          id: msg.id,
-          salonId,
-          author: msg.author_name,
-          text: msg.text,
-          timestamp: new Date(msg.created_date),
-          synced: true,
-        });
-      });
+      applyLoadedMessages(salonId, converted, offset);
     } catch (error) {
       console.error('Erreur lors du chargement des messages:', error);
       const cached = offlineModeService.getCachedMessages(salonId, MAX_PER_SALON);
@@ -124,60 +105,77 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         setSalonMessages(prev => ({ ...prev, [salonId]: fromCache.reverse() }));
       }
     }
-  }, []);
+  }, [applyLoadedMessages]);
 
-  // Charger plus de messages (pagination)
   const loadMoreMessages = useCallback(async (salonId: string) => {
-    const existing = salonMessages[salonId] || [];
-    const offset = existing.length;
-    await loadMessages(salonId, PAGE_SIZE, offset);
+    if (loadingHistoryRef.current || historyExhaustedRef.current[salonId]) return;
+
+    loadingHistoryRef.current = true;
+    setIsLoadingHistory(true);
+    try {
+      const existing = salonMessages[salonId] || [];
+      await loadMessages(salonId, PAGE_SIZE, existing.length);
+    } finally {
+      loadingHistoryRef.current = false;
+      setIsLoadingHistory(false);
+    }
   }, [salonMessages, loadMessages]);
 
-  // S'abonner aux messages en temps réel
   useEffect(() => {
     if (!currentSalonId) return;
 
-    // Nettoyer l'abonnement précédente
-    if (subscription) {
-      supabase.removeChannel(subscription);
+    if (subscriptionRef.current) {
+      supabase.removeChannel(subscriptionRef.current);
+      subscriptionRef.current = null;
     }
 
-    // Charger les messages existants
+    historyExhaustedRef.current[currentSalonId] = false;
     loadMessages(currentSalonId);
 
-    // S'abonner aux nouveaux messages
-    const channel = supabaseDbService.subscribeToMessages(currentSalonId, (message) => {
-      setSalonMessages(prev => {
-        const existing = prev[currentSalonId] || [];
-        const converted = convertSupabaseMessage(message);
-        // Éviter les doublons
-        if (existing.some(m => m.id === converted.id)) return prev;
-        const updated = [...existing, converted].slice(-MAX_PER_SALON);
-        return { ...prev, [currentSalonId]: updated };
-      });
+    const channel = supabaseDbService.subscribeToMessages(currentSalonId, {
+      onInsert: (message) => {
+        setSalonMessages(prev => {
+          const existing = prev[currentSalonId] || [];
+          const converted = convertSupabaseMessage(message);
+          return { ...prev, [currentSalonId]: mergeIncomingMessage(existing, converted) };
+        });
+      },
+      onUpdate: (message) => {
+        setSalonMessages(prev => {
+          const existing = prev[currentSalonId] || [];
+          const converted = convertSupabaseMessage(message);
+          const without = existing.filter(m => m.id !== converted.id);
+          return { ...prev, [currentSalonId]: mergeIncomingMessage(without, converted) };
+        });
+      },
+      onDelete: (messageId) => {
+        setSalonMessages(prev => ({
+          ...prev,
+          [currentSalonId]: (prev[currentSalonId] || []).filter(m => m.id !== messageId),
+        }));
+      },
     });
 
-    setSubscription(channel);
+    subscriptionRef.current = channel;
 
     return () => {
-      supabase.removeChannel(channel);
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
   }, [currentSalonId, loadMessages]);
 
   const addMessage = useCallback(async (salonId: string, message: Message) => {
-    // Générer un ID temporaire si pas d'ID
     const tempId = message.id || `temp-${Date.now()}-${Math.random()}`;
     const messageWithId = { ...message, id: tempId };
 
-    // Ajouter localement pour une réponse immédiate
     setSalonMessages(prev => {
       const existing = prev[salonId] || [];
       if (existing.some(m => m.id === tempId)) return prev;
-      const updated = [...existing, messageWithId].slice(-MAX_PER_SALON);
-      return { ...prev, [salonId]: updated };
+      return { ...prev, [salonId]: mergeIncomingMessage(existing, messageWithId) };
     });
 
-    // Synchroniser avec Supabase (ou mettre en file d'attente si hors ligne)
     const supabaseMessage: Omit<SupabaseMessage, 'id' | 'created_at'> = {
       salon_id: salonId,
       author_name: message.author_name,
@@ -208,13 +206,13 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
     try {
       const result = await supabaseDbService.addMessage(supabaseMessage);
-      
-      // Remplacer le message temporaire par le vrai message avec l'ID du serveur
+
       if (result && result.id !== tempId) {
         setSalonMessages(prev => {
           const existing = prev[salonId] || [];
-          const updated = existing.map(m => m.id === tempId ? convertSupabaseMessage(result) : m);
-          return { ...prev, [salonId]: updated };
+          const withoutTemp = existing.filter(m => m.id !== tempId);
+          const converted = convertSupabaseMessage(result);
+          return { ...prev, [salonId]: mergeIncomingMessage(withoutTemp, converted) };
         });
       }
 
@@ -247,7 +245,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const deleteMessage = useCallback(async (salonId: string, messageId: string) => {
     setSalonMessages(prev => ({
       ...prev,
-      [salonId]: (prev[salonId] || []).filter(m => m.id !== messageId)
+      [salonId]: (prev[salonId] || []).filter(m => m.id !== messageId),
     }));
 
     try {
@@ -258,40 +256,69 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pinMessage = useCallback(async (salonId: string, messageId: string) => {
-    setSalonMessages(prev => ({
-      ...prev,
-      [salonId]: (prev[salonId] || []).map(m =>
-        m.id === messageId ? { ...m, pinned: !m.pinned } : m
-      )
-    }));
+    let newPinned = false;
+
+    setSalonMessages(prev => {
+      const message = prev[salonId]?.find(m => m.id === messageId);
+      if (!message) return prev;
+      newPinned = !message.pinned;
+      return {
+        ...prev,
+        [salonId]: (prev[salonId] || []).map(m =>
+          m.id === messageId ? { ...m, pinned: newPinned } : m
+        ),
+      };
+    });
 
     try {
-      const message = salonMessages[salonId]?.find(m => m.id === messageId);
-      if (message) {
-        await supabaseDbService.updateMessage(messageId, { pinned: !message.pinned });
-      }
+      await supabaseDbService.updateMessage(messageId, { pinned: newPinned });
     } catch (error) {
       console.error('Erreur lors de l\'épinglage du message:', error);
     }
-  }, [salonMessages]);
+  }, []);
 
-  const updateReaction = useCallback(async (salonId: string, messageId: string, reactions: Record<string, string[]>) => {
+  const updateMessage = useCallback(async (salonId: string, messageId: string, updates: Partial<Message>) => {
+    setSalonMessages(prev => ({
+      ...prev,
+      [salonId]: (prev[salonId] || []).map(m =>
+        m.id === messageId ? { ...m, ...updates } : m
+      ),
+    }));
+
+    try {
+      await supabaseDbService.updateMessage(messageId, toDbMessageUpdates(updates));
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du message:', error);
+    }
+  }, []);
+
+  const updateReaction = useCallback(async (salonId: string, messageId: string, reactions: Record<string, string[]>, actorName?: string) => {
     setSalonMessages(prev => ({
       ...prev,
       [salonId]: (prev[salonId] || []).map(m =>
         m.id === messageId ? { ...m, reactions } : m
-      )
+      ),
     }));
 
     try {
-      await supabaseDbService.updateMessage(messageId, { reactions });
+      await supabaseDbService.updateMessage(messageId, { reactions }, actorName);
     } catch (error) {
       console.error('Erreur lors de la mise à jour des réactions:', error);
     }
   }, []);
 
   const value: MessagesContextType = {
-    salonMessages, addMessage, getMessages, deleteMessage, pinMessage, updateReaction, loadMessages, loadMoreMessages, setCurrentSalonId
+    salonMessages,
+    addMessage,
+    getMessages,
+    deleteMessage,
+    pinMessage,
+    updateMessage,
+    updateReaction,
+    loadMessages,
+    loadMoreMessages,
+    setCurrentSalonId,
+    isLoadingHistory,
   };
 
   return (

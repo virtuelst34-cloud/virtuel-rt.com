@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   name TEXT NOT NULL,
   avatar TEXT NOT NULL DEFAULT 'av1',
   initials TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'online' CHECK (status IN ('online', 'offline', 'away', 'busy')),
+  status TEXT NOT NULL DEFAULT 'online' CHECK (status IN ('online', 'offline', 'away', 'busy', 'invisible')),
   level INTEGER NOT NULL DEFAULT 1,
   xp INTEGER NOT NULL DEFAULT 0,
   is_premium BOOLEAN NOT NULL DEFAULT false,
@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS public.messages (
   is_announcement BOOLEAN DEFAULT false,
   reply_to TEXT,
   image_url TEXT,
+  edited BOOLEAN DEFAULT false,
+  edited_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

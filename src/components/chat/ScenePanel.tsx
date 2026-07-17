@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Mic, MicOff } from 'lucide-react';
 import Avatar from './Avatar';
-import { AVATAR_STYLES } from '@/lib/chatConfig';
 
 interface SceneMember {
   name: string;
   avatar: string;
   initials: string;
   speaking: boolean;
+  micLevel?: number;
   isMe?: boolean;
 }
 
@@ -18,27 +18,16 @@ interface ScenePanelProps {
   userMicLevel: number;
 }
 
-// Barre VU animée pour un membre qui parle
-function VUBar({ speaking }: { speaking: boolean }) {
-  const [bars, setBars] = useState([3, 5, 7, 5, 3]);
-
-  useEffect(() => {
-    if (!speaking) { setBars([3, 5, 7, 5, 3]); return; }
-    const id = setInterval(() => {
-      setBars([
-        Math.floor(Math.random() * 10) + 3,
-        Math.floor(Math.random() * 14) + 4,
-        Math.floor(Math.random() * 18) + 6,
-        Math.floor(Math.random() * 14) + 4,
-        Math.floor(Math.random() * 10) + 3,
-      ]);
-    }, 120);
-    return () => clearInterval(id);
-  }, [speaking]);
+// Barre VU basée sur le niveau micro réel (0–100)
+function VUBar({ speaking, level = 0 }: { speaking: boolean; level?: number }) {
+  const normalized = speaking ? Math.min(100, Math.max(0, level)) / 100 : 0;
+  const heights = [0.35, 0.55, 0.85, 0.55, 0.35].map(
+    factor => Math.round(4 + normalized * 18 * factor)
+  );
 
   return (
     <div className="flex items-end gap-[2px] h-5" aria-hidden="true">
-      {bars.map((h, i) => (
+      {heights.map((h, i) => (
         <div key={i}
           className={`w-[3px] rounded-sm transition-all duration-100 ${speaking ? 'bg-emerald-400' : 'bg-muted-foreground/20'}`}
           style={{ height: h }} />
@@ -47,16 +36,15 @@ function VUBar({ speaking }: { speaking: boolean }) {
   );
 }
 
-export default function ScenePanel({ salonId, members, micActive, userMicLevel }: ScenePanelProps) {
-  // Ajouter l'utilisateur courant si son micro est actif
+export default function ScenePanel({ members, micActive, userMicLevel }: ScenePanelProps) {
   const allMembers = micActive
-    ? [...members, { name: 'Vous', avatar: 'av1', initials: 'V', speaking: true, isMe: true }]
+    ? [...members, { name: 'Vous', avatar: 'av1', initials: 'V', speaking: userMicLevel > 8, micLevel: userMicLevel, isMe: true }]
     : members;
 
   if (allMembers.length === 0) return null;
 
   return (
-    <div 
+    <div
       className="border-b border-border bg-card/60 px-4 py-3 shrink-0"
       role="region"
       aria-label="Participants sur scène">
@@ -80,7 +68,7 @@ export default function ScenePanel({ salonId, members, micActive, userMicLevel }
               </div>
             </div>
             <span className={`text-[10px] font-medium truncate max-w-[60px] ${m.isMe ? 'text-primary' : 'text-foreground'}`}>{m.name}</span>
-            <VUBar speaking={m.speaking} />
+            <VUBar speaking={m.speaking} level={m.micLevel ?? (m.speaking ? userMicLevel : 0)} />
           </div>
         ))}
       </div>

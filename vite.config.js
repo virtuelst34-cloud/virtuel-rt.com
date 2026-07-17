@@ -8,25 +8,34 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
-      manifest: {
-        name: 'Virtuel',
-        short_name: 'Virtuel',
-        description: 'Application de chat en temps réel',
-        theme_color: '#8b5cf6',
-        icons: [
+      // Ne pas injecter de SW pendant `npm run dev`
+      devOptions: { enabled: false },
+      includeAssets: ['logo.png', 'manifest.json'],
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        runtimeCaching: [
           {
-            src: '/pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
+            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'supabase-api',
+              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
+              networkTimeoutSeconds: 8,
+            },
           },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
-      }
+        ],
+      },
+      manifest: {
+        name: 'Virtuel-RT',
+        short_name: 'Virtuel',
+        description: 'Chat en temps réel',
+        theme_color: '#8b5cf6',
+        background_color: '#0f0f14',
+        display: 'standalone',
+        start_url: '/',
+        lang: 'fr',
+        icons: [{ src: '/logo.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }],
+      },
     })
   ],
   resolve: {
@@ -56,6 +65,11 @@ export default defineConfig({
   build: {
     target: 'ES2020',
     minify: 'terser',
+    css: {
+      modules: {
+        scopeBehaviour: 'global'
+      }
+    },
     terserOptions: {
       compress: {
         drop_console: true,
@@ -65,60 +79,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        /**
-         * Code Splitting Strategy:
-         * 1. vendor.js - Dépendances tierces (React, Radix, etc.)
-         * 2. components-*.js - Composants lazy loadés
-         * 3. hooks-*.js - Hooks et utilitaires
-         * 4. index.js - Code application principal
-         */
-        manualChunks: {
-          // Vendor libraries
-          'vendor': [
-            'react',
-            'react-dom',
-            'react-router-dom',
-            '@tanstack/react-query',
-            'framer-motion',
-            'lucide-react',
-            'date-fns',
-          ],
-          // Radix UI components
-          'radix-ui': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-label',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-progress',
-            '@radix-ui/react-scroll-area',
-            '@radix-ui/react-separator',
-            '@radix-ui/react-slider',
-            '@radix-ui/react-switch',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-tooltip',
-          ],
-          // Utilities & helpers
-          'utils': [
-            'clsx',
-            'class-variance-authority',
-            'zod',
-            'react-hook-form',
-          ],
-          // Lazy-loaded admin components
-          'admin': [
-            '/src/components/chat/AdminPanel',
-          ],
-          // Lazy-loaded panels
-          'panels': [
-            '/src/components/chat/DirectMessagePanel',
-            '/src/components/chat/NotificationsPanel',
-            '/src/components/chat/SettingsPanel',
-          ],
-        },
-        // Optimize chunk names
+        // Code splitting automatique - laisser Vite gérer
         chunkFileNames: (chunkInfo) => {
           const facadeModuleId = chunkInfo.facadeModuleId ? chunkInfo.facadeModuleId.split('/').pop().split('.')[0] : 'chunk';
           return 'chunks/[name]-[hash].js';

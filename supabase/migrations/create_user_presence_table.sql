@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS public.user_presence (
   name TEXT NOT NULL,
   avatar TEXT NOT NULL,
   initials TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'online' CHECK (status IN ('online', 'away', 'busy')),
+  status TEXT NOT NULL DEFAULT 'online' CHECK (status IN ('online', 'away', 'busy', 'invisible')),
   current_salon_id TEXT,
   last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -26,6 +26,10 @@ DROP POLICY IF EXISTS "Allow public read access" ON public.user_presence;
 DROP POLICY IF EXISTS "Allow users to update own presence" ON public.user_presence;
 DROP POLICY IF EXISTS "Allow users to insert own presence" ON public.user_presence;
 DROP POLICY IF EXISTS "Allow users to delete own presence" ON public.user_presence;
+DROP POLICY IF EXISTS "Allow authenticated users to update own presence" ON public.user_presence;
+DROP POLICY IF EXISTS "Allow authenticated users to insert own presence" ON public.user_presence;
+DROP POLICY IF EXISTS "Allow authenticated users to delete own presence" ON public.user_presence;
+DROP POLICY IF EXISTS "Allow users to manage own presence by name" ON public.user_presence;
 
 -- Politique RLS : permettre à tous de lire la présence (pour afficher les utilisateurs en ligne)
 CREATE POLICY "Allow public read access" ON public.user_presence

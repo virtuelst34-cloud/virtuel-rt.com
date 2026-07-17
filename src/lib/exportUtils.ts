@@ -1,7 +1,7 @@
 import { Message } from './searchUtils';
 
 export interface ExportOptions {
-  format: 'json' | 'pdf';
+  format: 'json' | 'text';
   includeMetadata?: boolean;
   includeReactions?: boolean;
 }
@@ -53,12 +53,12 @@ export function exportToJSON(
 }
 
 /**
- * Export conversation en PDF (format texte simple)
+ * Export conversation en texte brut (.txt)
  */
-export function exportToPDF(
+export function exportToText(
   messages: Message[],
   salonName: string,
-  options: ExportOptions = { format: 'pdf' }
+  options: ExportOptions = { format: 'text' }
 ): void {
   let content = `Conversation - ${salonName}\n`;
   content += `Exporté le: ${new Date().toLocaleString('fr-FR')}\n`;
@@ -99,6 +99,9 @@ export function exportConversation(
   if (options.format === 'json') {
     exportToJSON(messages, salonName, options);
   } else {
-    exportToPDF(messages, salonName, options);
+    exportToText(messages, salonName, options);
   }
 }
+
+/** @deprecated alias */
+export const exportToPDF = exportToText;

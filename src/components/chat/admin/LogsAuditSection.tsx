@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Save, RefreshCw, Download, Search, Filter, Calendar, User, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { SectionTitle } from './AdminComponents';
-import { isFounder } from '@/lib/utils/founderCheck';
-import { useUser } from '@/lib/contexts';
+import { hasAdminAccess } from '@/lib/utils/founderCheck';
 
 interface LogEntry {
   id: string;
@@ -17,6 +16,7 @@ interface LogEntry {
 }
 
 interface LogsAuditSettings {
+  id?: string;
   enable_logging: boolean;
   log_retention_days: number;
   log_admin_actions: boolean;
@@ -42,10 +42,12 @@ const DEFAULT_SETTINGS: LogsAuditSettings = {
   alert_email_recipients: [],
 };
 
-interface Props { readOnly?: boolean; }
+interface Props {
+  readOnly?: boolean;
+  user: any;
+}
 
-export default function LogsAuditSection({ readOnly = false }: Props) {
-  const { user } = useUser();
+export default function LogsAuditSection({ readOnly = false, user }: Props) {
   const [settings, setSettings] = useState<LogsAuditSettings>(DEFAULT_SETTINGS);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,7 @@ export default function LogsAuditSection({ readOnly = false }: Props) {
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const [newEmail, setNewEmail] = useState('');
 
-  const canModify = !readOnly && isFounder(user);
+  const canModify = hasAdminAccess(user, readOnly);
 
   useEffect(() => {
     loadSettings();
@@ -107,11 +109,14 @@ export default function LogsAuditSection({ readOnly = false }: Props) {
   const saveSettings = async () => {
     try {
       setSaving(true);
-      const { error } = await supabase
-        .from('logs_audit_settings')
-        .upsert(settings);
+      const { id, ...payload } = settings;
+      const { error } = id
+        ? await supabase.from('logs_audit_settings').update(payload).eq('id', id)
+        : await supabase.from('logs_audit_settings').insert(payload);
 
       if (error) throw error;
+
+      if (!id) await loadSettings();
 
       setHasChanges(false);
       alert('Paramètres de logs sauvegardés avec succès !');

@@ -23,12 +23,14 @@ DROP POLICY IF EXISTS "Users can send friend requests" ON public.friends;
 DROP POLICY IF EXISTS "Users can update friend status" ON public.friends;
 
 -- Politique : Les utilisateurs peuvent lire leurs propres relations d'amis
+-- Cette politique utilise les pseudos (user_id et friend_id sont des TEXT)
 CREATE POLICY "Users can read their own friends"
   ON public.friends
   FOR SELECT
   TO authenticated
   USING (
-    auth.uid()::text = user_id OR auth.uid()::text = friend_id
+    user_id IN (SELECT name FROM public.profiles WHERE id = auth.uid())
+    OR friend_id IN (SELECT name FROM public.profiles WHERE id = auth.uid())
   );
 
 -- Politique : Les utilisateurs peuvent envoyer des demandes d'amis
@@ -37,7 +39,7 @@ CREATE POLICY "Users can send friend requests"
   FOR INSERT
   TO authenticated
   WITH CHECK (
-    auth.uid()::text = user_id
+    user_id IN (SELECT name FROM public.profiles WHERE id = auth.uid())
   );
 
 -- Politique : Les utilisateurs peuvent mettre à jour le statut des demandes reçues
@@ -46,10 +48,10 @@ CREATE POLICY "Users can update friend status"
   FOR UPDATE
   TO authenticated
   USING (
-    auth.uid()::text = friend_id
+    friend_id IN (SELECT name FROM public.profiles WHERE id = auth.uid())
   )
   WITH CHECK (
-    auth.uid()::text = friend_id
+    friend_id IN (SELECT name FROM public.profiles WHERE id = auth.uid())
   );
 
 -- Trigger pour mettre à jour updated_at automatiquement

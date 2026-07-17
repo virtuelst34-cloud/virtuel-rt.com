@@ -1,23 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BarChart2 } from 'lucide-react';
-import { useUser, useMessages, useXP, useSalons } from '@/lib/contexts';
 import { SALONS } from '@/lib/chatConfig';
+import { presenceService } from '@/lib/presenceService';
+import { supabaseDbService } from '@/lib/supabaseDb';
 import { SectionTitle, StatCard } from './AdminComponents';
 
-export default function StatsSection() {
-  const { profiles } = useUser();
-  const { salonMessages } = useMessages();
-  const { monthlyXP } = useXP();
-  const { customSalons } = useSalons();
+interface Props {
+  profiles: Record<string, any>;
+  customSalons: any[];
+  salonMessages: Record<string, any[]>;
+  monthlyXP: Record<string, number>;
+}
 
-  const all = Object.values(profiles);
+export default function StatsSection({ profiles, customSalons, salonMessages, monthlyXP }: Props) {
+  const [dbMessageCounts, setDbMessageCounts] = useState<Record<string, number> | null>(null);
+
+  const all = Object.values(profiles || {});
   const totalSalons = SALONS.length + (customSalons?.length || 0);
   const allSalons = [...SALONS, ...(customSalons || [])];
 
-  // Messages par salon
+  useEffect(() => {
+    const salonIds = allSalons.map(s => s.id);
+    void supabaseDbService.getMessageCountsBySalon(salonIds).then(setDbMessageCounts);
+  }, [customSalons?.length]);
+
+  // Messages par salon (comptage DB si disponible, sinon messages chargés en mémoire)
   const salonStats = allSalons.map(s => ({
     name: s.name,
-    count: (salonMessages?.[s.id] || []).length,
+    count: dbMessageCounts?.[s.id] ?? (salonMessages?.[s.id] || []).length,
   })).sort((a, b) => b.count - a.count);
 
   // Classement mensuel
@@ -30,7 +40,7 @@ export default function StatsSection() {
   const avgLevel = all.length ? Math.round(all.reduce((acc, p) => acc + (p.level || 1), 0) / all.length) : 0;
   const premiumCount = all.filter(p => p.isPremium).length;
   const totalXP = all.reduce((acc, p) => acc + (p.xp || 0), 0);
-  const onlineUsers = all.filter(p => p.status === 'online').length;
+  const onlineUsers = presenceService.getOnlineUsers().length;
   const activeUsers = all.filter(p => !p.isBanned && !p.isMuted).length;
 
   return (

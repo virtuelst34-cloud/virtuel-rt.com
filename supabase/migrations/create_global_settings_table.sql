@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS public.global_settings (
 -- Activer RLS
 ALTER TABLE public.global_settings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Founders can update global settings" ON public.global_settings;
+DROP POLICY IF EXISTS "Founders can insert global settings" ON public.global_settings;
+DROP POLICY IF EXISTS "Everyone can read global settings" ON public.global_settings;
+
 -- Politique : Seuls les fondateurs peuvent modifier les paramètres globaux
 CREATE POLICY "Founders can update global settings"
   ON public.global_settings
@@ -32,7 +36,7 @@ CREATE POLICY "Founders can update global settings"
       SELECT 1 FROM public.profiles
       WHERE profiles.email = 'virtuelst34@gmail.com'
       AND profiles.is_founder = true
-      AND auth.uid()::text = profiles.id
+      AND auth.uid() = profiles.id
     )
   );
 
@@ -46,7 +50,7 @@ CREATE POLICY "Founders can insert global settings"
       SELECT 1 FROM public.profiles
       WHERE profiles.email = 'virtuelst34@gmail.com'
       AND profiles.is_founder = true
-      AND auth.uid()::text = profiles.id
+      AND auth.uid() = profiles.id
     )
   );
 
@@ -67,6 +71,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_global_settings_updated_at ON public.global_settings;
 CREATE TRIGGER trigger_update_global_settings_updated_at
   BEFORE UPDATE ON public.global_settings
   FOR EACH ROW

@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
 import { Users, Search, Ban, CheckCircle, VolumeX, Volume2, Trash2 } from 'lucide-react';
-import { useUser, useModeration } from '@/lib/contexts';
 import Avatar from '../Avatar';
 import { SectionTitle, StatCard } from './AdminComponents';
-
-interface Props { readOnly?: boolean; }
 
 const STATUS_OPTIONS = [
   { id: 'online',  label: 'En ligne',        color: 'bg-emerald-500' },
@@ -13,12 +10,21 @@ const STATUS_OPTIONS = [
   { id: 'offline', label: 'Invisible',       color: 'bg-muted-foreground/40' },
 ];
 
-export default function UsersSection({ readOnly = false }: Props) {
-  const { profiles, setProfiles, setUserStatusAdmin } = useUser();
-  const { banUser, unbanUser, muteUser, unmuteUser } = useModeration();
+interface Props {
+  readOnly?: boolean;
+  profiles: Record<string, any>;
+  setProfiles: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  setUserStatusAdmin: (name: string, status: any) => void;
+  banUser: (name: string, reason?: string) => void;
+  unbanUser: (name: string) => void;
+  muteUser: (name: string) => void;
+  unmuteUser: (name: string) => void;
+}
+
+export default function UsersSection({ readOnly = false, profiles, setProfiles, setUserStatusAdmin, banUser, unbanUser, muteUser, unmuteUser }: Props) {
   const [search, setSearch] = useState('');
   const [banReason, setBanReason] = useState<Record<string, string>>({});
-  const all = Object.values(profiles).filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
+  const all = Object.values(profiles || {}).filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
 
   const btnClass = (color: string) =>
     `p-1.5 rounded-lg border transition-colors ${
@@ -31,9 +37,9 @@ export default function UsersSection({ readOnly = false }: Props) {
     <div>
       <SectionTitle icon={Users}>Gestion des utilisateurs</SectionTitle>
       <div className="grid grid-cols-3 gap-2 mb-4">
-        <StatCard value={Object.values(profiles).filter(p => !p.isBanned).length} label="Actifs"  color="green" />
-        <StatCard value={Object.values(profiles).filter(p => p.isBanned).length}  label="Bannis"  color="red" />
-        <StatCard value={Object.keys(profiles).length}                             label="Total"   color="blue" />
+        <StatCard value={Object.values(profiles || {}).filter(p => !p.isBanned).length} label="Actifs"  color="green" />
+        <StatCard value={Object.values(profiles || {}).filter(p => p.isBanned).length}  label="Bannis"  color="red" />
+        <StatCard value={Object.keys(profiles || {}).length}                             label="Total"   color="blue" />
       </div>
 
       <div className="relative mb-3">

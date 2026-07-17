@@ -34,17 +34,6 @@ const SALON_EMOJI: Record<string, string> = {
   libre: '🚪', insulte: '😤', cameras: '📹', bar: '🍷',
 };
 
-// Membres connectés simulés (en vrai, viendrait du backend)
-const ONLINE_DEMO: DisplayOnlineUser[] = [
-  { name: 'Cantique', avatar: 'av6', initials: 'CA', level: 8,  salon: 'musique60' },
-  { name: 'PiCanna',  avatar: 'av3', initials: 'PC', level: 5,  salon: 'debat'     },
-  { name: 'Coeur',    avatar: 'av2', initials: 'CO', level: 12, salon: 'karaoke'   },
-  { name: 'Thierry',  avatar: 'av5', initials: 'TH', level: 3,  salon: 'bar'       },
-  { name: 'Mélanie',  avatar: 'av1', initials: 'ME', level: 18, salon: 'libre'     },
-  { name: 'Sasha',    avatar: 'av4', initials: 'SA', level: 25, salon: null        },
-];
-
-// Pulse animé pour les salons live ou actifs
 function PulseDot({ color = 'bg-emerald-500' }: { color?: string }) {
   return (
     <span className="relative flex h-2 w-2 shrink-0">
@@ -60,7 +49,6 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
   const { addNotification } = useNotifications();
   const { xpProgress, xpForLevel, monthlyXP } = useXP();
   const { isMuted, isBlocked } = useMuteBlock();
-  const [hoveredUser, setHoveredUser] = useState<string | null>(null);
   const [waved, setWaved]             = useState<Record<string, boolean>>({});
   const [filter, setFilter]           = useState('all');
   const [viewProfile, setViewProfile] = useState<string | null>(null);
@@ -80,10 +68,6 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
         .filter(p => p.name !== user?.name && !isMuted(p.name) && !isBlocked(p.name));
       const salonPresence = presenceService.getAllSalonPresence();
 
-      console.log('[WelcomeScreen] Utilisateurs en ligne reçus:', presenceUsers);
-      console.log('[WelcomeScreen] Salon presence reçu:', Array.from(salonPresence.entries()));
-
-      // Convertir les utilisateurs de présence en format d'affichage
       const displayUsers: DisplayOnlineUser[] = presenceUsers.map(p => ({
         name: p.name,
         avatar: p.avatar,
@@ -92,10 +76,10 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
         salon: p.currentSalonId || null,
         isFounder: profiles[p.name]?.isFounder,
         isDirection: profiles[p.name]?.isDirection,
-        isMasterOp: profiles[p.name]?.isMasterOp
+        isMasterOp: profiles[p.name]?.isMasterOp,
+        gender: profiles[p.name]?.gender,
       }));
 
-      console.log('[WelcomeScreen] Utilisateurs à afficher:', displayUsers);
       setOnlineUsers(displayUsers);
 
       // Extraire les counts par salon
@@ -230,7 +214,16 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
 
       {/* ── Centre : épuré ── */}
       <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-8 select-none">
-        <img src="/logo.png" alt="Virtuel-RT Logo" className="w-20 h-20 mb-2" />
+        <div className="relative mb-1">
+          <div className="absolute inset-0 rounded-2xl bg-primary/25 blur-2xl scale-90 opacity-70" aria-hidden />
+          <div className="relative w-40 h-40 rounded-2xl overflow-hidden shadow-lg shadow-primary/25 ring-1 ring-primary/20">
+            <img
+              src="/logo.png"
+              alt="Virtuel-RT Logo"
+              className="w-full h-full object-cover object-[center_12%] scale-[1.34] origin-[center_12%]"
+            />
+          </div>
+        </div>
         <h2 className="text-xl font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
         <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg px-4 py-2 mb-2">
           <p className="text-sm font-semibold text-purple-300">🎉 Pour l'ouverture, Premium offert en essai !</p>
@@ -365,7 +358,8 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
                 <div className="flex items-center gap-1">
                   <GenderIcon gender={user.gender} size={10} />
                   <span className="text-[11px] font-semibold text-primary truncate">{user.name}</span>
-                  <DiamondBadge level={user.level || 1} size="xs" specialBadge={getSpecialBadgeForUser(user) || undefined} />
+                  {user.isFounder && <DiamondBadge level={user.level || 1} size="xs" specialBadge="founder" />}
+                  {user.isIridescent && <DiamondBadge level={user.level || 1} size="xs" specialBadge="iridescent" />}
                 </div>
                 <span className="text-[9px] text-muted-foreground/40">Vous</span>
               </div>
@@ -376,22 +370,35 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
           {onlineUsers.length === 0 ? (
             <p className="text-[10px] text-muted-foreground/40 italic px-2">Aucun autre utilisateur en ligne.</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-1 mt-1">
               {onlineUsers
                 .sort((a, b) => a.name.localeCompare(b.name))
-                .map((u) => (
-                <button
-                  key={u.name}
-                  onClick={() => setViewProfile(u.name)}
-                  onMouseEnter={() => setHoveredUser(u.name)}
-                  onMouseLeave={() => setHoveredUser(null)}
-                  className="relative shrink-0 transition-transform duration-200 hover:scale-110"
-                >
-                  <Avatar avatarClass={u.avatar || 'av1'} initials={u.initials || u.name.slice(0,2).toUpperCase()} size="xs" />
-                  <span className="absolute -bottom-px -right-px w-2 h-2 bg-emerald-500 border-2 border-card rounded-full animate-pulse" />
-                  <GenderIcon gender={u.gender} size={10} className="absolute -top-1 -right-1" />
-                </button>
-              ))}
+                .map((u) => {
+                  const salonName = u.salon ? allSalons.find(s => s.id === u.salon)?.name : null;
+                  return (
+                    <button
+                      key={u.name}
+                      type="button"
+                      onClick={() => setViewProfile(u.name)}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-xl w-full text-left bg-secondary/20 border border-border/40 hover:bg-white/[0.04] hover:border-border transition-all"
+                    >
+                      <div className="relative shrink-0">
+                        <Avatar avatarClass={u.avatar || 'av1'} initials={u.initials || u.name.slice(0, 2).toUpperCase()} size="xs" />
+                        <span className="absolute -bottom-px -right-px w-2 h-2 bg-emerald-500 border-2 border-card rounded-full animate-pulse" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <GenderIcon gender={u.gender} size={10} />
+                          <span className="text-[11px] font-medium text-foreground truncate">{u.name}</span>
+                          <DiamondBadge level={u.level || 1} size="xs" specialBadge={getSpecialBadgeForUser(u) || undefined} />
+                        </div>
+                        <span className="text-[9px] text-emerald-400/70 truncate block">
+                          {salonName ? `Dans ${salonName}` : 'En ligne'}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
             </div>
           )}
         </div>

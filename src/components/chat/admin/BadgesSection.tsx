@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Diamond, X } from 'lucide-react';
-import { useBadges } from '@/lib/contexts';
 import { getMergedBadges } from '@/lib/diamondBadges';
 import DiamondBadge from '../DiamondBadge';
 import { SectionTitle } from './AdminComponents';
 
-interface Props { readOnly?: boolean; }
+interface Props {
+  readOnly?: boolean;
+  customBadges: any[];
+  setCustomBadges: React.Dispatch<React.SetStateAction<any[]>>;
+}
 
-export default function BadgesSection({ readOnly = false }: Props) {
-  const { customBadges, setCustomBadges } = useBadges();
+export default function BadgesSection({ readOnly = false, customBadges, setCustomBadges }: Props) {
   const badges = getMergedBadges(customBadges || []);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, any>>({});

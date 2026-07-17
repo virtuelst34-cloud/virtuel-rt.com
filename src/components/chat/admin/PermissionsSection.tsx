@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useUser } from '@/lib/contexts';
+import { hasAdminAccess } from '@/lib/utils/founderCheck';
 import { Lock, Shield, Users, Check, X, Save, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { SPECIAL_BADGES } from '@/lib/diamondBadges';
 
@@ -141,39 +141,51 @@ const ACTION_LABELS: Record<string, string> = {
   manage_settings: 'Gérer les paramètres de logs',
 };
 
-interface Props { readOnly?: boolean; }
+interface Props {
+  readOnly?: boolean;
+  user: any;
+}
 
-export default function PermissionsSection({ readOnly = false }: Props) {
-  const { user } = useUser();
+export default function PermissionsSection({ readOnly = false, user }: Props) {
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Le fondateur/admin peut tout modifier, contournant le système de permissions
-  const canModify = user?.isFounder || user?.isAdmin || !readOnly;
+  const canModify = hasAdminAccess(user, readOnly);
   const [selectedSection, setSelectedSection] = useState<string>('chat');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['chat']));
   const [changes, setChanges] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadPermissions();
-  }, []);
+  }, [user, readOnly]);
 
   const loadPermissions = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('permissions')
-        .select('*')
-        .order('section', { ascending: true })
-        .order('action', { ascending: true });
+      const fetchAll = async () => {
+        const { data, error } = await supabase
+          .from('permissions')
+          .select('*')
+          .order('section', { ascending: true })
+          .order('action', { ascending: true });
+        if (error) throw error;
+        return data || [];
+      };
 
-      if (error) {
-        console.error('Erreur lors du chargement des permissions:', error);
-        setPermissions([]);
-        return;
+      let loaded = await fetchAll();
+
+      if (hasAdminAccess(user, readOnly)) {
+        const missing = findMissingPermissions(loaded);
+        if (missing.length > 0) {
+          const { error: insertError } = await supabase.from('permissions').insert(missing);
+          if (!insertError) {
+            loaded = await fetchAll();
+          }
+        }
       }
-      setPermissions(data || []);
+
+      setPermissions(mergeWithExpectedPermissions(loaded));
     } catch (error) {
       console.error('Erreur lors du chargement des permissions:', error);
       setPermissions([]);
@@ -182,13 +194,122 @@ export default function PermissionsSection({ readOnly = false }: Props) {
     }
   };
 
+  const findMissingPermissions = (existing: Permission[]) => {
+    const missing: Array<Omit<Permission, 'id'>> = [];
+    for (const section of SECTIONS) {
+      for (const action of section.actions) {
+        for (const entity of PERMISSION_ENTITIES) {
+          const identifierType = entity.type === 'user_type' ? 'user_type' : 'badge';
+          const exists = existing.some(
+            p =>
+              p.section === section.id &&
+              p.action === action &&
+              p.user_identifier === entity.id &&
+              p.identifier_type === identifierType
+          );
+          if (!exists) {
+            missing.push({
+              section: section.id,
+              action,
+              user_identifier: entity.id,
+              identifier_type: identifierType,
+              allowed: false,
+            });
+          }
+        }
+      }
+    }
+    return missing;
+  };
+
+  const mergeWithExpectedPermissions = (existing: Permission[]): Permission[] => {
+    const virtual: Permission[] = [];
+    for (const section of SECTIONS) {
+      for (const action of section.actions) {
+        for (const entity of PERMISSION_ENTITIES) {
+          const identifierType = entity.type === 'user_type' ? 'user_type' : 'badge';
+          const found = existing.find(
+            p =>
+              p.section === section.id &&
+              p.action === action &&
+              p.user_identifier === entity.id &&
+              p.identifier_type === identifierType
+          );
+          if (!found) {
+            virtual.push({
+              id: `temp-${section.id}-${action}-${entity.id}`,
+              section: section.id,
+              action,
+              user_identifier: entity.id,
+              identifier_type: identifierType,
+              allowed: false,
+            });
+          }
+        }
+      }
+    }
+    return [...existing, ...virtual];
+  };
+
   const togglePermission = (permissionId: string, newValue: boolean) => {
+    if (!canModify) return;
     setPermissions(prev =>
       prev.map(p =>
         p.id === permissionId ? { ...p, allowed: newValue } : p
       )
     );
     setChanges(prev => new Set([...prev, permissionId]));
+  };
+
+  const handlePermissionToggle = async (
+    section: string,
+    action: string,
+    entity: (typeof PERMISSION_ENTITIES)[number]
+  ) => {
+    if (!canModify) return;
+
+    const identifierType = entity.type === 'user_type' ? 'user_type' : 'badge';
+    let permission = permissions.find(
+      p =>
+        p.section === section &&
+        p.action === action &&
+        p.user_identifier === entity.id &&
+        p.identifier_type === identifierType
+    );
+
+    if (!permission) return;
+
+    const newValue = !permission.allowed;
+
+    if (permission.id.startsWith('temp-')) {
+      const { data, error } = await supabase
+        .from('permissions')
+        .insert({
+          section,
+          action,
+          user_identifier: entity.id,
+          identifier_type: identifierType,
+          allowed: newValue,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erreur création permission:', error);
+        alert('Impossible de créer cette permission. Vérifiez vos droits admin.');
+        return;
+      }
+
+      if (data) {
+        setPermissions(prev =>
+          prev.map(p => (p.id === permission!.id ? data : p))
+        );
+        setChanges(prev => new Set([...prev, data.id]));
+      }
+      return;
+    }
+
+    togglePermission(permission.id, newValue);
   };
 
   const saveChanges = async () => {
@@ -198,7 +319,7 @@ export default function PermissionsSection({ readOnly = false }: Props) {
 
       for (const permissionId of changesArray) {
         const permission = permissions.find(p => p.id === permissionId);
-        if (permission) {
+        if (permission && !permission.id.startsWith('temp-')) {
           const { error } = await supabase
             .from('permissions')
             .update({ allowed: permission.allowed })
@@ -267,7 +388,7 @@ export default function PermissionsSection({ readOnly = false }: Props) {
           </button>
           <button
             onClick={saveChanges}
-            disabled={readOnly || !hasChanges || saving}
+            disabled={!canModify || !hasChanges || saving}
             className="px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-xs hover:bg-red-500/25 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-3.5 h-3.5" />
@@ -282,6 +403,12 @@ export default function PermissionsSection({ readOnly = false }: Props) {
           <span className="text-xs text-yellow-400">
             {changes.size} modification(s) non sauvegardée(s)
           </span>
+        </div>
+      )}
+
+      {!canModify && !readOnly && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-400">
+          Connectez-vous avec un compte administrateur pour modifier les permissions.
         </div>
       )}
 
@@ -341,13 +468,23 @@ export default function PermissionsSection({ readOnly = false }: Props) {
                       return (
                         <td key={entity.id} className="px-3 py-2 text-center">
                           <button
-                            onClick={() => !readOnly && permission && togglePermission(permission.id, !permission.allowed)}
+                            type="button"
+                            onClick={() => handlePermissionToggle(selectedSection, action, entity)}
+                            disabled={!canModify}
                             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
                               permission?.allowed
                                 ? 'bg-green-500/15 border border-green-500/30 text-green-400'
                                 : 'bg-red-500/15 border border-red-500/30 text-red-400'
-                            } ${isChanged ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-card' : ''}`}
-                            title={permission?.allowed ? 'Autorisé' : 'Non autorisé'}
+                            } ${isChanged ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-card' : ''} ${
+                              !canModify ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 cursor-pointer'
+                            }`}
+                            title={
+                              !canModify
+                                ? 'Modification réservée aux administrateurs connectés'
+                                : permission?.allowed
+                                  ? 'Autorisé — cliquer pour refuser'
+                                  : 'Non autorisé — cliquer pour autoriser'
+                            }
                           >
                             {permission?.allowed ? (
                               <Check className="w-4 h-4" />

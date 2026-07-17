@@ -13,47 +13,46 @@ import { CustomEmojisProvider, useCustomEmojis } from './CustomEmojisContext';
 import { DMProvider, useDM } from './DMContext';
 import { FriendsProvider, useFriends } from './FriendsContext';
 import { MuteBlockProvider, useMuteBlock } from './MuteBlockContext';
+import { GlobalSettingsProvider, useGlobalSettings } from './GlobalSettingsContext';
 
 /**
  * Fournisseur composite qui combine tous les contextes séparés.
  * Ordre d'imbrication (dépendances respectées) :
- *   NotificationsProvider → UserProvider → PreferencesProvider
- *   → MessagesProvider → TypingProvider → DMProvider
- *   → FriendsProvider → MuteBlockProvider
- *   → ModerationProvider → SalonsProvider → UIProvider
- *   → XPProvider → BadgesProvider → CustomEmojisProvider
+ *   GlobalSettingsProvider → NotificationsProvider → UserProvider → ...
  */
 export function ChatProvider({ children }: { children: ReactNode }) {
   return (
-    <NotificationsProvider>
-      <UserProvider>
-        <PreferencesProvider>
-          <MessagesProvider>
-            <TypingProvider>
-              <DMProvider>
-                <FriendsProvider>
-                  <MuteBlockProvider>
-                    <ModerationProvider>
-                      <SalonsProvider>
-                        <UIProvider>
-                          <XPProvider>
-                            <BadgesProvider>
-                              <CustomEmojisProvider>
-                                {children}
-                              </CustomEmojisProvider>
-                            </BadgesProvider>
-                          </XPProvider>
-                        </UIProvider>
-                      </SalonsProvider>
-                    </ModerationProvider>
-                  </MuteBlockProvider>
-                </FriendsProvider>
-              </DMProvider>
-            </TypingProvider>
-          </MessagesProvider>
-        </PreferencesProvider>
-      </UserProvider>
-    </NotificationsProvider>
+    <GlobalSettingsProvider>
+      <NotificationsProvider>
+        <UserProvider>
+          <PreferencesProvider>
+            <MessagesProvider>
+              <TypingProvider>
+                <DMProvider>
+                  <FriendsProvider>
+                    <MuteBlockProvider>
+                      <ModerationProvider>
+                        <SalonsProvider>
+                          <UIProvider>
+                            <XPProvider>
+                              <BadgesProvider>
+                                <CustomEmojisProvider>
+                                  {children}
+                                </CustomEmojisProvider>
+                              </BadgesProvider>
+                            </XPProvider>
+                          </UIProvider>
+                        </SalonsProvider>
+                      </ModerationProvider>
+                    </MuteBlockProvider>
+                  </FriendsProvider>
+                </DMProvider>
+              </TypingProvider>
+            </MessagesProvider>
+          </PreferencesProvider>
+        </UserProvider>
+      </NotificationsProvider>
+    </GlobalSettingsProvider>
   );
 }
 
@@ -72,6 +71,7 @@ export { useCustomEmojis, CustomEmojisProvider };
 export { useDM, DMProvider };
 export { useFriends, FriendsProvider };
 export { useMuteBlock, MuteBlockProvider };
+export { useGlobalSettings, GlobalSettingsProvider };
 
 /**
  * Hook de compatibilité backward — accès unifié à l'ancienne API useChat().

@@ -525,6 +525,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
                   onEdit={handleEdit}
                   onViewProfile={handleViewProfile}
                   onReply={handleReply}
+                  onReport={(id, name, content) => handleReport(id, 'message', name, content)}
                 />
               </div>
             ))}

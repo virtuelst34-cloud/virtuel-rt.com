@@ -1,5 +1,5 @@
-import React, { useState, FormEvent } from 'react';
-import { useUser } from '@/lib/contexts';
+import React, { useState, FormEvent, useEffect } from 'react';
+import { useUser, useGlobalSettings } from '@/lib/contexts';
 import { supabaseAuthService } from '@/lib/supabaseAuth';
 import Avatar from './Avatar';
 import { AVATAR_IDS } from '@/lib/chatConfig';
@@ -7,6 +7,7 @@ import { Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 export default function UsernameModal() {
   const { login, loginWithSupabase } = useUser();
+  const { settings } = useGlobalSettings();
   const [mode, setMode] = useState<'guest' | 'login' | 'register'>('guest');
   
   const [name, setName] = useState('');
@@ -19,8 +20,22 @@ export default function UsernameModal() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (settings.maintenance_mode) return;
+    if (mode === 'guest' && !settings.allow_guest_access) {
+      setMode(settings.allow_registration ? 'register' : 'login');
+    }
+    if (mode === 'register' && !settings.allow_registration) {
+      setMode(settings.allow_guest_access ? 'guest' : 'login');
+    }
+  }, [settings, mode]);
+
   const handleGuestSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!settings.allow_guest_access) {
+      setError("Les connexions invitées sont désactivées.");
+      return;
+    }
     if (!name.trim() || name.trim().length < 3) return;
 
     setLoading(true);
@@ -56,6 +71,10 @@ export default function UsernameModal() {
 
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
+    if (!settings.allow_registration) {
+      setError("Les inscriptions sont désactivées.");
+      return;
+    }
     if (!email || !password || !name) return;
 
     setLoading(true);
@@ -76,6 +95,19 @@ export default function UsernameModal() {
     }
   };
 
+  if (settings.maintenance_mode) {
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="bg-card border border-border/50 rounded-3xl p-8 w-full max-w-[400px] text-center shadow-xl">
+          <h2 className="text-lg font-bold text-foreground mb-2">Maintenance</h2>
+          <p className="text-sm text-muted-foreground">
+            {settings.maintenance_message || 'Le site est en maintenance. Revenez plus tard.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300 p-4">
       <div className="bg-card border border-border/50 rounded-3xl p-8 w-full max-w-[400px] flex flex-col gap-6 shadow-[0_32px_64px_rgba(0,0,0,0.4)] animate-in zoom-in-95 duration-300">
@@ -88,15 +120,17 @@ export default function UsernameModal() {
         </div>
 
         <div className="flex gap-2 bg-secondary/50 rounded-xl p-1">
-          <button
-            type="button"
-            onClick={() => setMode('guest')}
-            className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
-              mode === 'guest' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Invité
-          </button>
+          {settings.allow_guest_access && (
+            <button
+              type="button"
+              onClick={() => setMode('guest')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                mode === 'guest' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Invité
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setMode('login')}
@@ -106,15 +140,17 @@ export default function UsernameModal() {
           >
             Connexion
           </button>
-          <button
-            type="button"
-            onClick={() => setMode('register')}
-            className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
-              mode === 'register' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Inscription
-          </button>
+          {settings.allow_registration && (
+            <button
+              type="button"
+              onClick={() => setMode('register')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                mode === 'register' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Inscription
+            </button>
+          )}
         </div>
 
         {error && (

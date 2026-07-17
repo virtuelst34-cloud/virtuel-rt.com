@@ -5,7 +5,7 @@ import SafeMessageContent from './SafeMessageContent';
 import { useUser, usePreferences, useMuteBlock } from '@/lib/contexts';
 import { useModeration } from '@/lib/contexts';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { Smile, Trash2, Flag, UserX, Pin, Plus, Reply } from 'lucide-react';
+import { Smile, Trash2, Flag, UserX, Pin, Pencil, Reply } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Message {
@@ -33,9 +33,10 @@ interface MessageBubbleContentProps {
   onEdit?: (messageId: string, newText: string) => void;
   onViewProfile?: (authorName: string) => void;
   onReply?: (message: Message) => void;
+  onReport?: (messageId: string, authorName: string, text: string) => void;
 }
 
-const MessageBubbleContent = function MessageBubbleContent({ message, onReact, onDelete, onPin, onEdit, onViewProfile, onReply }: MessageBubbleContentProps) {
+const MessageBubbleContent = function MessageBubbleContent({ message, onReact, onDelete, onPin, onEdit, onViewProfile, onReply, onReport }: MessageBubbleContentProps) {
   const { user } = useUser();
   const { compactMode } = usePreferences();
   const { reportMessage } = useModeration();
@@ -73,11 +74,15 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
     }
   }, [message.id, onReact]);
 
-  const handleReport = useCallback(() => { 
-    if (reported) return; 
-    reportMessage(message.author_name); 
-    setReported(true); 
-  }, [reported, reportMessage, message.author_name]);
+  const handleReport = useCallback(() => {
+    if (reported) return;
+    if (onReport) {
+      onReport(message.id, message.author_name, message.text);
+    } else {
+      reportMessage(message.author_name);
+    }
+    setReported(true);
+  }, [reported, reportMessage, onReport, message.id, message.author_name, message.text]);
 
   const handleBlock = useCallback(() => {
     if (!confirmBlock) { setConfirmBlock(true); setTimeout(() => setConfirmBlock(false), 3000); return; }
@@ -243,7 +248,7 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
                   className="p-1.5 rounded-lg text-muted-foreground/60 hover:bg-white/[0.08] hover:text-blue-400 transition-all duration-200 hover:scale-110"
                   aria-label="Éditer ce message"
                   title="Éditer">
-                  <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                  <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               )}
 
@@ -327,6 +332,8 @@ export default memo(MessageBubbleContent, (prevProps, nextProps) => {
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onPin === nextProps.onPin &&
     prevProps.onViewProfile === nextProps.onViewProfile &&
-    prevProps.onReply === nextProps.onReply
+    prevProps.onReply === nextProps.onReply &&
+    prevProps.onReport === nextProps.onReport &&
+    prevProps.onEdit === nextProps.onEdit
   );
 });

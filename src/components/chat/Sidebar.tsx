@@ -1,5 +1,5 @@
 import React, { useState, memo } from 'react';
-import { useUser, useSalons, useUI, usePreferences, useNotifications, useDM, useFriends } from '@/lib/contexts';
+import { useUser, useSalons, useUI, usePreferences, useNotifications, useDM, useFriends, useGlobalSettings } from '@/lib/contexts';
 import Avatar from './Avatar';
 import { SearchPanel } from './SearchPanel';
 import { StatsPanel } from './StatsPanel';
@@ -27,6 +27,7 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
   const { unreadCount } = useNotifications();
   const { getUnreadCount } = useDM();
   const { pendingRequests } = useFriends();
+  const { settings } = useGlobalSettings();
   const dmUnread = user?.name ? getUnreadCount(user.name) : 0;
   const pendingFriends = pendingRequests.length;
   const [showSearch, setShowSearch] = useState(false);
@@ -47,9 +48,12 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
       <IconBtn icon={Home} title="Accueil" onClick={() => setCurrentSalon(null)} />
       <IconBtn icon={Search} title="Recherche" onClick={() => setShowSearch(true)} />
       <IconBtn icon={TrendingUp} title="Statistiques" onClick={() => setShowStats(true)} />
-      <IconBtn icon={MessageSquare} title="Messages privés" onClick={() => onOpenDM()} badge={dmUnread > 0 ? dmUnread : null} />
-      <IconBtn icon={Bell} title="Notifications" onClick={onOpenNotifications} badge={unreadCount > 0 ? unreadCount : null} />
-
+      {settings.enable_dm && (
+        <IconBtn icon={MessageSquare} title="Messages privés" onClick={() => onOpenDM()} badge={dmUnread > 0 ? dmUnread : null} />
+      )}
+      {settings.enable_notifications && (
+        <IconBtn icon={Bell} title="Notifications" onClick={onOpenNotifications} badge={unreadCount > 0 ? unreadCount : null} />
+      )}
       <div className="flex-1" />
 
       {/* Thème */}

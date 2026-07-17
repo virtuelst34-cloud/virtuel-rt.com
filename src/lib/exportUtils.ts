@@ -103,5 +103,5 @@ export function exportConversation(
   }
 }
 
-/** @deprecated alias */
+/** Alias historique — exporte du texte, pas un PDF. */
 export const exportToPDF = exportToText;

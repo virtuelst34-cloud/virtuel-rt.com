@@ -13,37 +13,40 @@ import { TypingProvider } from '@/lib/contexts/TypingContext'
 import { CustomEmojisProvider } from '@/lib/contexts/CustomEmojisContext'
 import { FriendsProvider } from '@/lib/contexts/FriendsContext'
 import { MuteBlockProvider } from '@/lib/contexts/MuteBlockContext'
+import { GlobalSettingsProvider } from '@/lib/contexts/GlobalSettingsContext'
 
 export function TestProviders({ children }: { children: ReactNode }) {
   return (
-    <NotificationsProvider>
-      <UserProvider>
-        <PreferencesProvider>
-          <MessagesProvider>
-            <TypingProvider>
-              <DMProvider>
-                <FriendsProvider>
-                  <MuteBlockProvider>
-                    <ModerationProvider>
-                      <SalonsProvider>
-                        <UIProvider>
-                          <XPProvider>
-                            <BadgesProvider>
-                              <CustomEmojisProvider>
-                                {children}
-                              </CustomEmojisProvider>
-                            </BadgesProvider>
-                          </XPProvider>
-                        </UIProvider>
-                      </SalonsProvider>
-                    </ModerationProvider>
-                  </MuteBlockProvider>
-                </FriendsProvider>
-              </DMProvider>
-            </TypingProvider>
-          </MessagesProvider>
-        </PreferencesProvider>
-      </UserProvider>
-    </NotificationsProvider>
+    <GlobalSettingsProvider>
+      <NotificationsProvider>
+        <UserProvider>
+          <PreferencesProvider>
+            <MessagesProvider>
+              <TypingProvider>
+                <DMProvider>
+                  <FriendsProvider>
+                    <MuteBlockProvider>
+                      <ModerationProvider>
+                        <SalonsProvider>
+                          <UIProvider>
+                            <XPProvider>
+                              <BadgesProvider>
+                                <CustomEmojisProvider>
+                                  {children}
+                                </CustomEmojisProvider>
+                              </BadgesProvider>
+                            </XPProvider>
+                          </UIProvider>
+                        </SalonsProvider>
+                      </ModerationProvider>
+                    </MuteBlockProvider>
+                  </FriendsProvider>
+                </DMProvider>
+              </TypingProvider>
+            </MessagesProvider>
+          </PreferencesProvider>
+        </UserProvider>
+      </NotificationsProvider>
+    </GlobalSettingsProvider>
   )
 }

@@ -3,41 +3,8 @@ import { Settings, Save, RefreshCw, Globe, Palette, Bell, Shield, Database, Togg
 import { supabase } from '@/lib/supabase';
 import { SectionTitle } from './AdminComponents';
 import { hasAdminAccess } from '@/lib/utils/founderCheck';
-
-interface GlobalSettings {
-  id?: string;
-  default_theme: string;
-  default_party_mode: boolean;
-  default_accent_color: string;
-  default_compact_mode: boolean;
-  maintenance_mode: boolean;
-  maintenance_message: string;
-  allow_guest_access: boolean;
-  allow_registration: boolean;
-  max_users: number;
-  enable_notifications: boolean;
-  enable_presence: boolean;
-  enable_dm: boolean;
-  enable_voice: boolean;
-  auto_cleanup_days: number;
-}
-
-const DEFAULT_SETTINGS: GlobalSettings = {
-  default_theme: 'dark',
-  default_party_mode: false,
-  default_accent_color: 'purple',
-  default_compact_mode: false,
-  maintenance_mode: false,
-  maintenance_message: 'Le site est en maintenance. Revenez plus tard.',
-  allow_guest_access: true,
-  allow_registration: true,
-  max_users: 1000,
-  enable_notifications: true,
-  enable_presence: true,
-  enable_dm: true,
-  enable_voice: false,
-  auto_cleanup_days: 30,
-};
+import { DEFAULT_GLOBAL_SETTINGS, type GlobalSettings } from '@/lib/globalSettings';
+import { useGlobalSettings } from '@/lib/contexts';
 
 interface Props {
   readOnly?: boolean;
@@ -45,7 +12,8 @@ interface Props {
 }
 
 export default function GlobalSettingsSection({ readOnly = false, user }: Props) {
-  const [settings, setSettings] = useState<GlobalSettings>(DEFAULT_SETTINGS);
+  const { refresh } = useGlobalSettings();
+  const [settings, setSettings] = useState<GlobalSettings>(DEFAULT_GLOBAL_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -93,6 +61,7 @@ export default function GlobalSettingsSection({ readOnly = false, user }: Props)
 
       if (!id) await loadSettings();
       setHasChanges(false);
+      await refresh();
       alert('Paramètres globaux sauvegardés avec succès !');
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);

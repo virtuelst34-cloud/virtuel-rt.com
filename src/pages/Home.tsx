@@ -86,10 +86,10 @@ function ChatApp() {
         <WelcomeScreen onOpenDM={openDM} />
       )}
 
-      {showAdmin    && <Suspense fallback={null}><AdminPanel /></Suspense>}
-      {showDM       && <Suspense fallback={null}><DirectMessagePanel onClose={() => { setShowDM(false); setDmTarget(null); }} initialUser={dmTarget || undefined} /></Suspense>}
+      {showAdmin    && <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-sm text-muted-foreground">Chargement…</div>}><AdminPanel /></Suspense>}
+      {showDM       && <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-sm text-muted-foreground">Chargement…</div>}><DirectMessagePanel onClose={() => { setShowDM(false); setDmTarget(null); }} initialUser={dmTarget || undefined} /></Suspense>}
       {showNotif    && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-sm text-muted-foreground">Chargement…</div>}>
           <NotificationsPanel
             onClose={() => setShowNotif(false)}
             onOpenDM={openDM}
@@ -99,7 +99,7 @@ function ChatApp() {
         </Suspense>
       )}
       {showSettings && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-sm text-muted-foreground">Chargement…</div>}>
           <SettingsPanel
             onClose={() => setShowSettings(false)}
             initialTab={settingsTab}
@@ -115,7 +115,7 @@ function ChatApp() {
         </Suspense>
       )}
       {viewProfile && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-sm text-muted-foreground">Chargement…</div>}>
           <UserProfileView
             targetName={viewProfile}
             onClose={() => setViewProfile(null)}

@@ -1,7 +1,8 @@
 import { Message } from './searchUtils';
+import { buildTextPdf, downloadBlob } from './simplePdf';
 
 export interface ExportOptions {
-  format: 'json' | 'text';
+  format: 'json' | 'text' | 'pdf';
   includeMetadata?: boolean;
   includeReactions?: boolean;
 }
@@ -42,14 +43,7 @@ export function exportToJSON(
   };
 
   const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `conversation-${salonName}-${new Date().toISOString().split('T')[0]}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, `conversation-${salonName}-${new Date().toISOString().split('T')[0]}.json`);
 }
 
 /**
@@ -78,14 +72,41 @@ export function exportToText(
   });
 
   const blob = new Blob([content], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `conversation-${salonName}-${new Date().toISOString().split('T')[0]}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, `conversation-${salonName}-${new Date().toISOString().split('T')[0]}.txt`);
+}
+
+/**
+ * Export conversation en PDF réel
+ */
+export function exportToPDF(
+  messages: Message[],
+  salonName: string,
+  options: ExportOptions = { format: 'pdf' }
+): void {
+  const lines: string[] = [
+    `Conversation - ${salonName}`,
+    `Exporte le: ${new Date().toLocaleString('fr-FR')}`,
+    `Nombre de messages: ${messages.length}`,
+    '='.repeat(50),
+    '',
+  ];
+
+  messages.forEach(msg => {
+    const date = new Date(msg.created_date).toLocaleString('fr-FR');
+    lines.push(`[${date}] ${msg.author_name}:`);
+    lines.push(msg.text || '');
+    if (options.includeReactions && msg.reactions && Object.keys(msg.reactions).length > 0) {
+      lines.push(
+        `Reactions: ${Object.entries(msg.reactions)
+          .map(([emoji, users]) => `${emoji} ${users.length}`)
+          .join(', ')}`,
+      );
+    }
+    lines.push('');
+  });
+
+  const blob = buildTextPdf(`Conversation ${salonName}`, lines);
+  downloadBlob(blob, `conversation-${salonName}-${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 /**
@@ -98,10 +119,9 @@ export function exportConversation(
 ): void {
   if (options.format === 'json') {
     exportToJSON(messages, salonName, options);
+  } else if (options.format === 'pdf') {
+    exportToPDF(messages, salonName, options);
   } else {
     exportToText(messages, salonName, options);
   }
 }
-
-/** Alias historique — exporte du texte, pas un PDF. */
-export const exportToPDF = exportToText;

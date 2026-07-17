@@ -76,13 +76,15 @@ class WebRtcService {
   }
 
   private async handleSignal(payload: WebRtcSignalPayload): Promise<void> {
-    if (!this.salonId || payload.toId !== this.selfId) return;
-    if (payload.fromId === this.selfId) return;
+    if (!this.salonId || payload.fromId === this.selfId) return;
 
+    // leave est broadcast à tous (toId = '*')
     if (payload.type === 'leave') {
       this.closePeer(payload.fromId);
       return;
     }
+
+    if (payload.toId !== this.selfId) return;
 
     let pc = this.peers.get(payload.fromId);
     if (!pc && payload.type === 'offer') {
@@ -167,6 +169,7 @@ class WebRtcService {
   }
 
   connectToPeer(peerId: string, peerName: string): void {
+    if (!this.channel || !this.localStream) return;
     if (peerId === this.selfId || this.peers.has(peerId)) return;
     const pc = this.createPeer(peerId, peerName, true);
     this.peers.set(peerId, pc);
@@ -174,6 +177,31 @@ class WebRtcService {
 
   getLocalStream(): MediaStream | null {
     return this.localStream;
+  }
+
+  isJoined(): boolean {
+    return !!this.salonId && !!this.channel;
+  }
+
+  async ensureVideoTrack(): Promise<boolean> {
+    if (!this.localStream) return false;
+    if (this.localStream.getVideoTracks().some((t) => t.readyState === 'live')) {
+      this.toggleTrack('video', true);
+      return true;
+    }
+    try {
+      const videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const track = videoStream.getVideoTracks()[0];
+      if (!track) return false;
+      this.localStream.addTrack(track);
+      for (const pc of this.peers.values()) {
+        pc.addTrack(track, this.localStream);
+      }
+      return true;
+    } catch (error) {
+      console.error('WebRTC ensureVideoTrack:', error);
+      return false;
+    }
   }
 
   toggleTrack(kind: 'audio' | 'video', enabled: boolean): void {
@@ -221,10 +249,6 @@ class WebRtcService {
     this.channel = null;
     this.salonId = null;
   }
-}
-
-function selfNameFix(name: string): string {
-  return name;
 }
 
 export const webrtcService = new WebRtcService();

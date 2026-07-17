@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, X, FileJson, FileText, CheckSquare, Square } from 'lucide-react';
+import { Download, X, FileJson, FileText, FileType, CheckSquare, Square } from 'lucide-react';
 import { exportConversation, ExportOptions } from '@/lib/exportUtils';
 import { Message } from '@/lib/searchUtils';
 
@@ -10,7 +10,7 @@ interface ExportPanelProps {
 }
 
 export function ExportPanel({ messages, salonName, onClose }: ExportPanelProps) {
-  const [format, setFormat] = useState<'json' | 'text'>('json');
+  const [format, setFormat] = useState<'json' | 'text' | 'pdf'>('json');
   const [includeMetadata, setIncludeMetadata] = useState(false);
   const [includeReactions, setIncludeReactions] = useState(true);
   const [exported, setExported] = useState(false);
@@ -68,6 +68,17 @@ export function ExportPanel({ messages, salonName, onClose }: ExportPanelProps) 
               >
                 <FileText className="w-5 h-5" />
                 <span>Texte</span>
+              </button>
+              <button
+                onClick={() => setFormat('pdf')}
+                className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border transition-colors ${
+                  format === 'pdf'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border hover:bg-muted'
+                }`}
+              >
+                <FileType className="w-5 h-5" />
+                <span>PDF</span>
               </button>
             </div>
           </div>

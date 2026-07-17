@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { isValidUuid } from '@/lib/utils/uuid';
+import { getStoredGuestToken } from '@/lib/guestAuthService';
 
 interface NotificationAction {
   label: string;
@@ -34,6 +35,66 @@ interface NotificationsContextType {
 const NotificationsContext = createContext<NotificationsContextType | null>(null);
 
 const DB_NOTIFICATION_TYPES = new Set(['dm', 'friend_request', 'friend_accepted', 'system', 'mention']);
+const GUEST_NOTIFS_KEY = 'virtuel_rt_guest_notifications';
+const PERSISTENT_TYPES = new Set(['dm', 'mention', 'friend_request', 'friend_accepted', 'mod', 'report']);
+
+type StoredNotification = Omit<Notification, 'actions'>;
+
+function guestBucketKey(): string {
+  return getStoredGuestToken() || 'guest';
+}
+
+function loadGuestNotifications(bucket = guestBucketKey()): StoredNotification[] {
+  try {
+    const raw = localStorage.getItem(GUEST_NOTIFS_KEY);
+    if (!raw) return [];
+    const all = JSON.parse(raw) as Record<string, StoredNotification[]>;
+    const primary = Array.isArray(all[bucket]) ? all[bucket] : [];
+    // Migration soft: fusionner l'ancien bucket générique si un token apparaît
+    if (bucket !== 'guest' && Array.isArray(all.guest) && all.guest.length > 0) {
+      const merged = [...all.guest, ...primary];
+      const seen = new Set<string>();
+      return merged.filter((n) => {
+        const id = String(n.id);
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+    }
+    return primary;
+  } catch {
+    return [];
+  }
+}
+
+function saveGuestNotifications(notifs: Notification[], bucket = guestBucketKey()): void {
+  try {
+    const raw = localStorage.getItem(GUEST_NOTIFS_KEY);
+    const all = raw ? (JSON.parse(raw) as Record<string, StoredNotification[]>) : {};
+    const serializable: StoredNotification[] = notifs
+      .filter((n) => PERSISTENT_TYPES.has(n.type) || n.read === false)
+      .slice(0, 50)
+      .map(({ actions: _actions, ...rest }) => rest);
+    all[bucket] = serializable;
+    if (bucket !== 'guest') delete all.guest;
+    localStorage.setItem(GUEST_NOTIFS_KEY, JSON.stringify(all));
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearGuestNotifications(bucket = guestBucketKey()): void {
+  try {
+    const raw = localStorage.getItem(GUEST_NOTIFS_KEY);
+    if (!raw) return;
+    const all = JSON.parse(raw) as Record<string, StoredNotification[]>;
+    delete all[bucket];
+    delete all.guest;
+    localStorage.setItem(GUEST_NOTIFS_KEY, JSON.stringify(all));
+  } catch {
+    /* ignore */
+  }
+}
 
 function toDbNotificationType(type: string): string {
   return DB_NOTIFICATION_TYPES.has(type) ? type : 'system';
@@ -44,6 +105,31 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [localNotifications, setLocalNotifications] = useState<Notification[]>([]);
   const timersRef = useRef<Record<number | string, number>>({});
   const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
+  const syncedGuestRef = useRef(false);
+
+  // Hydrater les notifications invité au démarrage / focus
+  useEffect(() => {
+    const hydrateGuest = () => {
+      if (supabaseUserId) return;
+      const stored = loadGuestNotifications();
+      if (stored.length > 0) {
+        setLocalNotifications((prev) => {
+          const ids = new Set(prev.map((n) => String(n.id)));
+          const merged = [...stored.filter((n) => !ids.has(String(n.id))), ...prev];
+          return merged;
+        });
+      }
+    };
+    hydrateGuest();
+    window.addEventListener('focus', hydrateGuest);
+    return () => window.removeEventListener('focus', hydrateGuest);
+  }, [supabaseUserId]);
+
+  // Persister les notifs locales tant qu'invité
+  useEffect(() => {
+    if (supabaseUserId) return;
+    saveGuestNotifications(localNotifications);
+  }, [localNotifications, supabaseUserId]);
 
   // Écouter les changements d'authentification pour récupérer l'ID utilisateur
   useEffect(() => {
@@ -53,11 +139,49 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       } else {
         setSupabaseUserId(null);
         setNotifications([]);
+        syncedGuestRef.current = false;
+        const stored = loadGuestNotifications();
+        if (stored.length > 0) setLocalNotifications(stored);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Sync guest → DB à la connexion email
+  useEffect(() => {
+    if (!supabaseUserId || !isValidUuid(supabaseUserId) || syncedGuestRef.current) return;
+
+    const sync = async () => {
+      const pending = loadGuestNotifications();
+      if (pending.length === 0) {
+        syncedGuestRef.current = true;
+        return;
+      }
+
+      try {
+        for (const n of pending) {
+          await supabase.from('notifications').insert({
+            user_id: supabaseUserId,
+            type: toDbNotificationType(n.type),
+            message: n.message,
+            group_key: n.groupKey,
+            group_count: n.groupCount || 1,
+            metadata: n.metadata || {},
+            read_at: n.read ? (n.readAt || new Date().toISOString()) : null,
+          });
+        }
+      } catch (error) {
+        console.error('Sync notifications invité → compte:', error);
+      } finally {
+        clearGuestNotifications();
+        setLocalNotifications([]);
+        syncedGuestRef.current = true;
+      }
+    };
+
+    void sync();
+  }, [supabaseUserId]);
 
   // Charger les notifications depuis Supabase au démarrage
   useEffect(() => {
@@ -74,7 +198,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
         if (error) {
           console.error('Erreur lors du chargement des notifications:', error);
-          // Si la table n'existe pas, on ignore silencieusement
           if (error.code === '42P01') {
             console.log('Table notifications non créée encore, fonctionnalité désactivée');
             return;
@@ -103,7 +226,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     loadNotifications();
 
-    // S'abonner aux nouvelles notifications en temps réel
     let channel: any;
     try {
       channel = supabase
@@ -166,12 +288,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     };
   }, [supabaseUserId]);
 
-  // Fusionner les notifications locales et Supabase
   const allNotifications = [...localNotifications, ...notifications].sort((a, b) =>
     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 
-  // Nettoyer tous les timers au démontage
   useEffect(() => {
     return () => { Object.values(timersRef.current).forEach(clearTimeout); };
   }, []);
@@ -180,7 +300,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const id = Date.now().toString();
     const timestamp = new Date().toISOString();
     
-    // Ajouter localement pour affichage immédiat
     setLocalNotifications(prev => {
       if (notification.groupKey) {
         const existingGroup = prev.find(n => n.groupKey === notification.groupKey && !n.read);
@@ -196,7 +315,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       return [...prev, { ...notification, id, timestamp }];
     });
 
-    // Sauvegarder dans Supabase si l'utilisateur est connecté
     if (supabaseUserId && isValidUuid(supabaseUserId)) {
       try {
         const { error } = await supabase.from('notifications').insert({
@@ -209,7 +327,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         });
 
         if (error) {
-          // Si la table n'existe pas, on ignore silencieusement
           if (error.code === '42P01') {
             console.log('Table notifications non créée encore, notification locale uniquement');
           } else {
@@ -221,9 +338,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    // Auto-suppression locale après 15 secondes (sauf interactions importantes)
-    const persistentTypes = new Set(['dm', 'mention', 'friend_request', 'friend_accepted', 'mod', 'report']);
-    if ((!notification.actions || notification.actions.length === 0) && !persistentTypes.has(notification.type)) {
+    if ((!notification.actions || notification.actions.length === 0) && !PERSISTENT_TYPES.has(notification.type)) {
       timersRef.current[id] = setTimeout(() => {
         setLocalNotifications(prev => prev.filter(n => n.id !== id));
         delete timersRef.current[id];
@@ -232,19 +347,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [supabaseUserId]);
 
   const removeNotification = useCallback(async (id: number | string) => {
-    // Supprimer localement
     setLocalNotifications(prev => prev.filter(n => n.id !== id));
     setNotifications(prev => prev.filter(n => n.id !== id));
 
-    // Supprimer de Supabase si c'est une notification persistante
     if (supabaseUserId && isValidUuid(supabaseUserId) && isValidUuid(id)) {
       try {
         const { error } = await supabase.from('notifications').delete().eq('id', id);
-        if (error) {
-          // Si la table n'existe pas, on ignore silencieusement
-          if (error.code !== '42P01') {
-            console.error('Erreur lors de la suppression de la notification:', error);
-          }
+        if (error && error.code !== '42P01') {
+          console.error('Erreur lors de la suppression de la notification:', error);
         }
       } catch (error) {
         console.error('Erreur lors de la suppression de la notification:', error);
@@ -258,16 +368,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [supabaseUserId]);
 
   const markAllRead = useCallback(async () => {
-    // Marquer localement
     setLocalNotifications(prev => prev.map(n => ({ ...n, read: true })));
     setNotifications(prev => prev.map(n => ({ ...n, read: true, readAt: new Date().toISOString() })));
 
-    // Marquer dans Supabase
     if (supabaseUserId && isValidUuid(supabaseUserId)) {
       try {
         const { error } = await supabase.rpc('mark_all_notifications_read', { p_user_id: supabaseUserId });
         if (error) {
-          // Si la fonction n'existe pas, on ignore silencieusement
           if (error.code === '42883') {
             console.log('Fonction mark_all_notifications_read non créée encore');
           } else {
@@ -285,16 +392,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     setNotifications([]);
     Object.values(timersRef.current).forEach(clearTimeout);
     timersRef.current = {};
+    if (!supabaseUserId) clearGuestNotifications();
 
-    // Supprimer toutes les notifications de Supabase
     if (supabaseUserId && isValidUuid(supabaseUserId)) {
       try {
         const { error } = await supabase.from('notifications').delete().eq('user_id', supabaseUserId);
-        if (error) {
-          // Si la table n'existe pas, on ignore silencieusement
-          if (error.code !== '42P01') {
-            console.error('Erreur lors de la suppression des notifications:', error);
-          }
+        if (error && error.code !== '42P01') {
+          console.error('Erreur lors de la suppression des notifications:', error);
         }
       } catch (error) {
         console.error('Erreur lors de la suppression des notifications:', error);

@@ -190,37 +190,39 @@ class DataExportService {
   }
 
   /**
-   * Génère un rapport PDF (simplifié - utilise html2pdf en production)
+   * Génère un rapport PDF réel (Helvetica / WinAnsi)
    */
   generatePDFReport(
     messages: MessageExport[],
     stats: UserStatsExport,
     filename: string
   ): void {
-    // En production, utiliser une bibliothèque comme jsPDF ou html2pdf
-    // Pour l'instant, on exporte en format texte
-    let content = `RAPPORT D'ACTIVITÉ\n`;
-    content += `Généré le ${new Date().toLocaleString('fr-FR')}\n`;
-    content += '='.repeat(50) + '\n\n';
+    const lines = [
+      `RAPPORT D'ACTIVITE`,
+      `Genere le ${new Date().toLocaleString('fr-FR')}`,
+      '='.repeat(50),
+      '',
+      'STATISTIQUES UTILISATEUR',
+      '-'.repeat(30),
+      `Utilisateur: ${stats.username}`,
+      `Messages totaux: ${stats.totalMessages}`,
+      `Reactions totales: ${stats.totalReactions}`,
+      `Niveau: ${stats.level}`,
+      `XP: ${stats.xp}`,
+      `Succes: ${stats.achievements.join(', ')}`,
+      '',
+      'MESSAGES RECENTS',
+      '-'.repeat(30),
+      ...messages.slice(0, 50).map(
+        (msg) => `[${new Date(msg.timestamp).toLocaleString('fr-FR')}] ${msg.author}: ${msg.text}`,
+      ),
+    ];
 
-    content += `STATISTIQUES UTILISATEUR\n`;
-    content += '-'.repeat(30) + '\n';
-    content += `Utilisateur: ${stats.username}\n`;
-    content += `Messages totaux: ${stats.totalMessages}\n`;
-    content += `Réactions totales: ${stats.totalReactions}\n`;
-    content += `Niveau: ${stats.level}\n`;
-    content += `XP: ${stats.xp}\n`;
-    content += `Succès: ${stats.achievements.join(', ')}\n\n`;
-
-    content += `MESSAGES RÉCENTS\n`;
-    content += '-'.repeat(30) + '\n';
-    
-    messages.slice(0, 50).forEach(msg => {
-      content += `[${new Date(msg.timestamp).toLocaleString('fr-FR')}] ${msg.author}: ${msg.text}\n`;
+    // Import dynamique évite un cycle si dataExport est chargé tôt
+    void import('./simplePdf').then(({ buildTextPdf, downloadBlob }) => {
+      const blob = buildTextPdf(`Rapport ${stats.username}`, lines);
+      downloadBlob(blob, `${filename}.pdf`);
     });
-
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
-    this.downloadBlob(blob, `${filename}.txt`);
   }
 
   /**

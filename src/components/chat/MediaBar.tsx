@@ -54,20 +54,13 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
     onRemoteStreams?.(remoteStreams);
   }, [remoteStreams, onRemoteStreams]);
 
-  useEffect(() => {
-    if (!mediaSalon || !currentSalon || !user?.name) return;
-
-    const peers = presenceService
-      .getOnlineUsersInSalon(currentSalon)
-      .filter(u => u.name !== user.name);
-
-    for (const peer of peers) {
-      webrtcService.connectToPeer(peer.userId || peer.name, peer.name);
-    }
-  }, [currentSalon, mediaSalon, user?.name, micActive, camActive]);
-
   const ensureWebRtc = useCallback(async (wantVideo: boolean) => {
-    if (!currentSalon || !user?.name || webrtcJoinedRef.current) return;
+    if (!currentSalon || !user?.name) return;
+    if (webrtcJoinedRef.current && webrtcService.isJoined()) {
+      if (wantVideo) await webrtcService.ensureVideoTrack();
+      streamRef.current = webrtcService.getLocalStream();
+      return;
+    }
     const stream = await webrtcService.joinSalon(
       currentSalon,
       user.id || user.name,
@@ -130,6 +123,32 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
     }
   }, [onMicChange, currentSalon, user]);
 
+  useEffect(() => {
+    if (!mediaSalon) {
+      if (webrtcJoinedRef.current) {
+        webrtcJoinedRef.current = false;
+        void webrtcService.leaveSalon();
+        setRemoteStreams([]);
+        setMicActive(false);
+        setCamActive(false);
+        stopVU();
+      }
+    }
+  }, [mediaSalon, stopVU]);
+
+  useEffect(() => {
+    if (!mediaSalon || !currentSalon || !user?.name || (!micActive && !camActive)) return;
+    if (!webrtcService.isJoined()) return;
+
+    const peers = presenceService
+      .getOnlineUsersInSalon(currentSalon)
+      .filter(u => u.name !== user.name);
+
+    for (const peer of peers) {
+      webrtcService.connectToPeer(peer.userId || peer.name, peer.name);
+    }
+  }, [currentSalon, mediaSalon, user?.name, micActive, camActive]);
+
   const toggleMic = async () => {
     if (!mediaSalon) {
       toast.message('Activez un salon vocal ou vidéo pour utiliser le micro.');
@@ -137,7 +156,6 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
     }
     if (isRequestingRef.current) return;
     if (micActive) {
-      streamRef.current?.getAudioTracks().forEach(t => t.stop());
       webrtcService.toggleTrack('audio', false);
       stopVU();
       setMicActive(false);
@@ -145,6 +163,7 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
       isRequestingRef.current = true;
       try {
         await ensureWebRtc(camActive);
+        webrtcService.toggleTrack('audio', true);
         const stream = webrtcService.getLocalStream() || await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
         setMicActive(true);
@@ -164,17 +183,21 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
     }
     if (isRequestingRef.current) return;
     if (camActive) {
-      streamRef.current?.getVideoTracks().forEach(t => t.stop());
       webrtcService.toggleTrack('video', false);
       setCamActive(false);
     } else {
       isRequestingRef.current = true;
       try {
         await ensureWebRtc(true);
-        const stream = webrtcService.getLocalStream() || await navigator.mediaDevices.getUserMedia({ audio: micActive, video: true });
-        streamRef.current = stream;
+        const ok = await webrtcService.ensureVideoTrack();
+        if (!ok && !webrtcService.getLocalStream()?.getVideoTracks().length) {
+          throw new Error('no video');
+        }
+        webrtcService.toggleTrack('video', true);
+        const stream = webrtcService.getLocalStream();
+        if (stream) streamRef.current = stream;
         setCamActive(true);
-        if (micActive && stream.getAudioTracks().length) startVU(stream);
+        if (micActive && stream?.getAudioTracks().length) startVU(stream);
       } catch {
         toast.error('Impossible d\'accéder à la caméra.');
       } finally {

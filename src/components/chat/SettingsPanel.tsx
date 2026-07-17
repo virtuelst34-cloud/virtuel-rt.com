@@ -741,10 +741,10 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                 <h3 className="text-[13px] font-semibold text-foreground mb-5">Amis et demandes</h3>
 
                 {!supabaseUser && (
-                  <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-3 mb-4">
-                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-200/90 leading-relaxed">
-                      Liez un compte email (onglet Compte) pour envoyer et recevoir des demandes d&apos;amis.
+                  <div className="flex items-start gap-2 bg-sky-500/10 border border-sky-500/25 rounded-xl px-3 py-3 mb-4">
+                    <AlertCircle className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-sky-200/90 leading-relaxed">
+                      Mode invité : les demandes d&apos;amis fonctionnent pendant la session (30&nbsp;min). Un compte email conserve vos amis durablement.
                     </p>
                   </div>
                 )}

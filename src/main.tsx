@@ -14,6 +14,16 @@ window.addEventListener('vite:preloadError', (event) => {
   }
 })
 
+// Nouveau SW activé → recharger pour prendre le build frais
+if ('serviceWorker' in navigator && !import.meta.env.DEV) {
+  let refreshing = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return
+    refreshing = true
+    window.location.reload()
+  })
+}
+
 // PWA : VitePWA injecte déjà registerSW.js. En local, désenregistrer tout SW résiduel.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

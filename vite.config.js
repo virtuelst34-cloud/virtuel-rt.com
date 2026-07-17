@@ -12,8 +12,41 @@ export default defineConfig({
       devOptions: { enabled: false },
       includeAssets: ['logo.png', 'manifest.json'],
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Ne pré-cacher que le shell — les chunks hashés se chargent à la demande
+        // (évite de servir un vieux Home.js qui pointe vers des SettingsPanel 404)
+        globPatterns: [
+          'index.html',
+          'assets/*.{css,ico,png,svg,woff2}',
+          'logo.png',
+          'manifest.json',
+          'manifest.webmanifest',
+          'registerSW.js',
+        ],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api\//, /^\/functions\//],
         runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages',
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 },
+            },
+          },
+          {
+            // Fichiers hashés immuables
+            urlPattern: /\/(?:chunks\/)?[^/?]+\.[A-Za-z0-9_-]+\.(?:js|css)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'static-hashed',
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
             handler: 'NetworkFirst',

@@ -126,4 +126,6 @@ jobs:
           port: 21
           local-dir: ./dist/
           server-dir: ${{ secrets.FTP_SERVER_DIR || '/domains/virtuel-rt.com/public_html/' }}
+          # Supprime les anciens chunks/index hashés absents du nouveau build
+          dangerous-clean-slate: true
           exclude: ''

@@ -2,9 +2,8 @@ import React, { useState, FormEvent } from 'react';
 import { useUser } from '@/lib/contexts';
 import { supabaseAuthService } from '@/lib/supabaseAuth';
 import Avatar from './Avatar';
+import { AVATAR_IDS } from '@/lib/chatConfig';
 import { Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
-
-const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9', 'av10', 'av11', 'av12', 'av13', 'av14', 'av15', 'av16', 'av17', 'av18', 'av19', 'av20', 'av21', 'av22', 'av23', 'av24', 'av25', 'av26', 'av27', 'av28', 'av29', 'av30'];
 
 export default function UsernameModal() {
   const { login, loginWithSupabase } = useUser();
@@ -128,7 +127,7 @@ export default function UsernameModal() {
         {mode === 'guest' && (
           <form onSubmit={handleGuestSubmit} className="flex flex-col gap-4">
             <div className="flex gap-3 flex-wrap justify-center">
-              {AVATARS.map(av => (
+              {AVATAR_IDS.map(av => (
                 <button key={av} type="button" onClick={() => setSelectedAv(av)}
                   className={`rounded-full transition-all duration-200 ${selectedAv === av ? 'ring-4 ring-primary/50 scale-110 shadow-lg shadow-primary/25' : 'opacity-60 hover:opacity-100 hover:scale-105'}`}>
                   <Avatar avatarClass={av} initials={initials} size="lg" />
@@ -223,7 +222,7 @@ export default function UsernameModal() {
               </div>
             </div>
             <div className="flex gap-3 flex-wrap justify-center">
-              {AVATARS.map(av => (
+              {AVATAR_IDS.map(av => (
                 <button key={av} type="button" onClick={() => setSelectedAv(av)}
                   className={`rounded-full transition-all duration-200 ${selectedAv === av ? 'ring-4 ring-primary/50 scale-110 shadow-lg shadow-primary/25' : 'opacity-60 hover:opacity-100 hover:scale-105'}`}>
                   <Avatar avatarClass={av} initials={initials} size="lg" />

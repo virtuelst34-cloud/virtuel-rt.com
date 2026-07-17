@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { useUser, usePreferences, useXP, useBadges, useMuteBlock, useFriends } from '@/lib/contexts';
+import { useUser, usePreferences, useXP, useBadges, useMuteBlock, useFriends, useNotifications } from '@/lib/contexts';
 import { supabaseAuthService } from '@/lib/supabaseAuth';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import { getBadgeForLevel, getUnlockedBadges } from '@/lib/diamondBadges';
-import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy } from 'lucide-react';
+import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare } from 'lucide-react';
 import AchievementsSection from './AchievementsSection';
 import TwoFactorSection from './TwoFactorSection';
 import { format } from 'date-fns';
@@ -44,16 +44,22 @@ const STATUSES: StatusOption[] = [
 
 interface SettingsPanelProps {
   onClose: () => void;
+  initialTab?: string;
+  onOpenDM?: (name: string) => void;
+  onViewProfile?: (name: string) => void;
 }
 
-export default function SettingsPanel({ onClose }: SettingsPanelProps) {
-  const { user, updateProfile, setStatus, supabaseUser, logout } = useUser();
+export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewProfile }: SettingsPanelProps) {
+  const { user, updateProfile, setStatus, supabaseUser, logout, loginWithSupabase } = useUser();
   const { xpProgress, xpForLevel } = useXP();
   const { theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium, accentColor, changeAccent, ACCENT_COLORS, compactMode, toggleCompactMode } = usePreferences();
   const { mutedUsers, blockedUsers, unmuteUser, unblockUser } = useMuteBlock();
-  const { friends, pendingRequests, outgoingRequests, acceptFriendRequest, rejectFriendRequest, removeFriend, cancelFriendRequest } = useFriends();
+  const { friends, pendingRequests, outgoingRequests, acceptRequestFromSender, rejectRequestFromSender, removeFriend, cancelRequestToRecipient, reloadFriends } = useFriends();
+  const { addNotification } = useNotifications();
   const { customBadges } = useBadges();
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState(initialTab || 'profile');
+  const [friendsFeedback, setFriendsFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [accountMode, setAccountMode] = useState<'create' | 'login'>('create');
   const [editing, setEditing]     = useState(false);
   const [draft, setDraft]         = useState({ 
     bio: user?.bio || '', 
@@ -78,6 +84,14 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [resendSuccess, setResendSuccess] = useState(false);
 
   useEffect(() => {
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (activeTab === 'friends') void reloadFriends();
+  }, [activeTab, reloadFriends]);
+
+  useEffect(() => {
     setDraft({ 
       bio: user?.bio || '', 
       avatar: user?.avatar || 'av1', 
@@ -97,10 +111,23 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
   const prog     = xpProgress(user);
   const badge    = getBadgeForLevel(lvl, customBadges || []);
   const unlocked = getUnlockedBadges(lvl, customBadges || []);
-  const currentFriendKeys = [user.name, supabaseUser?.id].filter(Boolean);
   const acceptedFriends = friends
-    .filter(f => f.status === 'accepted' && (currentFriendKeys.includes(f.user_id) || currentFriendKeys.includes(f.friend_id)))
-    .map(f => currentFriendKeys.includes(f.user_id) ? f.friend_id : f.user_id);
+    .filter(f => f.status === 'accepted' && (f.user_id === user.name || f.friend_id === user.name))
+    .map(f => f.user_id === user.name ? f.friend_id : f.user_id);
+
+  const runFriendAction = async (action: () => Promise<void>, successMessage: string) => {
+    setFriendsFeedback(null);
+    try {
+      await action();
+      await reloadFriends();
+      setFriendsFeedback({ type: 'success', message: successMessage });
+      addNotification({ type: 'system', message: successMessage });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Action impossible';
+      setFriendsFeedback({ type: 'error', message });
+      addNotification({ type: 'system', message });
+    }
+  };
 
   const handleSave = () => {
     updateProfile({ 
@@ -123,26 +150,49 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
       setLinkError('Veuillez remplir tous les champs');
       return;
     }
+    if (password.length < 6) {
+      setLinkError('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
 
     setLinking(true);
     setLinkError('');
     setLinkSuccess(false);
 
     try {
-      // Sign up with Supabase (this will create a new account)
-      const result = await supabaseAuthService.signUp(email, password, user.name, user.avatar || 'av1');
-      
-      if (!result.success) {
-        setLinkError(result.error || 'Erreur lors de la liaison');
-      } else {
-        setLinkSuccess(true);
+      if (accountMode === 'login') {
+        const result = await supabaseAuthService.signIn(email, password);
+        if (!result.success || !result.user) {
+          setLinkError(result.error || 'Connexion impossible');
+          return;
+        }
+        loginWithSupabase(result.user);
+        addNotification({ type: 'system', message: 'Compte connecté — amis et sync activés' });
         setEmail('');
         setPassword('');
-        // The user will need to verify their email
-        setTimeout(() => setLinkSuccess(false), 3000);
+        return;
       }
-    } catch (error: any) {
-      setLinkError(error.message || 'Erreur lors de la liaison');
+
+      const result = await supabaseAuthService.signUp(email, password, user.name, user.avatar || 'av1');
+      if (!result.success) {
+        setLinkError(result.error || 'Erreur lors de la création du compte');
+        return;
+      }
+
+      if (result.user) {
+        loginWithSupabase(result.user);
+        addNotification({ type: 'system', message: 'Compte créé et connecté' });
+        setEmail('');
+        setPassword('');
+        return;
+      }
+
+      // Confirmation email requise : bascule vers connexion
+      setLinkSuccess(true);
+      setAccountMode('login');
+      setTimeout(() => setLinkSuccess(false), 5000);
+    } catch (error: unknown) {
+      setLinkError(error instanceof Error ? error.message : 'Erreur lors de la liaison');
     } finally {
       setLinking(false);
     }
@@ -195,11 +245,17 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
           <div className="w-[150px] bg-secondary border-r border-border p-1.5 flex flex-col gap-0.5 shrink-0">
             {TABS.map((tab, index) => {
               const Icon = tab.icon;
+              const friendsBadge = tab.id === 'friends' ? pendingRequests.length : 0;
               return (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition-all border ${activeTab === tab.id ? 'bg-primary/12 border-primary/25 text-primary scale-105' : 'border-transparent text-muted-foreground/60 hover:bg-white/[0.04] hover:text-muted-foreground hover:scale-[1.02]'} animate-slide-in-right`}
+                  className={`relative flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition-all border ${activeTab === tab.id ? 'bg-primary/12 border-primary/25 text-primary scale-105' : 'border-transparent text-muted-foreground/60 hover:bg-white/[0.04] hover:text-muted-foreground hover:scale-[1.02]'} animate-slide-in-right`}
                   style={{ animationDelay: `${index * 50}ms` }}>
                   <Icon className="w-3.5 h-3.5" />{tab.label}
+                  {friendsBadge > 0 && (
+                    <span className="ml-auto min-w-[16px] h-4 px-1 rounded-full bg-blue-500 text-white text-[9px] font-bold flex items-center justify-center">
+                      {friendsBadge > 9 ? '9+' : friendsBadge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -285,7 +341,8 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="text-[15px] font-bold text-foreground">{user.name}</span>
-                      <DiamondBadge level={lvl} size="sm" showLabel />
+                      {user.isFounder && <DiamondBadge level={lvl} size="xs" specialBadge="founder" />}
+                      {user.isIridescent && <DiamondBadge level={lvl} size="xs" specialBadge="iridescent" />}
                       {isPremium && <span className="text-[10px] bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 rounded-full px-2 py-px animate-pulse">PREMIUM</span>}
                     </div>
                   )}
@@ -496,9 +553,9 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-xs text-muted-foreground/60">
-                      <p className="mb-2">Vous êtes en mode invité. Vos données sont stockées localement.</p>
-                      <p>Liez votre compte à un email pour synchroniser vos données sur tous vos appareils.</p>
+                    <div className="text-xs text-muted-foreground/60 space-y-2">
+                      <p>Vous êtes en <strong className="text-amber-300/90">mode invité</strong> : données locales uniquement.</p>
+                      <p>Créez un compte ou connectez-vous pour les <strong className="text-foreground/80">demandes d&apos;amis</strong>, la sync multi-appareils et les notifications persistantes.</p>
                     </div>
                   )}
                 </div>
@@ -509,15 +566,30 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                   </div>
                 )}
 
-                {/* Formulaire de liaison email (pour invités) */}
+                {/* Formulaire compte (pour invités) */}
                 {!supabaseUser && (
                   <div className="bg-secondary/50 border border-border rounded-xl p-4">
-                    <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3">Lier un email</div>
-                    
+                    <div className="flex gap-1 p-1 mb-3 bg-background/60 rounded-lg border border-border">
+                      <button
+                        type="button"
+                        onClick={() => { setAccountMode('create'); setLinkError(''); }}
+                        className={`flex-1 py-1.5 rounded-md text-[11px] font-medium transition-all ${accountMode === 'create' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        Créer un compte
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setAccountMode('login'); setLinkError(''); setLinkSuccess(false); }}
+                        className={`flex-1 py-1.5 rounded-md text-[11px] font-medium transition-all ${accountMode === 'login' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        Se connecter
+                      </button>
+                    </div>
+
                     {linkSuccess ? (
                       <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-lg p-3 text-center">
                         <Check className="w-5 h-5 text-emerald-400 mx-auto mb-2" />
-                        <p className="text-sm text-emerald-400">Compte créé ! Vérifiez votre email pour activer votre compte.</p>
+                        <p className="text-sm text-emerald-400">Compte créé ! Vérifiez votre email, puis connectez-vous ici.</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -557,24 +629,26 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                           </div>
                         )}
                         <button
-                          onClick={handleLinkEmail}
+                          onClick={() => void handleLinkEmail()}
                           disabled={linking}
                           className="w-full py-2.5 rounded-lg bg-primary text-white font-medium text-sm flex items-center justify-center gap-2 hover:bg-primary/80 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {linking ? (
                             <>
                               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                              Création en cours...
+                              {accountMode === 'login' ? 'Connexion...' : 'Création...'}
                             </>
                           ) : (
                             <>
                               <Mail className="w-4 h-4" />
-                              Créer un compte
+                              {accountMode === 'login' ? 'Se connecter' : 'Créer un compte'}
                             </>
                           )}
                         </button>
                         <p className="text-[10px] text-muted-foreground/40 text-center">
-                          En créant un compte, vous acceptez nos conditions d'utilisation.
+                          {accountMode === 'login'
+                            ? 'Utilisez le même email que lors de la création du compte.'
+                            : 'Conservez le même pseudo pour retrouver vos messages.'}
                         </p>
                       </div>
                     )}
@@ -666,6 +740,25 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
               <div>
                 <h3 className="text-[13px] font-semibold text-foreground mb-5">Amis et demandes</h3>
 
+                {!supabaseUser && (
+                  <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-3 mb-4">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-200/90 leading-relaxed">
+                      Liez un compte email (onglet Compte) pour envoyer et recevoir des demandes d&apos;amis.
+                    </p>
+                  </div>
+                )}
+
+                {friendsFeedback && (
+                  <div className={`rounded-xl px-3 py-3 mb-4 text-xs leading-relaxed border ${
+                    friendsFeedback.type === 'success'
+                      ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+                      : 'bg-red-500/10 border-red-500/25 text-red-300'
+                  }`}>
+                    {friendsFeedback.message}
+                  </div>
+                )}
+
                 <div className="space-y-5">
                   <div>
                     <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-2">Demandes reçues</div>
@@ -677,8 +770,8 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                           <div key={req.id} className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-3 py-2.5">
                             <UserPlus className="w-4 h-4 text-blue-400 shrink-0" />
                             <span className="text-sm text-foreground flex-1">{req.user_id}</span>
-                            <button onClick={() => acceptFriendRequest(req.id)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] hover:bg-emerald-500/25 transition-all active:scale-95 cursor-pointer">Accepter</button>
-                            <button onClick={() => rejectFriendRequest(req.id)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-300 text-[11px] hover:bg-red-500/20 transition-all active:scale-95 cursor-pointer">Refuser</button>
+                            <button onClick={() => void runFriendAction(() => acceptRequestFromSender(req.user_id), `${req.user_id} ajouté à vos amis`)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] hover:bg-emerald-500/25 transition-all active:scale-95 cursor-pointer">Accepter</button>
+                            <button onClick={() => void runFriendAction(() => rejectRequestFromSender(req.user_id), `Demande de ${req.user_id} refusée`)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-300 text-[11px] hover:bg-red-500/20 transition-all active:scale-95 cursor-pointer">Refuser</button>
                           </div>
                         ))}
                       </div>
@@ -696,7 +789,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                             <UserPlus className="w-4 h-4 text-muted-foreground/50 shrink-0" />
                             <span className="text-sm text-foreground flex-1">{req.friend_id}</span>
                             <span className="text-[10px] text-muted-foreground/55">En attente</span>
-                            <button onClick={() => cancelFriendRequest(req.id)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-300 text-[11px] hover:bg-red-500/20 transition-all active:scale-95 cursor-pointer">Annuler</button>
+                            <button onClick={() => void runFriendAction(() => cancelRequestToRecipient(req.friend_id), `Demande à ${req.friend_id} annulée`)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-300 text-[11px] hover:bg-red-500/20 transition-all active:scale-95 cursor-pointer">Annuler</button>
                           </div>
                         ))}
                       </div>
@@ -712,8 +805,25 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                         {[...new Set(acceptedFriends)].map(name => (
                           <div key={name} className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-3 py-2.5">
                             <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                            <span className="text-sm text-foreground flex-1">{name}</span>
-                            <button onClick={() => removeFriend(name)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-300 text-[11px] hover:bg-red-500/20 transition-all active:scale-95 cursor-pointer">Retirer</button>
+                            <button
+                              type="button"
+                              onClick={() => onViewProfile?.(name)}
+                              className="text-sm text-foreground flex-1 text-left hover:text-primary transition-colors truncate"
+                              title={`Voir le profil de ${name}`}
+                            >
+                              {name}
+                            </button>
+                            {onOpenDM && (
+                              <button
+                                type="button"
+                                onClick={() => onOpenDM(name)}
+                                className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/30 text-primary text-[11px] hover:bg-primary/25 transition-all active:scale-95 cursor-pointer"
+                                title={`Message à ${name}`}
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                              </button>
+                            )}
+                            <button onClick={() => void runFriendAction(() => removeFriend(name), `${name} retiré de vos amis`)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-300 text-[11px] hover:bg-red-500/20 transition-all active:scale-95 cursor-pointer">Retirer</button>
                           </div>
                         ))}
                       </div>

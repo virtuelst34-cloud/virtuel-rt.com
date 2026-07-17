@@ -181,19 +181,18 @@ export const supabaseDbService = {
       await enforceRateLimit('salon_create', creatorName);
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('salons')
-        .insert(salon)
-        .select()
-        .maybeSingle();
+    const { data, error } = await supabase
+      .from('salons')
+      .insert(salon)
+      .select()
+      .maybeSingle();
 
-      if (error) throw error;
-      return data;
-    } catch (error) {
+    if (error) {
       console.error('Erreur lors de l\'ajout du salon:', error);
-      return null;
+      throw error;
     }
+
+    return data;
   },
 
   async deleteSalon(salonId: string): Promise<void> {

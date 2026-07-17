@@ -176,14 +176,6 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
         password: salon.password,
       };
       const saved = await supabaseDbService.addSalon(supabaseSalon, user?.name);
-      if (!saved) {
-        setCustomSalons(prev => prev.filter(s => s.id !== salon.id));
-        addNotification({
-          type: 'error',
-          message: `Impossible de créer le salon « ${salon.name} ».`,
-        });
-        return;
-      }
       setCustomSalons(prev => mergeSalonLists(prev, [convertSupabaseSalon(saved)]));
       addNotification({ type: 'system', message: `✅ Salon « ${salon.name} » créé.` });
     } catch (error) {
@@ -191,7 +183,7 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
       console.error('Erreur lors de l\'ajout du salon:', error);
       addNotification({
         type: 'error',
-        message: error instanceof Error ? error.message : 'Impossible de créer le salon',
+        message: error instanceof Error ? error.message : `Impossible de créer le salon « ${salon.name} ».`,
       });
     }
   }, [addNotification, user?.name]);

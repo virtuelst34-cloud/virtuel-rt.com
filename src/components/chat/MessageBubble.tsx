@@ -1,5 +1,6 @@
 import React, { useState, useRef, memo, RefObject, useCallback, useMemo, useEffect } from 'react';
 import Avatar from './Avatar';
+import DiamondBadge from './DiamondBadge';
 import SafeMessageContent from './SafeMessageContent';
 import { useUser, usePreferences, useMuteBlock } from '@/lib/contexts';
 import { useModeration } from '@/lib/contexts';
@@ -47,6 +48,11 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
   }, [can]);
 
   const isOwn = message.author_name === user?.name;
+  const showCreatorBadges =
+    isOwn &&
+    !!user &&
+    (user.isFounder || user.specialBadges?.includes('founder')) &&
+    (user.isIridescent || user.specialBadges?.includes('iridescent'));
   const canDeleteMessage = isOwn || isAdmin || canDeleteAny;
   const [hovered, setHovered]       = useState(false);
   const [reported, setReported]     = useState(false);
@@ -123,6 +129,12 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
             aria-label={`Message de ${message.author_name}`}>
             {message.author_name}
           </button>
+          {showCreatorBadges && (
+            <span className={`inline-flex items-center gap-1 ${isOwn ? 'mr-1' : 'ml-1'}`} aria-label="Badges créateur">
+              <DiamondBadge level={1} size="xs" specialBadge="founder" />
+              <DiamondBadge level={1} size="xs" specialBadge="iridescent" />
+            </span>
+          )}
           <span className={`${compactMode ? 'text-[9px]' : 'text-[10px]'} text-muted-foreground/40`} aria-label={`Envoyé à ${time}`}>{time}</span>
           {message.pinned && <Pin className="w-3 h-3 text-amber-400 animate-bounce" aria-label="Message épinglé" />}
         </div>

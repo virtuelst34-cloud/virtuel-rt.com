@@ -1,5 +1,5 @@
 import React from 'react';
-import { useChat, useFriends, useMuteBlock } from '@/lib/contexts';
+import { useChat, useFriends, useMuteBlock, useNotifications } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
@@ -17,7 +17,8 @@ interface UserProfileViewProps {
 // Fiche profil en lecture seule d'un autre utilisateur
 export default function UserProfileView({ targetName, onClose, onOpenDM }: UserProfileViewProps) {
   const { profiles, user } = useChat();
-  const { isFriend, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, removeFriend, pendingRequests, outgoingRequests } = useFriends();
+  const { addNotification } = useNotifications();
+  const { isFriend, sendFriendRequest, acceptRequestFromSender, rejectRequestFromSender, cancelRequestToRecipient, removeFriend, pendingRequests, outgoingRequests } = useFriends();
   const { isMuted, isBlocked, muteUser, unmuteUser, blockUser, unblockUser } = useMuteBlock();
   const target = profiles[targetName] || { name: targetName, avatar: 'av1', initials: targetName.slice(0, 2).toUpperCase(), level: 1, xp: 0 };
 
@@ -49,14 +50,25 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
   };
 
   const handleFriend = async () => {
-    if (friend) {
-      await removeFriend(targetName);
-    } else if (incomingRequest) {
-      await acceptFriendRequest(incomingRequest.id);
-    } else if (outgoingRequest) {
-      await rejectFriendRequest(outgoingRequest.id);
-    } else {
-      await sendFriendRequest(targetName);
+    try {
+      if (friend) {
+        await removeFriend(targetName);
+        addNotification({ type: 'system', message: `${targetName} retiré de vos amis` });
+      } else if (incomingRequest) {
+        await acceptRequestFromSender(targetName);
+        addNotification({ type: 'system', message: `Vous êtes maintenant ami avec ${targetName}` });
+      } else if (outgoingRequest) {
+        await cancelRequestToRecipient(targetName);
+        addNotification({ type: 'system', message: `Demande à ${targetName} annulée` });
+      } else {
+        await sendFriendRequest(targetName);
+        addNotification({ type: 'system', message: `Demande d'ami envoyée à ${targetName}` });
+      }
+    } catch (error) {
+      addNotification({
+        type: 'system',
+        message: error instanceof Error ? error.message : 'Impossible de modifier la relation d\'ami',
+      });
     }
   };
 
@@ -75,8 +87,12 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
         role="document">
 
         {/* Banner */}
-        <div className="h-16 relative" style={{ background: `linear-gradient(135deg, ${badge.color}22, transparent)` }}>
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.1))' }} aria-hidden="true" />
+        <div className="h-16 relative z-0" style={{ background: `linear-gradient(135deg, ${badge.color}22, transparent)` }}>
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.1))' }}
+            aria-hidden="true"
+          />
           <button 
             onClick={onClose}
             className="absolute top-3 right-3 p-1.5 rounded-lg bg-black/30 text-white/60 hover:text-white hover:bg-black/50 transition-colors"
@@ -85,7 +101,7 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
           </button>
         </div>
 
-        <div className="px-5 pb-5">
+        <div className="px-5 pb-5 relative z-10">
           {/* Avatar + nom */}
           <div className="-mt-7 mb-4 flex items-end justify-between">
             <div className="relative">

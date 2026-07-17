@@ -434,6 +434,21 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
 export function useUser(): UserContextType {
   const context = useContext(UserContext);
-  if (!context) throw new Error('useUser must be used inside UserProvider');
-  return context;
+  if (context) return context;
+
+  // Fallback défensif: évite un crash complet si l'arbre de providers
+  // est momentanément incohérent (ex: duplication de module / hot-reload).
+  // Les composants verront un état "déconnecté".
+  return {
+    user: null,
+    supabaseUser: null,
+    profiles: {},
+    setProfiles: () => {},
+    login: async () => ({ success: false, error: 'UserProvider manquant' }),
+    loginWithSupabase: () => {},
+    logout: () => {},
+    updateProfile: () => {},
+    setStatus: () => {},
+    setUserStatusAdmin: () => {},
+  };
 }

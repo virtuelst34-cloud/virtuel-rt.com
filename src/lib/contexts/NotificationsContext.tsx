@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
+import { isValidUuid } from '@/lib/utils/uuid';
 
 interface NotificationAction {
   label: string;
@@ -24,12 +25,19 @@ interface NotificationsContextType {
   notifications: Notification[];
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   markAllRead: () => void;
+  markNotificationRead: (id: number | string) => void;
   clearNotifications: () => void;
   unreadCount: number;
   removeNotification: (id: number | string) => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | null>(null);
+
+const DB_NOTIFICATION_TYPES = new Set(['dm', 'friend_request', 'friend_accepted', 'system', 'mention']);
+
+function toDbNotificationType(type: string): string {
+  return DB_NOTIFICATION_TYPES.has(type) ? type : 'system';
+}
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -53,7 +61,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   // Charger les notifications depuis Supabase au démarrage
   useEffect(() => {
-    if (!supabaseUserId) return;
+    if (!supabaseUserId || !isValidUuid(supabaseUserId)) return;
 
     const loadNotifications = async () => {
       try {
@@ -189,11 +197,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     });
 
     // Sauvegarder dans Supabase si l'utilisateur est connecté
-    if (supabaseUserId) {
+    if (supabaseUserId && isValidUuid(supabaseUserId)) {
       try {
         const { error } = await supabase.from('notifications').insert({
           user_id: supabaseUserId,
-          type: notification.type,
+          type: toDbNotificationType(notification.type),
           message: notification.message,
           group_key: notification.groupKey,
           group_count: notification.groupCount || 1,
@@ -229,7 +237,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     setNotifications(prev => prev.filter(n => n.id !== id));
 
     // Supprimer de Supabase si c'est une notification persistante
-    if (supabaseUserId && typeof id === 'string') {
+    if (supabaseUserId && isValidUuid(supabaseUserId) && isValidUuid(id)) {
       try {
         const { error } = await supabase.from('notifications').delete().eq('id', id);
         if (error) {
@@ -255,7 +263,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     setNotifications(prev => prev.map(n => ({ ...n, read: true, readAt: new Date().toISOString() })));
 
     // Marquer dans Supabase
-    if (supabaseUserId) {
+    if (supabaseUserId && isValidUuid(supabaseUserId)) {
       try {
         const { error } = await supabase.rpc('mark_all_notifications_read', { p_user_id: supabaseUserId });
         if (error) {
@@ -279,7 +287,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     timersRef.current = {};
 
     // Supprimer toutes les notifications de Supabase
-    if (supabaseUserId) {
+    if (supabaseUserId && isValidUuid(supabaseUserId)) {
       try {
         const { error } = await supabase.from('notifications').delete().eq('user_id', supabaseUserId);
         if (error) {
@@ -294,12 +302,27 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }
   }, [supabaseUserId]);
 
+  const markNotificationRead = useCallback(async (id: number | string) => {
+    const readAt = new Date().toISOString();
+    setLocalNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true, readAt } : n));
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true, readAt } : n));
+
+    if (supabaseUserId && isValidUuid(supabaseUserId) && isValidUuid(id)) {
+      try {
+        await supabase.from('notifications').update({ read_at: readAt }).eq('id', id);
+      } catch (error) {
+        console.error('Erreur marquage notification lue:', error);
+      }
+    }
+  }, [supabaseUserId]);
+
   const unreadCount = allNotifications.filter(n => !n.read).length;
 
   const value: NotificationsContextType = {
     notifications: allNotifications,
     addNotification,
     markAllRead,
+    markNotificationRead,
     clearNotifications,
     unreadCount,
     removeNotification

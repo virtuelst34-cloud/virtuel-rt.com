@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, ChangeEvent, KeyboardEvent } from 'react';
+import React, { useState, useRef, useEffect, useCallback, ChangeEvent, KeyboardEvent, useMemo } from 'react';
 import { useUser, useNotifications, useXP, useDM, useMuteBlock } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
@@ -29,7 +29,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
   const { addNotification } = useNotifications();
   const { isMuted, isBlocked } = useMuteBlock();
   const { sounds } = useXP();
-  const { sendDM, getConversation, markRead, getUnreadCount, loadConversation } = useDM();
+  const { conversations, sendDM, getConversation, markRead, getUnreadCount, loadConversation } = useDM();
 
   const [selectedUser, setSelectedUser] = useState<string | null>(typeof initialUser === 'string' ? initialUser : (initialUser?.name || null));
   const [text, setText]                 = useState('');
@@ -107,8 +107,64 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
     if (selectedUser) setTimeout(() => inputRef.current?.focus(), 50);
   }, [selectedUser]);
 
-  const contacts = Object.values(profiles).filter(p => p.name !== user?.name && !isMuted(p.name) && !isBlocked(p.name));
-  const filteredContacts = contacts.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()));
+  const contacts = useMemo(() => {
+    if (!user?.name) return [];
+
+    // 1) Base: profiles connus
+    const base = Object.values(profiles)
+      .filter(p => p.name !== user.name && !isMuted(p.name) && !isBlocked(p.name))
+      .map(p => ({
+        name: p.name,
+        avatar: p.avatar,
+        initials: p.initials,
+        level: (p as any).level,
+        status: (p as any).status,
+        lastAt: (p as any).lastAt as string | undefined,
+      }));
+
+    // 2) Inbox: participants rencontrés en DM (même si profiles est incomplet)
+    const fromInboxMap = new Map<string, { name: string; avatar?: string; initials?: string; level?: number; status?: string; lastAt?: string }>();
+    for (const msgs of Object.values(conversations || {})) {
+      for (const m of msgs as any[]) {
+        const sender = m?.sender_id;
+        const receiver = m?.receiver_id;
+        if (!sender || !receiver) continue;
+        if (sender !== user.name && receiver !== user.name) continue;
+
+        const other = sender === user.name ? receiver : sender;
+        if (!other || other === user.name) continue;
+        if (isMuted(other) || isBlocked(other)) continue;
+
+        const p = profiles[other];
+        const existing = fromInboxMap.get(other);
+        const createdAt = m?.created_at as string | undefined;
+        const lastAt = !existing?.lastAt
+          ? createdAt
+          : (createdAt && createdAt > existing.lastAt ? createdAt : existing.lastAt);
+
+        fromInboxMap.set(other, {
+          name: other,
+          avatar: p?.avatar || existing?.avatar,
+          initials: p?.initials || existing?.initials || other.slice(0, 2).toUpperCase(),
+          level: (p as any)?.level ?? existing?.level ?? 1,
+          status: (p as any)?.status ?? existing?.status ?? 'offline',
+          lastAt,
+        });
+      }
+    }
+
+    const merged = new Map<string, any>();
+    for (const c of base) merged.set(c.name, c);
+    for (const c of fromInboxMap.values()) merged.set(c.name, { ...merged.get(c.name), ...c });
+
+    return Array.from(merged.values())
+      .sort((a, b) => (b.lastAt || '').localeCompare(a.lastAt || '') || a.name.localeCompare(b.name));
+  }, [user?.name, profiles, conversations, isMuted, isBlocked]);
+
+  const filteredContacts = useMemo(
+    () => contacts.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase())),
+    [contacts, search],
+  );
 
   const unreadFor = useCallback((name: string) => {
     if (!user) return 0;

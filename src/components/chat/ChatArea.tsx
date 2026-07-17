@@ -203,10 +203,10 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     if (user && added > 0) {
       const last = messages[messages.length - 1];
       if (last && last.author_name !== user.name && last.text?.includes(`@${user.name}`)) {
-        sendPush(`${last.author_name} vous a mentionné`, last.text);
+        sendPush(`${last.author_name} vous a mentionnï¿½`, last.text);
         addNotification({
           type: 'mention',
-          message: `@ ${last.author_name} vous a mentionné dans #${salon?.name}`,
+          message: `@ ${last.author_name} vous a mentionnï¿½ dans #${salon?.name}`,
           groupKey: `mention:${last.author_name}`,
         });
         recordMention(user.name);

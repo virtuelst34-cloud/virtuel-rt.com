@@ -80,6 +80,8 @@ const MIGRATION_ORDER = [
   "add_quiz_answers_column.sql",
   "create_notify_user_rpc.sql",
   "enable_salons_realtime.sql",
+  "enable_salons_rls.sql",
+  "fix_friends_rls_and_realtime.sql",
 ];
 
 const SKIP_ERROR_CODES = new Set([

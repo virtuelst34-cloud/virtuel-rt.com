@@ -24,6 +24,8 @@ function ChatApp() {
   const [dmTarget,  setDmTarget]        = useState<string | null>(null);
   const [showNotif, setShowNotif]       = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [settingsTab, setSettingsTab]   = useState<string>('profile');
+  const [viewProfile, setViewProfile]   = useState<string | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<RemoteStreamInfo[]>([]);
 
   const handleMicChange = useCallback((active: boolean, level: number) => {
@@ -36,6 +38,11 @@ function ChatApp() {
     setShowDM(true);
   }, []);
 
+  const openSettings = useCallback((tab = 'profile') => {
+    setSettingsTab(tab);
+    setShowSettings(true);
+  }, []);
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {!user && <UsernameModal />}
@@ -44,7 +51,7 @@ function ChatApp() {
       <Sidebar
         onOpenDM={openDM}
         onOpenNotifications={() => setShowNotif(true)}
-        onOpenSettings={() => setShowSettings(true)}
+        onOpenSettings={openSettings}
       />
 
       {currentSalon ? (
@@ -66,8 +73,41 @@ function ChatApp() {
 
       {showAdmin    && <Suspense fallback={null}><AdminPanel /></Suspense>}
       {showDM       && <Suspense fallback={null}><DirectMessagePanel onClose={() => { setShowDM(false); setDmTarget(null); }} initialUser={dmTarget || undefined} /></Suspense>}
-      {showNotif    && <Suspense fallback={null}><NotificationsPanel onClose={() => setShowNotif(false)} /></Suspense>}
-      {showSettings && <Suspense fallback={null}><SettingsPanel onClose={() => setShowSettings(false)} /></Suspense>}
+      {showNotif    && (
+        <Suspense fallback={null}>
+          <NotificationsPanel
+            onClose={() => setShowNotif(false)}
+            onOpenDM={openDM}
+            onOpenSettings={openSettings}
+            onViewProfile={name => setViewProfile(name)}
+          />
+        </Suspense>
+      )}
+      {showSettings && (
+        <Suspense fallback={null}>
+          <SettingsPanel
+            onClose={() => setShowSettings(false)}
+            initialTab={settingsTab}
+            onOpenDM={name => {
+              setShowSettings(false);
+              openDM(name);
+            }}
+            onViewProfile={name => {
+              setShowSettings(false);
+              setViewProfile(name);
+            }}
+          />
+        </Suspense>
+      )}
+      {viewProfile && (
+        <Suspense fallback={null}>
+          <UserProfileView
+            targetName={viewProfile}
+            onClose={() => setViewProfile(null)}
+            onOpenDM={openDM}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

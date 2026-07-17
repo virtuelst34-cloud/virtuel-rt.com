@@ -62,8 +62,19 @@ export const supabaseAuthService = {
 
         if (profileError) {
           console.error('Erreur RLS lors de la création du profil:', profileError);
-          // Ne pas bloquer l'inscription si le profil échoue - le profil sera créé via trigger
-          // L'utilisateur peut continuer, mais le profil sera manquant jusqu'à ce que le trigger soit configuré
+        }
+
+        // Session immédiate si la confirmation email n'est pas requise
+        if (data.session) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .maybeSingle();
+
+          if (profile) {
+            return { success: true, user: profile as UserProfile };
+          }
         }
 
         return { success: true };

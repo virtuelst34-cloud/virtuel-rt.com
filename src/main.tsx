@@ -4,23 +4,25 @@ import App from '@/App'
 import '@/index.css'
 import '@/lib/sentry'
 
-// PWA : ne pas enregistrer le SW en local (cache stale → page blanche)
+// Après un déploiement, d’anciens chunks hashés peuvent 404 → recharger une fois
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  const key = 'virtuel-rt-chunk-reload'
+  if (!sessionStorage.getItem(key)) {
+    sessionStorage.setItem(key, '1')
+    window.location.reload()
+  }
+})
+
+// PWA : VitePWA injecte déjà registerSW.js. En local, désenregistrer tout SW résiduel.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     if (import.meta.env.DEV) {
       void navigator.serviceWorker.getRegistrations().then(regs => {
-        regs.forEach(reg => void reg.unregister());
-      });
-      return;
-    }
-    navigator.serviceWorker.register('/sw.js')
-      .then(registration => {
-        console.log('Service Worker enregistré avec succès:', registration.scope);
+        regs.forEach(reg => void reg.unregister())
       })
-      .catch(error => {
-        console.log('Erreur lors de l\'enregistrement du Service Worker:', error);
-      });
-  });
+    }
+  })
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

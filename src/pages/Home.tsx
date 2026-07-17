@@ -8,13 +8,28 @@ import WebRtcRemotePanel from '@/components/chat/WebRtcRemotePanel';
 import type { RemoteStreamInfo } from '@/lib/webrtcService';
 import RightPanel from '@/components/chat/RightPanel';
 
-// Lazy loading des composants lourds
-const ChatArea = lazy(() => import('@/components/chat/ChatArea'));
-const AdminPanel = lazy(() => import('@/components/chat/AdminPanel'));
-const NotificationsPanel = lazy(() => import('@/components/chat/NotificationsPanel'));
-const SettingsPanel = lazy(() => import('@/components/chat/SettingsPanel'));
-const DirectMessagePanel = lazy(() => import('@/components/chat/DirectMessagePanel'));
-const UserProfileView = lazy(() => import('@/components/chat/UserProfileView'));
+// Lazy loading — reload si un chunk post-deploy est introuvable (404)
+function lazyWithReload<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+) {
+  return lazy(() =>
+    factory().catch((err) => {
+      const key = 'virtuel-rt-lazy-reload';
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1');
+        window.location.reload();
+      }
+      throw err;
+    }),
+  );
+}
+
+const ChatArea = lazyWithReload(() => import('@/components/chat/ChatArea'));
+const AdminPanel = lazyWithReload(() => import('@/components/chat/AdminPanel'));
+const NotificationsPanel = lazyWithReload(() => import('@/components/chat/NotificationsPanel'));
+const SettingsPanel = lazyWithReload(() => import('@/components/chat/SettingsPanel'));
+const DirectMessagePanel = lazyWithReload(() => import('@/components/chat/DirectMessagePanel'));
+const UserProfileView = lazyWithReload(() => import('@/components/chat/UserProfileView'));
 
 function ChatApp() {
   const { user, currentSalon, showAdmin } = useChat();

@@ -3,6 +3,8 @@ import { checkServerRateLimit } from '@/lib/rateLimitService';
 
 describe('rateLimitService', () => {
   beforeEach(() => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://placeholder.supabase.co');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'placeholder-key');
     vi.stubGlobal('fetch', vi.fn());
   });
 

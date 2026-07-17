@@ -10,6 +10,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: https://placeholder.supabase.co
+      VITE_SUPABASE_ANON_KEY: placeholder-key
 
     steps:
       - name: Checkout code
@@ -26,9 +29,6 @@ jobs:
 
       - name: Run tests
         run: npm run test:run
-        env:
-          VITE_SUPABASE_URL: https://placeholder.supabase.co
-          VITE_SUPABASE_ANON_KEY: placeholder-key
 
       - name: Run tests with coverage
         run: npx vitest run --coverage

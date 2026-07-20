@@ -8,19 +8,27 @@ import WebRtcRemotePanel from '@/components/chat/WebRtcRemotePanel';
 import type { RemoteStreamInfo } from '@/lib/webrtcService';
 import RightPanel from '@/components/chat/RightPanel';
 
-// Lazy loading — reload si un chunk post-deploy est introuvable (404)
+// Lazy loading — normalise toujours `{ default }` (Rollup peut renvoyer
+// le composant directement via `.then(m => m.X)`), + reload si chunk 404.
 function lazyWithReload<T extends React.ComponentType<any>>(
-  factory: () => Promise<{ default: T }>,
+  factory: () => Promise<{ default: T } | T>,
 ) {
   return lazy(() =>
-    factory().catch((err) => {
-      const key = 'virtuel-rt-lazy-reload';
-      if (!sessionStorage.getItem(key)) {
-        sessionStorage.setItem(key, '1');
-        window.location.reload();
-      }
-      throw err;
-    }),
+    factory()
+      .then((mod) => {
+        if (mod && typeof mod === 'object' && 'default' in mod && (mod as { default: T }).default) {
+          return mod as { default: T };
+        }
+        return { default: mod as T };
+      })
+      .catch((err) => {
+        const key = 'virtuel-rt-lazy-reload';
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, '1');
+          window.location.reload();
+        }
+        throw err;
+      }),
   );
 }
 

@@ -27,9 +27,38 @@ const XPContext = createContext<XPContextType | null>(null);
 
 const XP_PER_MESSAGE = 15;
 const XP_COOLDOWN_MS = 30000;
+const MONTHLY_KEY = 'virtuel_rt_monthly';
 const MONTHLY_MONTH_KEY = 'virtuel_rt_monthly_month';
 
 function xpForLevel(lvl: number): number { return lvl * lvl * 500; }
+
+function readLocalMonthlyXP(): Record<string, number> {
+  try {
+    const saved = localStorage.getItem(MONTHLY_KEY);
+    if (!saved) return {};
+    const parsed = JSON.parse(saved);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLocalMonthlyXP(data: Record<string, number>): void {
+  try {
+    localStorage.setItem(MONTHLY_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function mergeMonthlyXP(
+  base: Record<string, number>,
+  extra: Record<string, number>,
+): Record<string, number> {
+  const merged = { ...base };
+  for (const [name, xp] of Object.entries(extra)) {
+    if ((merged[name] || 0) < xp) merged[name] = xp;
+  }
+  return merged;
+}
 
 // Sons
 let audioContextInstance: AudioContext | null = null;
@@ -72,37 +101,82 @@ const sounds: SoundsType = {
 export function XPProvider({ children }: { children: ReactNode }) {
   const [monthlyXP, setMonthlyXP] = useState<Record<string, number>>({});
   const lastXpRef = useRef<number>(0);
+  const persistTimerRef = useRef<number | null>(null);
   const { addNotification } = useNotifications();
   const { user, updateProfile } = useUser();
   const { isPremium } = usePreferences();
-  const timerRef = useRef<number | null>(null);
 
-  // Charger depuis Supabase avec reset mensuel automatique
+  const userName = user?.name;
+
+  // Charger depuis Supabase + cache local, avec reset mensuel automatique
   const loadMonthlyXP = useCallback(async () => {
-    if (!user) return;
+    if (!userName) return;
 
     try {
       const currentMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
       const savedMonth = localStorage.getItem(MONTHLY_MONTH_KEY);
+      // Distinguer 1ère visite (savedMonth null) d'un vrai changement de mois
+      const monthRolledOver = savedMonth != null && savedMonth !== currentMonth;
 
       if (savedMonth !== currentMonth) {
-        // Nouveau mois : reset
         localStorage.setItem(MONTHLY_MONTH_KEY, currentMonth);
-        setMonthlyXP({});
-      } else {
-        const currentMonth = new Date().toISOString().slice(0, 7);
-        const allMonthly = await supabaseDbService.getAllMonthlyXP(currentMonth);
-        setMonthlyXP(Object.keys(allMonthly).length > 0 ? allMonthly : { [user.name]: 0 });
+        if (monthRolledOver) localStorage.removeItem(MONTHLY_KEY);
       }
+
+      // Toujours charger le mois courant (vide naturellement si nouveau mois).
+      // Fusionner avec l'état local / cache pour ne pas écraser un gain tout juste attribué.
+      const allMonthly = await supabaseDbService.getAllMonthlyXP(currentMonth);
+      setMonthlyXP(prev => {
+        // Vrai nouveau mois : ignorer prev (ancien mois) et le cache disque
+        if (monthRolledOver) {
+          writeLocalMonthlyXP(allMonthly);
+          return allMonthly;
+        }
+        // Même mois (ou 1ère visite) : fusionner serveur + cache + gains session
+        const merged = mergeMonthlyXP(
+          mergeMonthlyXP(allMonthly, readLocalMonthlyXP()),
+          prev,
+        );
+        writeLocalMonthlyXP(merged);
+        return merged;
+      });
     } catch (error) {
       console.error('Erreur lors du chargement de l\'XP mensuel:', error);
+      if (localStorage.getItem(MONTHLY_MONTH_KEY) === new Date().toISOString().slice(0, 7)) {
+        setMonthlyXP(prev => mergeMonthlyXP(readLocalMonthlyXP(), prev));
+      }
     }
-  }, [user]);
+  }, [userName]);
 
-  // Charger l'XP au démarrage et quand l'utilisateur change
+  // Charger une fois à la connexion (par nom), puis rafraîchir périodiquement
   useEffect(() => {
+    if (!userName) return;
+
     loadMonthlyXP();
-  }, [loadMonthlyXP]);
+
+    const intervalId = window.setInterval(() => {
+      loadMonthlyXP();
+    }, 60_000);
+
+    const onFocus = () => { loadMonthlyXP(); };
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [loadMonthlyXP, userName]);
+
+  // Persister le cache local (debounced)
+  useEffect(() => {
+    if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = window.setTimeout(() => {
+      writeLocalMonthlyXP(monthlyXP);
+    }, 300);
+    return () => {
+      if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+    };
+  }, [monthlyXP]);
 
   const awardXP = useCallback(async (): Promise<number | null> => {
     const now = Date.now();
@@ -127,12 +201,15 @@ export function XPProvider({ children }: { children: ReactNode }) {
 
     updateProfile({ xp: newXp, level: newLvl });
 
-    // Mettre à jour l'XP mensuel dans Supabase
+    // Mettre à jour l'XP mensuel (état local + Supabase) sans dépendance stale
     const currentMonth = new Date().toISOString().slice(0, 7);
-    const currentMonthlyXP = monthlyXP[user.name] || 0;
-    const newMonthlyXP = currentMonthlyXP + gain;
-
-    setMonthlyXP(m => ({ ...m, [user.name]: newMonthlyXP }));
+    let newMonthlyXP = gain;
+    setMonthlyXP(m => {
+      newMonthlyXP = (m[user.name] || 0) + gain;
+      const next = { ...m, [user.name]: newMonthlyXP };
+      writeLocalMonthlyXP(next);
+      return next;
+    });
 
     try {
       await supabaseDbService.updateMonthlyXP(user.name, currentMonth, newMonthlyXP);
@@ -141,7 +218,7 @@ export function XPProvider({ children }: { children: ReactNode }) {
     }
 
     return levelUp;
-  }, [user, updateProfile, isPremium, addNotification, monthlyXP]);
+  }, [user, updateProfile, isPremium, addNotification]);
 
   const xpProgress = useCallback((u: { level?: number; xp?: number } | null): number => {
     if (!u) return 0;

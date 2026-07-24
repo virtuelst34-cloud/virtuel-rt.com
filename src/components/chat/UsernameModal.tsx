@@ -112,8 +112,8 @@ export default function UsernameModal() {
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300 p-4">
       <div className="bg-card border border-border/50 rounded-3xl p-8 w-full max-w-[400px] flex flex-col gap-6 shadow-[0_32px_64px_rgba(0,0,0,0.4)] animate-in zoom-in-95 duration-300">
         <div className="text-center">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden shadow-lg shadow-primary/25">
-            <img src="/logo.png" alt="Virtuel-RT" className="w-full h-full object-cover" />
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden bg-black/40 shadow-lg shadow-primary/25 ring-1 ring-primary/20">
+            <img src="/logo.png" alt="Virtuel-RT" className="w-full h-full object-contain p-0.5" />
           </div>
           <h2 className="text-lg font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
           <p className="text-sm text-muted-foreground mt-1">Choisissez comment vous connecter</p>

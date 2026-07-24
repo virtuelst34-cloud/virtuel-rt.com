@@ -1,0 +1,24 @@
+# Déploiement Virtuel-RT sur Hostinger
+#
+# Option A — Redéploiement hPanel (recommandé pour ce site)
+# 1. Préparer le zip SOURCE (pas dist) :
+#      python .\scripts\make-hostinger-source-zip.py
+#    → Nouveau dossier\virtuel-rt-SOURCE-FULL-hostinger.zip
+# 2. hPanel → virtuel-rt.com → Déploiements → Paramètres et redéploiement
+# 3. Importer le zip SOURCE (package.json à la racine du zip)
+# 4. Variables d'env : VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
+# 5. Build : npm run build / sortie dist / Node 20
+# 6. Après succès : vider données du site (Service Worker) puis Ctrl+F5
+# 7. Vérifier : index.html live ≠ ancien hash ; quiz a « Changer de thème »
+#
+# Option B — File Manager (static dist)
+# 1. npm run build
+# 2. Zipper le CONTENU de dist/ à la racine (index.html + assets/)
+# 3. Extraire dans public_html (pas dans un sous-dossier)
+#
+# Option C — GitHub Actions (branche master uniquement)
+# Push sur master → CI build + FTPS vers FTP_SERVER_DIR
+# Vérifier le secret FTP_SERVER_DIR = vrai document root www
+#
+# Permissions zip Windows (EACCES Hostinger) :
+#   powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\zip-for-hostinger.ps1"

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ChatProvider, useChat } from '@/lib/contexts';
 import Sidebar from '@/components/chat/Sidebar';
 import UsernameModal from '@/components/chat/UsernameModal';
@@ -7,43 +7,14 @@ import MediaBar from '@/components/chat/MediaBar';
 import WebRtcRemotePanel from '@/components/chat/WebRtcRemotePanel';
 import type { RemoteStreamInfo } from '@/lib/webrtcService';
 import RightPanel from '@/components/chat/RightPanel';
-// Panels importés en statique : le lazy + chunks qui ré-importent l'index
-// provoquait React #306 (element type undefined) en prod (notifications, profil…).
+// Tout en statique : React.lazy + chunks Hostinger/PWA provoquait #306
+// (element type undefined) dès qu’un salon ou un panel s’ouvrait.
+import ChatArea from '@/components/chat/ChatArea';
 import AdminPanel from '@/components/chat/AdminPanel';
 import NotificationsPanel from '@/components/chat/NotificationsPanel';
 import SettingsPanel from '@/components/chat/SettingsPanel';
 import DirectMessagePanel from '@/components/chat/DirectMessagePanel';
 import UserProfileView from '@/components/chat/UserProfileView';
-
-// Lazy loading — normalise toujours `{ default }` (Rollup peut renvoyer
-// le composant directement via `.then(m => m.X)`), + reload si chunk 404.
-function lazyWithReload<T extends React.ComponentType<any>>(
-  factory: () => Promise<{ default: T } | T>,
-) {
-  return lazy(() =>
-    factory()
-      .then((mod) => {
-        const resolved =
-          mod && typeof mod === 'object' && 'default' in mod && (mod as { default: T }).default
-            ? (mod as { default: T }).default
-            : (mod as T);
-        if (typeof resolved !== 'function' && (typeof resolved !== 'object' || resolved === null)) {
-          throw new Error('Lazy module resolved to an invalid React component');
-        }
-        return { default: resolved };
-      })
-      .catch((err) => {
-        const key = 'virtuel-rt-lazy-reload';
-        if (!sessionStorage.getItem(key)) {
-          sessionStorage.setItem(key, '1');
-          window.location.reload();
-        }
-        throw err;
-      }),
-  );
-}
-
-const ChatArea = lazyWithReload(() => import('@/components/chat/ChatArea'));
 
 function ChatApp() {
   const { user, currentSalon, showAdmin } = useChat();
@@ -87,9 +58,7 @@ function ChatApp() {
         /* ── Vue salon ── */
         <>
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground">Chargement...</div>}>
-              <ChatArea micActive={micActive} micLevel={micLevel} onOpenDM={openDM} />
-            </Suspense>
+            <ChatArea micActive={micActive} micLevel={micLevel} onOpenDM={openDM} />
             <WebRtcRemotePanel streams={remoteStreams} />
             <MediaBar onMicChange={handleMicChange} onRemoteStreams={setRemoteStreams} />
           </div>

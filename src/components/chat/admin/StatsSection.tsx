@@ -30,9 +30,10 @@ export default function StatsSection({ profiles, customSalons, salonMessages, mo
     count: dbMessageCounts?.[s.id] ?? (salonMessages?.[s.id] || []).length,
   })).sort((a, b) => b.count - a.count);
 
-  // Classement mensuel
+  // Classement mensuel (XP du mois > 0 uniquement)
   const monthlyRanked = Object.entries(monthlyXP || {})
-    .map(([name, xp]) => ({ name, xp }))
+    .filter(([, xp]) => (xp as number) > 0)
+    .map(([name, xp]) => ({ name, xp: xp as number }))
     .sort((a, b) => b.xp - a.xp)
     .slice(0, 5);
 

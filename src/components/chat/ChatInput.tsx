@@ -5,6 +5,8 @@ import FileUpload from './FileUpload';
 import { useUser, useTyping, useSalons, useNotifications } from '@/lib/contexts';
 import { validateMessage, type MessageInput } from '@/lib/validation';
 import { detectSpam } from '@/lib/antiSpam';
+import { DEFAULT_BANNED_WORDS, findBannedWord, mergeBannedWords } from '@/lib/bannedWords';
+import { supabase } from '@/lib/supabase';
 
 interface Member {
   name: string;
@@ -39,10 +41,29 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
+  const [bannedWords, setBannedWords] = useState<string[]>(DEFAULT_BANNED_WORDS);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
   const caretRef  = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('content_moderation_settings')
+          .select('banned_words')
+          .maybeSingle();
+        if (cancelled) return;
+        const words = Array.isArray(data?.banned_words) ? data.banned_words : [];
+        setBannedWords(mergeBannedWords(words));
+      } catch {
+        if (!cancelled) setBannedWords(DEFAULT_BANNED_WORDS);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Construire la liste des gens mentionnables
   const allNames = [...new Set([
@@ -134,6 +155,16 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
     }
 
     if ((!text.trim() && !selectedImage && !selectedFile) || disabled) return;
+
+    const banned = findBannedWord(text.trim(), bannedWords);
+    if (banned) {
+      setValidationError('Message bloqué : contenu non autorisé.');
+      addNotification({
+        type: 'block',
+        message: 'Ce message contient un mot ou une expression interdite.',
+      });
+      return;
+    }
 
     // Spam detection
     if (user) {

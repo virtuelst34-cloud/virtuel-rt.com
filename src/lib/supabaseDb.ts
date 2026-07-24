@@ -223,25 +223,11 @@ export const supabaseDbService = {
 
   async updateMonthlyXP(userName: string, month: string, xp: number): Promise<void> {
     try {
-      const { data: existing } = await supabase
-        .from('xp_monthly')
-        .select('id')
-        .eq('user_name', userName)
-        .eq('month', month)
-        .maybeSingle();
-
-      if (existing) {
-        await supabase
-          .from('xp_monthly')
-          .update({ xp })
-          .eq('id', existing.id);
-      } else {
-        await supabase.from('xp_monthly').insert({
-          user_name: userName,
-          month,
-          xp,
-        });
-      }
+      const { error } = await supabase.from('xp_monthly').upsert(
+        { user_name: userName, month, xp },
+        { onConflict: 'user_name,month' },
+      );
+      if (error) throw error;
     } catch (error) {
       console.error('Erreur lors de la mise à jour de l\'XP mensuel:', error);
     }

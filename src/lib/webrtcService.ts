@@ -62,17 +62,69 @@ class WebRtcService {
       });
     } catch (error) {
       console.error('WebRTC getUserMedia:', error);
-      return null;
+      // Si la caméra échoue, rejoindre en audio puis ajouter la vidéo à part
+      if (options.video && options.audio) {
+        try {
+          this.localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: false,
+          });
+        } catch (audioError) {
+          console.error('WebRTC getUserMedia audio fallback:', audioError);
+          return null;
+        }
+      } else {
+        return null;
+      }
     }
 
+    this.bindChannel(salonId);
+
+    if (options.video) {
+      await this.ensureVideoTrack();
+    }
+
+    return this.localStream;
+  }
+
+  /** Canal de signalisation sans media (réception d'appels DM). */
+  async joinSignalOnly(salonId: string, userId: string, userName: string): Promise<void> {
+    if (this.salonId === salonId && this.channel) {
+      this.selfId = userId;
+      this.selfName = userName;
+      return;
+    }
+    await this.leaveSalon();
+    this.salonId = salonId;
+    this.selfId = userId;
+    this.selfName = userName;
+    this.bindChannel(salonId);
+  }
+
+  private bindChannel(salonId: string): void {
     this.channel = supabase
       .channel(`webrtc:${salonId}`)
       .on('broadcast', { event: 'signal' }, ({ payload }) => {
         void this.handleSignal(payload as WebRtcSignalPayload);
       })
       .subscribe();
+  }
 
-    return this.localStream;
+  private async ensureLocalMedia(wantVideo: boolean): Promise<boolean> {
+    if (this.localStream) {
+      if (wantVideo) await this.ensureVideoTrack();
+      return true;
+    }
+    try {
+      this.localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: wantVideo,
+      });
+      return true;
+    } catch (error) {
+      console.error('WebRTC ensureLocalMedia:', error);
+      return false;
+    }
   }
 
   private async handleSignal(payload: WebRtcSignalPayload): Promise<void> {
@@ -88,6 +140,8 @@ class WebRtcService {
 
     let pc = this.peers.get(payload.fromId);
     if (!pc && payload.type === 'offer') {
+      const ok = await this.ensureLocalMedia(!!payload.hasVideo);
+      if (!ok) return;
       pc = this.createPeer(payload.fromId, payload.fromName, false);
       this.peers.set(payload.fromId, pc);
     }
@@ -184,23 +238,73 @@ class WebRtcService {
   }
 
   async ensureVideoTrack(): Promise<boolean> {
-    if (!this.localStream) return false;
-    if (this.localStream.getVideoTracks().some((t) => t.readyState === 'live')) {
-      this.toggleTrack('video', true);
+    if (!this.localStream) {
+      try {
+        this.localStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: true,
+        });
+      } catch {
+        try {
+          this.localStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: true,
+          });
+        } catch (error) {
+          console.error('WebRTC ensureVideoTrack (no stream):', error);
+          return false;
+        }
+      }
+    }
+
+    const live = this.localStream.getVideoTracks().find((t) => t.readyState === 'live');
+    if (live) {
+      live.enabled = true;
       return true;
     }
+
+    // Réactiver une piste arrêtée / désactivée si encore présente
+    const existing = this.localStream.getVideoTracks()[0];
+    if (existing && existing.readyState !== 'ended') {
+      existing.enabled = true;
+      return true;
+    }
+
     try {
       const videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       const track = videoStream.getVideoTracks()[0];
       if (!track) return false;
       this.localStream.addTrack(track);
-      for (const pc of this.peers.values()) {
-        pc.addTrack(track, this.localStream);
-      }
+      await this.renegotiateWithVideo(track);
       return true;
     } catch (error) {
       console.error('WebRTC ensureVideoTrack:', error);
       return false;
+    }
+  }
+
+  /** Après ajout d'une piste vidéo, renégocie les peers déjà connectés. */
+  private async renegotiateWithVideo(track: MediaStreamTrack): Promise<void> {
+    if (!this.localStream) return;
+    for (const [peerId, pc] of this.peers.entries()) {
+      const already = pc.getSenders().some((s) => s.track?.id === track.id);
+      if (!already) {
+        pc.addTrack(track, this.localStream);
+      }
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        this.sendSignal({
+          type: 'offer',
+          fromId: this.selfId,
+          fromName: this.selfName,
+          toId: peerId,
+          sdp: offer,
+          hasVideo: true,
+        });
+      } catch (error) {
+        console.error('WebRTC renegotiate video:', error);
+      }
     }
   }
 

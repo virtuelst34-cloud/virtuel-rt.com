@@ -7,7 +7,7 @@ import GenderIcon from './GenderIcon';
 import UserProfileView from './UserProfileView';
 import { SupabaseLogin } from '../auth/SupabaseLogin';
 import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users } from 'lucide-react';
-import { getSpecialBadgeForUser } from '@/lib/diamondBadges';
+import { getSpecialBadgeForUser, getSpecialBadgeIdsForUser, SPECIAL_BADGES } from '@/lib/diamondBadges';
 import { presenceService, OnlineUser as PresenceOnlineUser } from '@/lib/presenceService';
 import MembersPanel from './MembersPanel';
 
@@ -20,6 +20,8 @@ interface DisplayOnlineUser {
   isFounder?: boolean;
   isDirection?: boolean;
   isMasterOp?: boolean;
+  isIridescent?: boolean;
+  specialBadges?: string[];
   gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
 }
 
@@ -68,17 +70,22 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
         .filter(p => p.name !== user?.name && !isMuted(p.name) && !isBlocked(p.name));
       const salonPresence = presenceService.getAllSalonPresence();
 
-      const displayUsers: DisplayOnlineUser[] = presenceUsers.map(p => ({
-        name: p.name,
-        avatar: p.avatar,
-        initials: p.initials,
-        level: profiles[p.name]?.level || 1,
-        salon: p.currentSalonId || null,
-        isFounder: profiles[p.name]?.isFounder,
-        isDirection: profiles[p.name]?.isDirection,
-        isMasterOp: profiles[p.name]?.isMasterOp,
-        gender: profiles[p.name]?.gender,
-      }));
+      const displayUsers: DisplayOnlineUser[] = presenceUsers.map(p => {
+        const profile = profiles[p.name];
+        return {
+          name: p.name,
+          avatar: p.avatar || profile?.avatar || 'av1',
+          initials: p.initials || profile?.initials || p.name.slice(0, 2).toUpperCase(),
+          level: profile?.level || 1,
+          salon: p.currentSalonId || null,
+          isFounder: profile?.isFounder,
+          isDirection: profile?.isDirection,
+          isMasterOp: profile?.isMasterOp,
+          isIridescent: profile?.isIridescent,
+          specialBadges: profile?.specialBadges,
+          gender: profile?.gender,
+        };
+      });
 
       setOnlineUsers(displayUsers);
 
@@ -107,9 +114,10 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
   const next = xpForLevel ? xpForLevel(lvl) : 500;
   const prog = user && xpProgress ? xpProgress(user) : 0;
 
-  // Classement mensuel
+  // Classement mensuel (XP du mois > 0 uniquement)
   const monthlyRanked = Object.entries(monthlyXP || {})
-    .map(([name, mxp]) => ({ mxp, ...(profiles[name] || {}) }))
+    .filter(([, mxp]) => (mxp as number) > 0)
+    .map(([name, mxp]) => ({ ...(profiles[name] || {}), name, mxp: mxp as number }))
     .sort((a, b) => b.mxp - a.mxp)
     .slice(0, 10);
 
@@ -216,11 +224,11 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
       <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-8 select-none">
         <div className="relative mb-1">
           <div className="absolute inset-0 rounded-2xl bg-primary/25 blur-2xl scale-90 opacity-70" aria-hidden />
-          <div className="relative w-40 h-40 rounded-2xl overflow-hidden shadow-lg shadow-primary/25 ring-1 ring-primary/20">
+          <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-2xl overflow-hidden shadow-lg shadow-primary/25 ring-1 ring-primary/20">
             <img
               src="/logo.png"
               alt="Virtuel-RT Logo"
-              className="w-full h-full object-cover object-[center_12%] scale-[1.34] origin-[center_12%]"
+              className="w-full h-full object-contain"
             />
           </div>
         </div>
@@ -310,6 +318,7 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
             ? <p className="text-[10px] text-muted-foreground/40 italic">Aucun profil.</p>
             : ranked.slice(0, 5).map((r, i) => {
               const isMe = r.name === user?.name;
+              const primaryBadge = getSpecialBadgeForUser(r);
               return (
                 <div key={r.name} className={`flex items-center gap-1 py-1 px-1 rounded-lg mb-0.5 ${isMe ? 'bg-purple-500/8 border border-purple-500/18' : ''}`}>
                   <span className="text-[9px] text-muted-foreground/40 w-4 text-center shrink-0">{i+1}</span>
@@ -318,7 +327,7 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
                     <div className="flex items-center gap-1 justify-between">
                       <span className={`text-[10px] truncate font-medium ${isMe ? 'text-purple-300' : 'text-muted-foreground'}`}>{r.name}</span>
                       <div className="flex items-center gap-0.5 shrink-0">
-                        <DiamondBadge level={r.level || 1} size="xs" specialBadge={getSpecialBadgeForUser(r) || undefined} />
+                        <DiamondBadge level={r.level || 1} size="xs" specialBadge={primaryBadge || undefined} />
                         <span className="text-[9px] text-purple-400 font-bold">Nv.{r.level||1}</span>
                       </div>
                     </div>
@@ -355,11 +364,30 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
                 <span className="absolute -bottom-px -right-px w-2 h-2 bg-emerald-500 border-2 border-card rounded-full" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 min-w-0">
                   <GenderIcon gender={user.gender} size={10} />
                   <span className="text-[11px] font-semibold text-primary truncate">{user.name}</span>
-                  {user.isFounder && <DiamondBadge level={user.level || 1} size="xs" specialBadge="founder" />}
-                  {user.isIridescent && <DiamondBadge level={user.level || 1} size="xs" specialBadge="iridescent" />}
+                  <span className="flex items-center gap-0.5 shrink-0">
+                    {(() => {
+                      const primary = getSpecialBadgeForUser(user);
+                      return (
+                        <>
+                          <DiamondBadge level={user.level || 1} size="xs" specialBadge={primary || undefined} />
+                          {getSpecialBadgeIdsForUser(user)
+                            .filter((id) => id !== primary && id !== 'iridescent')
+                            .map((id) => {
+                              const meta = SPECIAL_BADGES.find((b) => b.id === id);
+                              if (!meta) return null;
+                              return (
+                                <span key={id} className="text-[11px] leading-none" title={meta.label} style={{ color: meta.color }}>
+                                  {meta.icon}
+                                </span>
+                              );
+                            })}
+                        </>
+                      );
+                    })()}
+                  </span>
                 </div>
                 <span className="text-[9px] text-muted-foreground/40">Vous</span>
               </div>
@@ -375,6 +403,8 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map((u) => {
                   const salonName = u.salon ? allSalons.find(s => s.id === u.salon)?.name : null;
+                  const profile = profiles[u.name] || u;
+                  const primaryBadge = getSpecialBadgeForUser(profile);
                   return (
                     <button
                       key={u.name}
@@ -387,10 +417,27 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
                         <span className="absolute -bottom-px -right-px w-2 h-2 bg-emerald-500 border-2 border-card rounded-full animate-pulse" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 min-w-0">
                           <GenderIcon gender={u.gender} size={10} />
                           <span className="text-[11px] font-medium text-foreground truncate">{u.name}</span>
-                          <DiamondBadge level={u.level || 1} size="xs" specialBadge={getSpecialBadgeForUser(u) || undefined} />
+                          <span className="flex items-center gap-0.5 shrink-0">
+                            <DiamondBadge
+                              level={u.level || profile.level || 1}
+                              size="xs"
+                              specialBadge={primaryBadge || undefined}
+                            />
+                            {getSpecialBadgeIdsForUser(profile)
+                              .filter((id) => id !== primaryBadge && id !== 'iridescent')
+                              .map((id) => {
+                                const meta = SPECIAL_BADGES.find((b) => b.id === id);
+                                if (!meta) return null;
+                                return (
+                                  <span key={id} className="text-[11px] leading-none" title={meta.label} style={{ color: meta.color }}>
+                                    {meta.icon}
+                                  </span>
+                                );
+                              })}
+                          </span>
                         </div>
                         <span className="text-[9px] text-emerald-400/70 truncate block">
                           {salonName ? `Dans ${salonName}` : 'En ligne'}

@@ -179,7 +179,7 @@ export default function NotificationsPanel({
           ) : (
             (notifications as AppNotification[]).map((notif, index) => {
               const cfg = TYPE_CONFIG[notif.type] || TYPE_CONFIG.default;
-              const Icon = cfg.icon;
+              const Icon = cfg.icon || Bell;
               const actions = resolveActions(notif);
               const hasActions = actions.length > 0;
               const groupCount = notif.groupCount;

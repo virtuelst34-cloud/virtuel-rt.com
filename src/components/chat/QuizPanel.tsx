@@ -1,18 +1,27 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Brain, Play, Trophy, X, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Brain, Trophy, Users, X } from 'lucide-react';
 import { useUser } from '@/lib/contexts';
 import {
   quizRealtimeService,
   QuizEvent,
   formatQuizAnswerMessage,
 } from '@/lib/quizRealtimeService';
-import type { Quiz, QuizQuestion, QuizParticipant, QuizLiveAnswer } from '@/lib/quiz';
+import {
+  QUIZ_THEMES,
+  type Quiz,
+  type QuizPresetId,
+  type QuizQuestion,
+  type QuizParticipant,
+  type QuizLiveAnswer,
+} from '@/lib/quiz';
 
 interface QuizPanelProps {
   salonId: string;
   onClose?: () => void;
   onAnswerPosted?: (text: string) => void;
 }
+
+const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
 
 function mergeAnswers(existing: QuizLiveAnswer[], incoming: QuizLiveAnswer[]): QuizLiveAnswer[] {
   const map = new Map(existing.map(a => [`${a.userId}:${a.questionId}`, a]));
@@ -32,6 +41,8 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(true);
 
   const questionIndexRef = useRef<number>(-1);
   const postedAnswersRef = useRef<Set<string>>(new Set());
@@ -68,12 +79,14 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
     const active = await quizRealtimeService.getActiveQuiz(salonId);
     setQuiz(active);
     if (active) {
+      setShowThemePicker(false);
       applyQuestion(active);
       setLeaderboard(quizRealtimeService.getLeaderboard(active.id));
     } else {
       setDisplayQuestion(null);
       setLiveAnswers([]);
       questionIndexRef.current = -1;
+      setShowThemePicker(true);
     }
   }, [salonId, applyQuestion]);
 
@@ -89,6 +102,7 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
   useEffect(() => {
     return quizRealtimeService.subscribe(salonId, (event: QuizEvent) => {
       if (event.type === 'quiz_started') {
+        setShowThemePicker(false);
         setQuiz(event.quiz);
         applyQuestion(event.quiz);
         setLeaderboard(quizRealtimeService.getLeaderboard(event.quiz.id));
@@ -99,6 +113,7 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
         setLeaderboard(quizRealtimeService.getLeaderboard(event.quiz.id));
 
         if (event.quiz.isActive) {
+          setShowThemePicker(false);
           const idxChanged = event.questionIndex !== questionIndexRef.current;
           if (idxChanged) {
             applyQuestion(event.quiz);
@@ -120,6 +135,7 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
         setDisplayQuestion(null);
         setLiveAnswers([]);
         questionIndexRef.current = -1;
+        setShowThemePicker(true);
       }
 
       if (event.type === 'answer_submitted') {
@@ -132,12 +148,39 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
     });
   }, [salonId, quiz, displayQuestion, applyQuestion, postAnswerToSalon]);
 
-  const startPreset = async (preset: 'general' | 'tech' | 'culture') => {
-    if (!user?.name || quiz) return;
+  const startPreset = async (preset: QuizPresetId) => {
+    if (!user?.name) return;
     setCreating(true);
+    setFeedback(null);
+
+    if (quiz) {
+      await quizRealtimeService.endQuiz(quiz.id, salonId);
+      setQuiz(null);
+      setDisplayQuestion(null);
+      setLiveAnswers([]);
+      questionIndexRef.current = -1;
+    }
+
     const created = await quizRealtimeService.createPresetQuiz(salonId, user.name, preset);
-    if (created) await quizRealtimeService.startQuiz(created.id);
+    if (created) {
+      await quizRealtimeService.startQuiz(created.id);
+      setShowThemePicker(false);
+    }
     setCreating(false);
+  };
+
+  const goBackToThemes = async () => {
+    if (quiz) {
+      await quizRealtimeService.endQuiz(quiz.id, salonId);
+      setQuiz(null);
+      setDisplayQuestion(null);
+      setLiveAnswers([]);
+      setSelected(null);
+      setHasSubmitted(false);
+      setFeedback(null);
+      questionIndexRef.current = -1;
+    }
+    setShowThemePicker(true);
   };
 
   const submitAnswer = async () => {
@@ -157,6 +200,7 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
       setLiveAnswers(prev => mergeAnswers(prev, [result.liveAnswer!]));
       postAnswerToSalon(result.liveAnswer);
     }
+    setLeaderboard(quizRealtimeService.getLeaderboard(quiz.id));
     setFeedback(
       result.isCorrect
         ? `✓ +${result.pointsEarned} pts`
@@ -166,75 +210,162 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
     );
   };
 
+  const goNextQuestion = async () => {
+    if (!quiz || advancing) return;
+    setAdvancing(true);
+    const next = await quizRealtimeService.nextQuestion(quiz.id, salonId);
+    if (!next) {
+      await quizRealtimeService.endQuiz(quiz.id, salonId);
+    } else {
+      const active = await quizRealtimeService.getActiveQuiz(salonId);
+      if (active) {
+        setQuiz(active);
+        applyQuestion(active);
+        setLeaderboard(quizRealtimeService.getLeaderboard(active.id));
+      }
+    }
+    setAdvancing(false);
+  };
+
+  const progress = quiz
+    ? { current: quiz.currentQuestionIndex + 1, total: quiz.questions.length }
+    : null;
+  const isLastQuestion = quiz ? quiz.currentQuestionIndex >= quiz.questions.length - 1 : false;
+  const showPicker = showThemePicker || !quiz;
+
   return (
     <div className="border-b border-border bg-card/80 px-4 py-3 shrink-0" data-testid="quiz-panel">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Brain className="w-4 h-4 text-primary" /> Quiz en direct
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground min-w-0">
+          {!showPicker && (
+            <button
+              type="button"
+              onClick={() => void goBackToThemes()}
+              className="shrink-0 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary"
+              title="Changer de thème"
+              aria-label="Revenir au choix du thème"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          <Brain className="w-4 h-4 text-primary shrink-0" />
+          <span className="truncate">Quiz en direct</span>
           {quiz && (
-            <span className="text-[10px] font-normal text-muted-foreground">
+            <span className="text-[10px] font-normal text-muted-foreground truncate">
               — {quiz.title}
             </span>
           )}
         </div>
-        {onClose && (
-          <button type="button" onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground">
-            <X className="w-4 h-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {progress && !showPicker && (
+            <span className="text-[10px] text-muted-foreground tabular-nums px-1.5 py-0.5 rounded bg-secondary">
+              {progress.current}/{progress.total}
+            </span>
+          )}
+          {onClose && (
+            <button type="button" onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground" aria-label="Fermer le quiz">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
-      {!quiz && (
-        <div className="flex flex-wrap gap-2">
-          <span className="text-[10px] text-muted-foreground w-full mb-0.5">Choisir un thème :</span>
-          {(['general', 'tech', 'culture'] as const).map(preset => (
-            <button
-              key={preset}
-              type="button"
-              disabled={creating || !user}
-              onClick={() => startPreset(preset)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/15 border border-primary/30 text-xs text-primary hover:bg-primary/25 disabled:opacity-50">
-              <Play className="w-3 h-3" /> {preset}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {quiz && displayQuestion && (
+      {showPicker && (
         <div className="space-y-2">
-          <p className="text-sm text-foreground font-medium">{displayQuestion.question}</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {displayQuestion.options.map((opt, i) => (
+          <p className="text-[10px] text-muted-foreground">Choisis un thème pour démarrer :</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            {QUIZ_THEMES.map(theme => (
               <button
-                key={i}
+                key={theme.id}
                 type="button"
-                disabled={hasSubmitted}
-                onClick={() => !hasSubmitted && setSelected(i)}
-                className={`text-left text-xs px-3 py-2 rounded-lg border transition-colors disabled:cursor-not-allowed ${
-                  selected === i
-                    ? 'bg-primary/20 border-primary/50 text-foreground'
-                    : 'bg-secondary border-border text-muted-foreground'
-                } ${hasSubmitted ? 'opacity-70' : ''}`}>
-                {opt}
+                disabled={creating || !user}
+                onClick={() => void startPreset(theme.id)}
+                className="flex flex-col items-start gap-0.5 px-2.5 py-2 rounded-lg bg-primary/10 border border-primary/25 text-left hover:bg-primary/20 disabled:opacity-50 transition-colors"
+              >
+                <span className="text-sm leading-none">{theme.emoji} <span className="text-xs font-medium text-primary">{theme.label}</span></span>
+                <span className="text-[9px] text-muted-foreground">{theme.description}</span>
               </button>
             ))}
           </div>
-          {!hasSubmitted && (
-            <button
-              type="button"
-              onClick={submitAnswer}
-              disabled={selected === null}
-              className="w-full py-2 rounded-lg bg-primary text-white text-xs font-medium disabled:opacity-50">
-              Valider
-            </button>
-          )}
-          {hasSubmitted && (
-            <p className="text-[10px] text-muted-foreground text-center">Réponse enregistrée — en attente des autres joueurs</p>
+          {!user && (
+            <p className="text-[10px] text-amber-400">Connecte-toi pour lancer un quiz.</p>
           )}
         </div>
       )}
 
-      {liveAnswers.length > 0 && (
+      {!showPicker && quiz && displayQuestion && (
+        <div className="space-y-2">
+          {progress && (
+            <div className="h-1 rounded-full bg-secondary overflow-hidden">
+              <div
+                className="h-full bg-primary/70 transition-all duration-300"
+                style={{ width: `${(progress.current / progress.total) * 100}%` }}
+              />
+            </div>
+          )}
+          <p className="text-sm text-foreground font-medium">{displayQuestion.question}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {displayQuestion.points} pts · {displayQuestion.timeLimit}s
+          </p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {displayQuestion.options.map((opt, i) => {
+              const showCorrect = hasSubmitted && i === displayQuestion.correctAnswer;
+              const showWrong = hasSubmitted && selected === i && i !== displayQuestion.correctAnswer;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  disabled={hasSubmitted}
+                  onClick={() => !hasSubmitted && setSelected(i)}
+                  className={`text-left text-xs px-3 py-2 rounded-lg border transition-colors disabled:cursor-not-allowed ${
+                    showCorrect
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                      : showWrong
+                        ? 'bg-red-500/15 border-red-500/40 text-red-300'
+                        : selected === i
+                          ? 'bg-primary/20 border-primary/50 text-foreground'
+                          : 'bg-secondary border-border text-muted-foreground hover:border-primary/30'
+                  }`}
+                >
+                  <span className="font-semibold text-[10px] text-muted-foreground mr-1.5">{OPTION_LETTERS[i]}.</span>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+          {!hasSubmitted ? (
+            <button
+              type="button"
+              onClick={() => void submitAnswer()}
+              disabled={selected === null}
+              className="w-full py-2 rounded-lg bg-primary text-white text-xs font-medium disabled:opacity-50"
+            >
+              Valider
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void goBackToThemes()}
+                className="flex-1 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-secondary"
+              >
+                Changer de thème
+              </button>
+              <button
+                type="button"
+                onClick={() => void goNextQuestion()}
+                disabled={advancing}
+                className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-medium disabled:opacity-50 flex items-center justify-center gap-1"
+              >
+                {isLastQuestion ? 'Terminer' : 'Suivante'}
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {liveAnswers.length > 0 && !showPicker && (
         <div className="mt-2 space-y-0.5">
           <div className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground">
             <Users className="w-3 h-3" /> Réponses

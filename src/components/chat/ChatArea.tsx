@@ -103,7 +103,8 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const onlineUsers  = currentSalon
     ? presenceService.getOnlineUsersInSalon(currentSalon).filter(u => !isLocallyMuted(u.name) && !isLocallyBlocked(u.name))
     : [];
-  const hasScene     = salon?.type === 'vocal' || salon?.type === 'chat vocal' || salon?.type === 'video';
+  // Scène interactive dans tous les salons (profil + DM sur les participants)
+  const hasScene     = !!currentSalon;
   const messages     = currentSalon ? getMessages(currentSalon) : [];
   const pinnedMsg    = messages.find(m => m.pinned);
 
@@ -502,7 +503,16 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
       <div className="flex flex-1 min-h-0">
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
 
-          {hasScene && <ScenePanel salonId={currentSalon || ''} members={sceneMembers} micActive={micActive} userMicLevel={micLevel} />}
+          {hasScene && (
+            <ScenePanel
+              salonId={currentSalon || ''}
+              members={sceneMembers}
+              micActive={micActive}
+              userMicLevel={micLevel}
+              onViewProfile={handleViewProfile}
+              onOpenDM={onOpenDM}
+            />
+          )}
           {currentSalon === 'quiz' && (
             <QuizPanel salonId={currentSalon} onAnswerPosted={handleQuizAnswerPosted} />
           )}

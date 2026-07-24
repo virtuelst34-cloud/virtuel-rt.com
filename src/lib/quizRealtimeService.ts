@@ -7,6 +7,7 @@ import {
   QuizParticipant,
   QuizResult,
   QuizLiveAnswer,
+  QuizPresetId,
 } from './quiz';
 
 export type QuizEvent =
@@ -118,7 +119,7 @@ class QuizRealtimeService {
   async createPresetQuiz(
     salonId: string,
     createdBy: string,
-    preset: 'general' | 'tech' | 'culture',
+    preset: QuizPresetId,
   ): Promise<Quiz | null> {
     await ensureGuestSessionContext();
 

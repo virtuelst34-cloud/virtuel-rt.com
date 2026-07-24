@@ -42,4 +42,15 @@ describe('quizService', () => {
     const result = quizService.endQuiz(quiz.id);
     expect(result?.winner?.userName).toBe('Winner');
   });
+
+  it('createPresetQuiz crée un quiz musique avec plusieurs questions', () => {
+    const quiz = quizService.createPresetQuiz('quiz', 'TestUser', 'musique');
+    expect(quiz.title).toMatch(/Musique/i);
+    expect(quiz.questions.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('createPresetQuiz géographie a au moins 6 questions', () => {
+    const quiz = quizService.createPresetQuiz('quiz', 'TestUser', 'geographie');
+    expect(quiz.questions.length).toBeGreaterThanOrEqual(6);
+  });
 });

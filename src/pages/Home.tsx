@@ -7,6 +7,13 @@ import MediaBar from '@/components/chat/MediaBar';
 import WebRtcRemotePanel from '@/components/chat/WebRtcRemotePanel';
 import type { RemoteStreamInfo } from '@/lib/webrtcService';
 import RightPanel from '@/components/chat/RightPanel';
+// Panels importés en statique : le lazy + chunks qui ré-importent l'index
+// provoquait React #306 (element type undefined) en prod (notifications, profil…).
+import AdminPanel from '@/components/chat/AdminPanel';
+import NotificationsPanel from '@/components/chat/NotificationsPanel';
+import SettingsPanel from '@/components/chat/SettingsPanel';
+import DirectMessagePanel from '@/components/chat/DirectMessagePanel';
+import UserProfileView from '@/components/chat/UserProfileView';
 
 // Lazy loading — normalise toujours `{ default }` (Rollup peut renvoyer
 // le composant directement via `.then(m => m.X)`), + reload si chunk 404.
@@ -16,10 +23,14 @@ function lazyWithReload<T extends React.ComponentType<any>>(
   return lazy(() =>
     factory()
       .then((mod) => {
-        if (mod && typeof mod === 'object' && 'default' in mod && (mod as { default: T }).default) {
-          return mod as { default: T };
+        const resolved =
+          mod && typeof mod === 'object' && 'default' in mod && (mod as { default: T }).default
+            ? (mod as { default: T }).default
+            : (mod as T);
+        if (typeof resolved !== 'function' && (typeof resolved !== 'object' || resolved === null)) {
+          throw new Error('Lazy module resolved to an invalid React component');
         }
-        return { default: mod as T };
+        return { default: resolved };
       })
       .catch((err) => {
         const key = 'virtuel-rt-lazy-reload';
@@ -33,11 +44,6 @@ function lazyWithReload<T extends React.ComponentType<any>>(
 }
 
 const ChatArea = lazyWithReload(() => import('@/components/chat/ChatArea'));
-const AdminPanel = lazyWithReload(() => import('@/components/chat/AdminPanel'));
-const NotificationsPanel = lazyWithReload(() => import('@/components/chat/NotificationsPanel'));
-const SettingsPanel = lazyWithReload(() => import('@/components/chat/SettingsPanel'));
-const DirectMessagePanel = lazyWithReload(() => import('@/components/chat/DirectMessagePanel'));
-const UserProfileView = lazyWithReload(() => import('@/components/chat/UserProfileView'));
 
 function ChatApp() {
   const { user, currentSalon, showAdmin } = useChat();
@@ -94,42 +100,41 @@ function ChatApp() {
         <WelcomeScreen onOpenDM={openDM} />
       )}
 
-      {showAdmin    && <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-sm text-muted-foreground">Chargement…</div>}><AdminPanel /></Suspense>}
-      {showDM       && <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-sm text-muted-foreground">Chargement…</div>}><DirectMessagePanel onClose={() => { setShowDM(false); setDmTarget(null); }} initialUser={dmTarget || undefined} /></Suspense>}
-      {showNotif    && (
-        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-sm text-muted-foreground">Chargement…</div>}>
-          <NotificationsPanel
-            onClose={() => setShowNotif(false)}
-            onOpenDM={openDM}
-            onOpenSettings={openSettings}
-            onViewProfile={name => setViewProfile(name)}
-          />
-        </Suspense>
+      {showAdmin && <AdminPanel />}
+      {showDM && (
+        <DirectMessagePanel
+          onClose={() => { setShowDM(false); setDmTarget(null); }}
+          initialUser={dmTarget || undefined}
+        />
+      )}
+      {showNotif && (
+        <NotificationsPanel
+          onClose={() => setShowNotif(false)}
+          onOpenDM={openDM}
+          onOpenSettings={openSettings}
+          onViewProfile={name => setViewProfile(name)}
+        />
       )}
       {showSettings && (
-        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-sm text-muted-foreground">Chargement…</div>}>
-          <SettingsPanel
-            onClose={() => setShowSettings(false)}
-            initialTab={settingsTab}
-            onOpenDM={name => {
-              setShowSettings(false);
-              openDM(name);
-            }}
-            onViewProfile={name => {
-              setShowSettings(false);
-              setViewProfile(name);
-            }}
-          />
-        </Suspense>
+        <SettingsPanel
+          onClose={() => setShowSettings(false)}
+          initialTab={settingsTab}
+          onOpenDM={name => {
+            setShowSettings(false);
+            openDM(name);
+          }}
+          onViewProfile={name => {
+            setShowSettings(false);
+            setViewProfile(name);
+          }}
+        />
       )}
       {viewProfile && (
-        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 text-sm text-muted-foreground">Chargement…</div>}>
-          <UserProfileView
-            targetName={viewProfile}
-            onClose={() => setViewProfile(null)}
-            onOpenDM={openDM}
-          />
-        </Suspense>
+        <UserProfileView
+          targetName={viewProfile}
+          onClose={() => setViewProfile(null)}
+          onOpenDM={openDM}
+        />
       )}
     </div>
   );

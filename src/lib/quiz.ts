@@ -1,6 +1,6 @@
 /**
  * Système de Quiz en temps réel
- * 
+ *
  * Permet de créer et gérer des quiz interactifs dans les salons
  * avec des points XP et des classements.
  */
@@ -61,15 +61,124 @@ export interface QuizResult {
   winner?: QuizParticipant;
 }
 
+export type QuizPresetId =
+  | 'general'
+  | 'tech'
+  | 'culture'
+  | 'musique'
+  | 'sport'
+  | 'histoire'
+  | 'cinema'
+  | 'geographie';
+
+export const QUIZ_THEMES: {
+  id: QuizPresetId;
+  label: string;
+  emoji: string;
+  description: string;
+}[] = [
+  { id: 'general', label: 'Général', emoji: '🧠', description: 'Culture G variée' },
+  { id: 'tech', label: 'Tech', emoji: '💻', description: 'Web & informatique' },
+  { id: 'culture', label: 'Culture', emoji: '🎨', description: 'Art & patrimoine' },
+  { id: 'musique', label: 'Musique', emoji: '🎵', description: 'Hits & artistes' },
+  { id: 'sport', label: 'Sport', emoji: '⚽', description: 'Foot, JO & co' },
+  { id: 'histoire', label: 'Histoire', emoji: '📜', description: 'Dates & événements' },
+  { id: 'cinema', label: 'Cinéma', emoji: '🎬', description: 'Films & réalisateurs' },
+  { id: 'geographie', label: 'Géo', emoji: '🌍', description: 'Pays & capitales' },
+];
+
+function q(
+  question: string,
+  options: [string, string, string, string],
+  correctAnswer: number,
+  points = 100,
+  timeLimit = 20,
+): QuizQuestion {
+  return {
+    id: crypto.randomUUID(),
+    question,
+    options,
+    correctAnswer,
+    timeLimit,
+    points,
+  };
+}
+
+const PRESET_QUESTIONS: Record<QuizPresetId, QuizQuestion[]> = {
+  general: [
+    q('Quelle est la capitale de la France ?', ['Londres', 'Berlin', 'Paris', 'Madrid'], 2),
+    q('Combien de continents y a-t-il ?', ['5', '6', '7', '8'], 2),
+    q('Quelle planète est appelée la planète rouge ?', ['Vénus', 'Mars', 'Jupiter', 'Saturne'], 1),
+    q('Combien de jours compte une année bissextile ?', ['364', '365', '366', '367'], 2),
+    q('Quel animal est le plus rapide sur terre ?', ['Léopard', 'Guépard', 'Lion', 'Antilope'], 1),
+    q('Combien y a-t-il de couleurs dans un arc-en-ciel ?', ['5', '6', '7', '8'], 2),
+    q('Quel est le plus grand océan ?', ['Atlantique', 'Indien', 'Arctique', 'Pacifique'], 3),
+    q('Combien de côtés a un hexagone ?', ['5', '6', '7', '8'], 1),
+  ],
+  tech: [
+    q('Que signifie HTML ?', ['Hyper Text Markup Language', 'High Tech Modern Language', 'Home Tool Markup Language', 'Hyperlinks Text Mark Language'], 0, 150),
+    q('Quel langage sert au styling web ?', ['JavaScript', 'Python', 'CSS', 'PHP'], 2),
+    q('Qui a créé Linux ?', ['Bill Gates', 'Steve Jobs', 'Linus Torvalds', 'Mark Zuckerberg'], 2, 150),
+    q('Que signifie CPU ?', ['Central Processing Unit', 'Computer Personal Unit', 'Central Program Utility', 'Core Process Utility'], 0),
+    q('Quel protocole sécurise le web (HTTPS) ?', ['FTP', 'SSH', 'SSL/TLS', 'SMTP'], 2, 150),
+    q('React est principalement utilisé pour…', ['Bases de données', 'Interfaces utilisateur', 'Systèmes d’exploitation', 'Réseaux'], 1),
+  ],
+  culture: [
+    q('Qui a peint la Joconde ?', ['Van Gogh', 'Picasso', 'Léonard de Vinci', 'Michel-Ange'], 2, 150),
+    q('En quelle année le Titanic a-t-il coulé ?', ['1905', '1912', '1920', '1898'], 1, 150),
+    q('Qui a écrit Les Misérables ?', ['Zola', 'Hugo', 'Balzac', 'Flaubert'], 1),
+    q('Quel musée abrite la Joconde ?', ['Orsay', 'Louvre', 'Pompidou', 'British Museum'], 1),
+    q('Quelle ville a inventé les Jeux olympiques antiques ?', ['Rome', 'Athènes', 'Sparte', 'Troie'], 1),
+    q('Combien de cordes a un violon ?', ['3', '4', '5', '6'], 1),
+  ],
+  musique: [
+    q('Qui a chanté « Billie Jean » ?', ['Prince', 'Michael Jackson', 'Madonna', 'Bruno Mars'], 1),
+    q('Combien de notes dans une gamme majeure ?', ['5', '6', '7', '8'], 2),
+    q('Quel instrument a 88 touches ?', ['Guitare', 'Piano', 'Harpe', 'Orgue'], 1),
+    q('Qui est surnommé le Roi du Rock’n’Roll ?', ['Chuck Berry', 'Elvis Presley', 'Buddy Holly', 'Johnny Cash'], 1),
+    q('Quel groupe a sorti « Bohemian Rhapsody » ?', ['The Beatles', 'Queen', 'Pink Floyd', 'ABBA'], 1),
+    q('La clé de sol se place sur quelle ligne ?', ['1re', '2e', '3e', '4e'], 1, 150),
+  ],
+  sport: [
+    q('Combien de joueurs sur un terrain de football (par équipe) ?', ['9', '10', '11', '12'], 2),
+    q('En quelle année la France a-t-elle gagné sa 1re Coupe du monde ?', ['1994', '1998', '2002', '2006'], 1),
+    q('Combien de sets max pour un match de tennis messieurs (Grand Chelem) ?', ['1', '2', '3', '5'], 3),
+    q('Quel sport utilise un panier ?', ['Volley', 'Basket', 'Handball', 'Rugby'], 1),
+    q('Les JO d’été 2024 se sont déroulés à…', ['Tokyo', 'Los Angeles', 'Paris', 'Londres'], 2),
+    q('Combien de trous sur un parcours de golf standard ?', ['9', '12', '18', '21'], 2),
+  ],
+  histoire: [
+    q('En quelle année a eu lieu la Révolution française ?', ['1776', '1789', '1815', '1848'], 1),
+    q('Qui était le premier président de la Ve République ?', ['Pompidou', 'De Gaulle', 'Mitterrand', 'Chirac'], 1),
+    q('La chute du mur de Berlin a eu lieu en…', ['1985', '1989', '1991', '1995'], 1),
+    q('Qui a découvert l’Amérique en 1492 ?', ['Magellan', 'Vasco de Gama', 'Christophe Colomb', 'Cook'], 2),
+    q('Napoléon a perdu à Waterloo en…', ['1804', '1812', '1815', '1821'], 2),
+    q('La Première Guerre mondiale a commencé en…', ['1912', '1914', '1916', '1918'], 1),
+  ],
+  cinema: [
+    q('Qui a réalisé « Inception » ?', ['Spielberg', 'Nolan', 'Tarantino', 'Scorsese'], 1),
+    q('Quel film a pour héros un hobbit nommé Frodon ?', ['Harry Potter', 'Le Seigneur des Anneaux', 'Narnia', 'Star Wars'], 1),
+    q('Qui joue Jack dans Titanic ?', ['Brad Pitt', 'Leonardo DiCaprio', 'Tom Cruise', 'Matt Damon'], 1),
+    q('Quelle saga commence par « Un nouvel espoir » ?', ['Star Trek', 'Star Wars', 'Dune', 'Alien'], 1),
+    q('Combien d’Oscars a remporté « Titanic » ?', ['5', '8', '11', '14'], 2, 150),
+    q('Qui a co-fondé Pixar (figure célèbre) ?', ['Walt Disney', 'Steve Jobs', 'George Lucas', 'James Cameron'], 1),
+  ],
+  geographie: [
+    q('Quelle est la capitale de l’Italie ?', ['Milan', 'Naples', 'Rome', 'Florence'], 2),
+    q('Le Nil traverse principalement quel continent ?', ['Asie', 'Afrique', 'Europe', 'Amérique'], 1),
+    q('Quel est le plus grand pays du monde (superficie) ?', ['Chine', 'Canada', 'USA', 'Russie'], 3),
+    q('Quelle est la capitale du Japon ?', ['Osaka', 'Kyoto', 'Tokyo', 'Nagoya'], 2),
+    q('Quel désert est le plus grand du monde ?', ['Gobi', 'Sahara', 'Antarctique', 'Kalahari'], 2, 150),
+    q('Combien de pays bordent la France métropolitaine ?', ['6', '7', '8', '9'], 2),
+  ],
+};
+
 class QuizService {
   private activeQuizzes: Map<string, Quiz> = new Map();
   private quizAnswers: Map<string, QuizAnswer[]> = new Map();
   private liveAnswers: Map<string, QuizLiveAnswer[]> = new Map();
   private quizParticipants: Map<string, Map<string, QuizParticipant>> = new Map();
 
-  /**
-   * Hydrate l'état local depuis une session Supabase (multi-clients / rechargement page)
-   */
   syncSession(
     quiz: Quiz,
     participants?: Record<string, QuizParticipant> | null,
@@ -118,15 +227,12 @@ class QuizService {
     return (this.liveAnswers.get(quizId) || []).filter(a => a.questionId === questionId);
   }
 
-  /**
-   * Crée un nouveau quiz
-   */
   createQuiz(quiz: Omit<Quiz, 'id' | 'isActive' | 'currentQuestionIndex'>): Quiz {
     const newQuiz: Quiz = {
       ...quiz,
       id: crypto.randomUUID(),
       isActive: false,
-      currentQuestionIndex: 0
+      currentQuestionIndex: 0,
     };
 
     this.activeQuizzes.set(newQuiz.id, newQuiz);
@@ -137,25 +243,19 @@ class QuizService {
     return newQuiz;
   }
 
-  /**
-   * Démarre un quiz
-   */
   startQuiz(quizId: string): Quiz | null {
     const quiz = this.activeQuizzes.get(quizId);
     if (!quiz) return null;
 
     quiz.isActive = true;
     quiz.startedAt = new Date();
-    const duration = quiz.questions.reduce((sum, q) => sum + q.timeLimit, 0);
+    const duration = quiz.questions.reduce((sum, qq) => sum + qq.timeLimit, 0);
     quiz.endsAt = new Date(Date.now() + duration * 1000);
 
     this.activeQuizzes.set(quizId, quiz);
     return quiz;
   }
 
-  /**
-   * Obtient le quiz actif d'un salon
-   */
   getActiveQuiz(salonId: string): Quiz | null {
     for (const quiz of this.activeQuizzes.values()) {
       if (quiz.salonId === salonId && quiz.isActive) {
@@ -165,9 +265,6 @@ class QuizService {
     return null;
   }
 
-  /**
-   * Obtient la question actuelle d'un quiz
-   */
   getCurrentQuestion(quizId: string): QuizQuestion | null {
     const quiz = this.activeQuizzes.get(quizId);
     if (!quiz || !quiz.isActive) return null;
@@ -175,15 +272,12 @@ class QuizService {
     return quiz.questions[quiz.currentQuestionIndex];
   }
 
-  /**
-   * Enregistre une réponse à une question
-   */
   submitAnswer(
     quizId: string,
     userId: string,
     userName: string,
     questionId: string,
-    answer: number
+    answer: number,
   ): {
     isCorrect: boolean;
     pointsEarned: number;
@@ -196,7 +290,7 @@ class QuizService {
       return { isCorrect: false, pointsEarned: 0, isLate: true, alreadyAnswered: false };
     }
 
-    const question = quiz.questions.find(q => q.id === questionId);
+    const question = quiz.questions.find(qq => qq.id === questionId);
     if (!question) {
       return { isCorrect: false, pointsEarned: 0, isLate: false, alreadyAnswered: false };
     }
@@ -207,9 +301,8 @@ class QuizService {
 
     const now = new Date();
     const questionStartTime = new Date(quiz.startedAt!);
-    const questionIndex = quiz.questions.findIndex(q => q.id === questionId);
-    
-    // Calculer le temps de début de cette question
+    const questionIndex = quiz.questions.findIndex(qq => qq.id === questionId);
+
     for (let i = 0; i < questionIndex; i++) {
       questionStartTime.setSeconds(questionStartTime.getSeconds() + quiz.questions[i].timeLimit);
     }
@@ -224,14 +317,13 @@ class QuizService {
     const isCorrect = answer === question.correctAnswer;
     const pointsEarned = isCorrect ? question.points : 0;
 
-    // Enregistrer la réponse
     const quizAnswer: QuizAnswer = {
       userId,
       questionId,
       answer,
       timestamp: now,
       isCorrect,
-      pointsEarned
+      pointsEarned,
     };
 
     const answers = this.quizAnswers.get(quizId) || [];
@@ -252,14 +344,13 @@ class QuizService {
     live.push(liveAnswer);
     this.liveAnswers.set(quizId, live);
 
-    // Mettre à jour le participant
     const participants = this.quizParticipants.get(quizId) || new Map();
     const participant = participants.get(userId) || {
       userId,
       userName,
       totalPoints: 0,
       correctAnswers: 0,
-      totalAnswers: 0
+      totalAnswers: 0,
     };
 
     participant.totalPoints += pointsEarned;
@@ -274,9 +365,6 @@ class QuizService {
     return { isCorrect, pointsEarned, isLate: false, alreadyAnswered: false, liveAnswer };
   }
 
-  /**
-   * Passe à la question suivante
-   */
   nextQuestion(quizId: string): QuizQuestion | null {
     const quiz = this.activeQuizzes.get(quizId);
     if (!quiz || !quiz.isActive) return null;
@@ -284,7 +372,6 @@ class QuizService {
     quiz.currentQuestionIndex++;
 
     if (quiz.currentQuestionIndex >= quiz.questions.length) {
-      // Quiz terminé
       quiz.isActive = false;
       this.activeQuizzes.set(quizId, quiz);
       return null;
@@ -294,9 +381,6 @@ class QuizService {
     return quiz.questions[quiz.currentQuestionIndex];
   }
 
-  /**
-   * Termine un quiz
-   */
   endQuiz(quizId: string): QuizResult | null {
     const quiz = this.activeQuizzes.get(quizId);
     if (!quiz) return null;
@@ -306,22 +390,16 @@ class QuizService {
 
     const participants = this.quizParticipants.get(quizId) || new Map();
     const participantArray = Array.from(participants.values());
-    
-    // Trier par points
+
     participantArray.sort((a, b) => b.totalPoints - a.totalPoints);
 
-    const result: QuizResult = {
+    return {
       quizId,
       participants: participantArray,
-      winner: participantArray.length > 0 ? participantArray[0] : undefined
+      winner: participantArray.length > 0 ? participantArray[0] : undefined,
     };
-
-    return result;
   }
 
-  /**
-   * Obtient le classement actuel d'un quiz
-   */
   getLeaderboard(quizId: string): QuizParticipant[] {
     const participants = this.quizParticipants.get(quizId);
     if (!participants) return [];
@@ -329,9 +407,6 @@ class QuizService {
     return Array.from(participants.values()).sort((a, b) => b.totalPoints - a.totalPoints);
   }
 
-  /**
-   * Obtient les résultats d'un utilisateur pour un quiz
-   */
   getUserResults(quizId: string, userId: string): QuizParticipant | null {
     const participants = this.quizParticipants.get(quizId);
     if (!participants) return null;
@@ -339,9 +414,6 @@ class QuizService {
     return participants.get(userId) || null;
   }
 
-  /**
-   * Obtient les réponses d'un utilisateur pour un quiz
-   */
   getUserAnswers(quizId: string, userId: string): QuizAnswer[] {
     const answers = this.quizAnswers.get(quizId);
     if (!answers) return [];
@@ -349,9 +421,6 @@ class QuizService {
     return answers.filter(a => a.userId === userId);
   }
 
-  /**
-   * Supprime un quiz
-   */
   deleteQuiz(quizId: string): boolean {
     this.activeQuizzes.delete(quizId);
     this.quizAnswers.delete(quizId);
@@ -360,87 +429,22 @@ class QuizService {
     return true;
   }
 
-  /**
-   * Obtient tous les quiz actifs
-   */
   getAllActiveQuizzes(): Quiz[] {
     return Array.from(this.activeQuizzes.values()).filter(q => q.isActive);
   }
 
-  /**
-   * Crée un quiz prédéfini
-   */
-  createPresetQuiz(salonId: string, createdBy: string, preset: 'general' | 'tech' | 'culture'): Quiz {
-    const presets: Record<string, QuizQuestion[]> = {
-      general: [
-        {
-          id: crypto.randomUUID(),
-          question: 'Quelle est la capitale de la France?',
-          options: ['Londres', 'Berlin', 'Paris', 'Madrid'],
-          correctAnswer: 2,
-          timeLimit: 15,
-          points: 100
-        },
-        {
-          id: crypto.randomUUID(),
-          question: 'Combien de continents y a-t-il?',
-          options: ['5', '6', '7', '8'],
-          correctAnswer: 2,
-          timeLimit: 15,
-          points: 100
-        },
-        {
-          id: crypto.randomUUID(),
-          question: 'Quelle planète est appelée la planète rouge?',
-          options: ['Vénus', 'Mars', 'Jupiter', 'Saturne'],
-          correctAnswer: 1,
-          timeLimit: 15,
-          points: 100
-        }
-      ],
-      tech: [
-        {
-          id: crypto.randomUUID(),
-          question: 'Que signifie HTML?',
-          options: ['Hyper Text Markup Language', 'High Tech Modern Language', 'Home Tool Markup Language', 'Hyperlinks Text Mark Language'],
-          correctAnswer: 0,
-          timeLimit: 20,
-          points: 150
-        },
-        {
-          id: crypto.randomUUID(),
-          question: 'Quel langage est utilisé pour le styling web?',
-          options: ['JavaScript', 'Python', 'CSS', 'PHP'],
-          correctAnswer: 2,
-          timeLimit: 15,
-          points: 100
-        }
-      ],
-      culture: [
-        {
-          id: crypto.randomUUID(),
-          question: 'Qui a peint la Joconde?',
-          options: ['Van Gogh', 'Picasso', 'Léonard de Vinci', 'Michel-Ange'],
-          correctAnswer: 2,
-          timeLimit: 20,
-          points: 150
-        },
-        {
-          id: crypto.randomUUID(),
-          question: 'En quelle année le Titanic a-t-il coulé?',
-          options: ['1905', '1912', '1920', '1898'],
-          correctAnswer: 1,
-          timeLimit: 20,
-          points: 150
-        }
-      ]
-    };
+  createPresetQuiz(salonId: string, createdBy: string, preset: QuizPresetId): Quiz {
+    const theme = QUIZ_THEMES.find(t => t.id === preset);
+    const questions = (PRESET_QUESTIONS[preset] || PRESET_QUESTIONS.general).map(question => ({
+      ...question,
+      id: crypto.randomUUID(),
+    }));
 
     return this.createQuiz({
       salonId,
       createdBy,
-      title: `Quiz ${preset}`,
-      questions: presets[preset]
+      title: theme ? `Quiz ${theme.label}` : `Quiz ${preset}`,
+      questions,
     });
   }
 }

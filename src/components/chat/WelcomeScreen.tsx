@@ -31,6 +31,8 @@ interface DisplayOnlineUser {
 
 interface WelcomeScreenProps {
   onOpenDM?: (name: string) => void;
+  mobileSalonsOpen?: boolean;
+  onMobileSalonsOpenChange?: (open: boolean) => void;
 }
 
 // Emoji par salon
@@ -49,7 +51,7 @@ function PulseDot({ color = 'bg-emerald-500' }: { color?: string }) {
   );
 }
 
-export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
+export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalonsOpenChange }: WelcomeScreenProps) {
   const { setCurrentSalon, customSalons, hiddenSalons, displayOrder, isSalonLocked, verifySalonPassword } = useSalons();
   const { user, profiles, loginWithSupabase, logout } = useUser();
   const { addNotification } = useNotifications();
@@ -64,7 +66,11 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
   const [onlineUsers, setOnlineUsers] = useState<DisplayOnlineUser[]>([]);
   const [salonCounts, setSalonCounts] = useState<Record<string, number>>({});
   const [showMembersPanel, setShowMembersPanel] = useState(false);
+  const [localSalonsOpen, setLocalSalonsOpen] = useState(false);
   const waveTimersRef                 = useRef<Record<string, number>>({});
+
+  const salonsDrawerOpen = mobileSalonsOpen ?? localSalonsOpen;
+  const setSalonsDrawerOpen = onMobileSalonsOpenChange ?? setLocalSalonsOpen;
 
   // Charger les utilisateurs en ligne et les counts de salons
   useEffect(() => {
@@ -153,8 +159,9 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
       setPasswordError('');
     } else {
       setCurrentSalon(salon.id);
+      setSalonsDrawerOpen(false);
     }
-  }, [isSalonLocked, setCurrentSalon]);
+  }, [isSalonLocked, setCurrentSalon, setSalonsDrawerOpen]);
 
   const handlePasswordSubmit = useCallback((e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -163,18 +170,40 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
       setCurrentSalon(passwordPrompt.id);
       setPasswordPrompt(null);
       setPasswordError('');
+      setSalonsDrawerOpen(false);
     } else {
       setPasswordError('Mot de passe incorrect');
     }
-  }, [passwordPrompt, verifySalonPassword, setCurrentSalon]);
+  }, [passwordPrompt, verifySalonPassword, setCurrentSalon, setSalonsDrawerOpen]);
 
   return (
-    <div className="flex-1 flex min-h-0 overflow-hidden">
+    <div className="flex-1 flex min-h-0 overflow-hidden relative">
 
-      {/* ── Colonne gauche : liste des salons ── */}
-      <div className="w-[260px] border-r border-border flex flex-col shrink-0 bg-card">
-        <div className="px-4 py-3 border-b border-border">
+      {/* ── Colonne gauche : liste des salons (drawer mobile) ── */}
+      {salonsDrawerOpen && (
+        <button
+          type="button"
+          className="md:hidden absolute inset-0 bg-black/50 z-30"
+          aria-label="Fermer la liste des salons"
+          onClick={() => setSalonsDrawerOpen(false)}
+        />
+      )}
+      <div className={`
+        absolute md:relative inset-y-0 left-0 z-40 md:z-auto
+        w-[min(100%,300px)] md:w-[260px] border-r border-border flex flex-col shrink-0 bg-card
+        transition-transform duration-200 ease-out
+        ${salonsDrawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
           <h3 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Salons</h3>
+          <button
+            type="button"
+            className="md:hidden p-2 rounded-lg border border-white/10 text-muted-foreground hover:text-foreground touch-target"
+            onClick={() => setSalonsDrawerOpen(false)}
+            aria-label="Fermer"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Filtres */}
@@ -225,10 +254,17 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
       </div>
 
       {/* ── Centre : épuré ── */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-8 select-none">
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 sm:gap-4 text-center px-4 sm:px-8 select-none overflow-y-auto min-w-0 py-6">
+        <button
+          type="button"
+          onClick={() => setSalonsDrawerOpen(true)}
+          className="md:hidden self-start mb-1 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary border border-border text-xs text-foreground touch-target"
+        >
+          <Users className="w-3.5 h-3.5 text-primary" /> Voir les salons
+        </button>
         <div className="relative mb-1">
           <div className="absolute inset-0 rounded-2xl bg-primary/25 blur-2xl scale-90 opacity-70" aria-hidden />
-          <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-2xl overflow-hidden shadow-lg shadow-primary/25 ring-1 ring-primary/20">
+          <div className="relative w-40 h-40 sm:w-64 sm:h-64 md:w-72 md:h-72 rounded-2xl overflow-hidden shadow-lg shadow-primary/25 ring-1 ring-primary/20">
             <img
               src="/logo.png"
               alt="Virtuel-RT Logo"
@@ -236,20 +272,23 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
             />
           </div>
         </div>
-        <h2 className="text-xl font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
-        <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg px-4 py-2 mb-2">
+        <h2 className="text-lg sm:text-xl font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
+        <p className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] text-amber-200/85 bg-amber-500/10 border border-amber-500/25 rounded-full px-2.5 py-1">
+          <Scale className="w-3 h-3 shrink-0" /> Interdit aux mineurs · réservé aux 18 ans et plus
+        </p>
+        <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg px-4 py-2 mb-1">
           <p className="text-sm font-semibold text-purple-300">🎉 Pour l'ouverture, Premium offert en essai !</p>
         </div>
         <DailySparkCard className="w-full max-w-sm" />
         <p className="text-sm text-muted-foreground/50 max-w-xs leading-relaxed">
-          Choisissez un salon à gauche pour rejoindre une discussion,<br />
-          ou envoyez un message privé à quelqu'un à droite.
+          Choisissez un salon pour rejoindre une discussion,
+          ou envoyez un message privé à quelqu'un.
         </p>
         <Link
           to={MENTIONS_LEGALES_HREF}
           className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/45 hover:text-purple-300 transition-colors"
         >
-          <Scale className="w-3 h-3" /> Mentions légales
+          <Scale className="w-3 h-3" /> Mentions légales · 18+
         </Link>
         {user ? (
           <div className="mt-2 flex items-center gap-3">
@@ -281,7 +320,7 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
       </div>
 
       {/* ── Colonne droite : XP, classement et connectés ── */}
-      <div className="w-[240px] border-l border-border flex flex-col shrink-0 bg-card overflow-y-auto">
+      <div className="hidden lg:flex w-[240px] border-l border-border flex-col shrink-0 bg-card overflow-y-auto">
         
         {/* XP du joueur */}
         <div className="p-3 border-b border-border">

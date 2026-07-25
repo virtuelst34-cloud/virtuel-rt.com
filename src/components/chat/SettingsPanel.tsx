@@ -156,12 +156,17 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
   };
 
   const handleSave = () => {
+    const ageNum = draft.age ? parseInt(draft.age.toString(), 10) : undefined;
+    if (ageNum != null && (!Number.isFinite(ageNum) || ageNum < 18 || ageNum > 120)) {
+      addNotification({ type: 'system', message: 'L’âge doit être entre 18 et 120 ans (service 18+).' });
+      return;
+    }
     updateProfile({ 
       bio: draft.bio, 
       avatar: draft.avatar, 
       statusText: draft.statusText,
       name: draft.name,
-      age: draft.age ? parseInt(draft.age.toString()) : undefined,
+      age: ageNum,
       city: draft.city,
       gender: draft.gender
     });
@@ -277,8 +282,8 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[2000] animate-in fade-in duration-300 p-4" onClick={onClose}>
-      <div className="bg-card border-2 border-red-500/50 rounded-3xl w-full max-w-[580px] max-h-[90vh] flex flex-col overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5),0_0_0_1px_rgba(239,68,68,0.3)] animate-in zoom-in-95 duration-300"
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center z-[2000] animate-in fade-in duration-300 p-0 sm:p-4 safe-area-pad" onClick={onClose}>
+      <div className="bg-card border-2 border-red-500/50 rounded-t-3xl sm:rounded-3xl w-full max-w-[580px] max-h-[92dvh] sm:max-h-[90vh] flex flex-col overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5),0_0_0_1px_rgba(239,68,68,0.3)] animate-in zoom-in-95 duration-300"
         onClick={e => e.stopPropagation()}>
 
         <div className="px-5 py-4 border-b border-border flex items-center gap-2.5 shrink-0">
@@ -434,21 +439,24 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
 
                 {/* Informations personnelles */}
                 <div className="mb-4 grid grid-cols-2 gap-3">
-                  {/* Âge */}
+                  {/* Âge (18+ uniquement — champ indicatif, pas de vérification d'identité) */}
                   <div>
-                    <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5">Âge</div>
+                    <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5">Âge (18+)</div>
                     {editing ? (
                       <input 
                         type="number"
                         value={draft.age}
                         onChange={e => setDraft(d => ({ ...d, age: e.target.value }))}
-                        min={13}
+                        min={18}
                         max={120}
-                        placeholder="Âge"
+                        placeholder="18+"
                         className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200" 
                       />
                     ) : (
                       <span className="text-sm text-muted-foreground/80">{user.age ? `${user.age} ans` : 'Non renseigné'}</span>
+                    )}
+                    {editing && (
+                      <p className="text-[10px] text-muted-foreground/45 mt-1">Virtuel-RT est réservé aux adultes. Aucune pièce d’identité n’est demandée.</p>
                     )}
                   </div>
 

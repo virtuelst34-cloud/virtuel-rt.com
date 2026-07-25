@@ -66,14 +66,14 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
 
   return (
     <>
-      <div className="fixed right-0 top-0 h-full w-80 bg-card border-l border-border flex flex-col z-40 animate-in slide-in-from-right duration-300">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+      <div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto sm:w-80 bg-card sm:border-l border-border flex flex-col z-40 animate-in slide-in-from-right duration-300 safe-area-pad">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-primary" />
             <span className="text-sm font-semibold text-foreground">Membres</span>
             <span className="text-xs text-muted-foreground">({onlineMembers.length})</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-all" aria-label="Fermer la liste des membres">
+          <button onClick={onClose} className="p-2 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-all touch-target" aria-label="Fermer la liste des membres">
             <X className="w-4 h-4" />
           </button>
         </div>

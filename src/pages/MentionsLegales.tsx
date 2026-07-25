@@ -107,7 +107,31 @@ export default function MentionsLegales() {
           </section>
 
           <section className="space-y-2">
-            <h2 className="text-base font-semibold text-foreground">7. Droit applicable</h2>
+            <h2 className="text-base font-semibold text-foreground">7. Accès réservé aux majeurs (18+)</h2>
+            <p>
+              Virtuel-RT est un service de chat <strong className="text-foreground font-semibold">interdit aux mineurs</strong>.
+              Toute personne qui s’inscrit, se connecte ou utilise le service (y compris en mode invité) déclare avoir
+              <strong className="text-foreground font-semibold"> 18 ans ou plus</strong>.
+            </p>
+            <p>
+              Aucune vérification d’identité officielle (pièce d’identité, selfie, etc.) n’est exigée à l’entrée : l’accès
+              repose sur une confirmation déclarative et sur le respect des règles de la communauté. Un champ d’âge
+              optionnel peut être renseigné sur le profil à titre indicatif.
+            </p>
+            <p>
+              Sont strictement interdits : tout contenu à caractère sexuel impliquant des mineurs (réel ou fictif),
+              toute sollicitation ou exploitation de mineurs, et tout partage de matériel illicite. Les utilisateurs
+              peuvent signaler un contenu ou un comportement via les outils de signalement. La modération peut supprimer
+              du contenu, muter ou bannir un compte, et transmettre aux autorités compétentes lorsque la loi l’exige.
+            </p>
+            <p>
+              L’éditeur ne peut garantir l’âge réel de chaque utilisateur. En cas de doute ou de signalement crédible
+              concernant un mineur, des mesures conservatoires (restriction, bannissement) peuvent être prises.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-base font-semibold text-foreground">8. Droit applicable</h2>
             <p>
               Les présentes mentions sont régies par le droit français. En cas de litige, et à défaut de résolution amiable,
               les tribunaux français compétents seront seuls compétents.
@@ -115,7 +139,7 @@ export default function MentionsLegales() {
           </section>
 
           <p className="text-[11px] text-muted-foreground/40 pt-4 border-t border-white/5">
-            Dernière mise à jour : juillet 2026 · Virtuel-RT
+            Dernière mise à jour : juillet 2026 · Virtuel-RT · Interdit aux mineurs (18+)
           </p>
         </div>
       </div>

@@ -9,7 +9,7 @@ import { getSpecialBadgeForUser, SPECIAL_BADGES } from '@/lib/diamondBadges';
 import { webrtcService, RemoteStreamInfo } from '@/lib/webrtcService';
 import { uploadChatFile } from '@/lib/storageService';
 import { toast } from 'sonner';
-import { DEFAULT_BANNED_WORDS, findBannedWord } from '@/lib/bannedWords';
+import { DEFAULT_BANNED_WORDS, findBannedWord, mergeBannedWords } from '@/lib/bannedWords';
 
 interface DirectMessagePanelProps {
   onClose: () => void;
@@ -326,7 +326,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
     if ((!text.trim() && !selectedFile) || !selectedUser || !user || sending) return;
     if (isMuted(selectedUser) || isBlocked(selectedUser)) return;
 
-    if (text.trim() && findBannedWord(text.trim(), DEFAULT_BANNED_WORDS)) {
+    if (text.trim() && findBannedWord(text.trim(), mergeBannedWords(DEFAULT_BANNED_WORDS))) {
       toast.error('Message bloqué : contenu non autorisé.');
       return;
     }

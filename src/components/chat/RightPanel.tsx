@@ -64,7 +64,7 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
 
   return (
     <>
-      <div className="w-[220px] bg-card border-l border-border flex flex-col shrink-0 overflow-y-auto">
+      <div className="hidden lg:flex w-[220px] bg-card border-l border-border flex-col shrink-0 overflow-y-auto">
 
       {/* XP du joueur */}
       <div className="p-3 border-b border-border">

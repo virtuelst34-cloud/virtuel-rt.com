@@ -7,8 +7,7 @@ import MediaBar from '@/components/chat/MediaBar';
 import WebRtcRemotePanel from '@/components/chat/WebRtcRemotePanel';
 import type { RemoteStreamInfo } from '@/lib/webrtcService';
 import RightPanel from '@/components/chat/RightPanel';
-// Tout en statique : React.lazy + chunks Hostinger/PWA provoquait #306
-// (element type undefined) dès qu’un salon ou un panel s’ouvrait.
+import MobileBottomNav from '@/components/chat/MobileBottomNav';
 import ChatArea from '@/components/chat/ChatArea';
 import AdminPanel from '@/components/chat/AdminPanel';
 import NotificationsPanel from '@/components/chat/NotificationsPanel';
@@ -17,7 +16,7 @@ import DirectMessagePanel from '@/components/chat/DirectMessagePanel';
 import UserProfileView from '@/components/chat/UserProfileView';
 
 function ChatApp() {
-  const { user, currentSalon, showAdmin } = useChat();
+  const { user, currentSalon, showAdmin, setCurrentSalon } = useChat();
   const [micActive, setMicActive]       = useState<boolean>(false);
   const [micLevel,  setMicLevel]        = useState<number>(0);
   const [showDM,    setShowDM]          = useState<boolean>(false);
@@ -27,6 +26,7 @@ function ChatApp() {
   const [settingsTab, setSettingsTab]   = useState<string>('profile');
   const [viewProfile, setViewProfile]   = useState<string | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<RemoteStreamInfo[]>([]);
+  const [mobileSalonsOpen, setMobileSalonsOpen] = useState(false);
 
   const handleMicChange = useCallback((active: boolean, level: number) => {
     setMicActive(active);
@@ -44,30 +44,44 @@ function ChatApp() {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-background safe-area-pad">
       {!user && <UsernameModal />}
 
-      {/* Sidebar icônes */}
-      <Sidebar
-        onOpenDM={openDM}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <Sidebar
+          onOpenDM={openDM}
+          onOpenNotifications={() => setShowNotif(true)}
+          onOpenSettings={openSettings}
+        />
+
+        {currentSalon ? (
+          <>
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+              <ChatArea micActive={micActive} micLevel={micLevel} onOpenDM={openDM} />
+              <WebRtcRemotePanel streams={remoteStreams} />
+              <MediaBar onMicChange={handleMicChange} onRemoteStreams={setRemoteStreams} />
+            </div>
+            <RightPanel onOpenDM={openDM} />
+          </>
+        ) : (
+          <WelcomeScreen
+            onOpenDM={openDM}
+            mobileSalonsOpen={mobileSalonsOpen}
+            onMobileSalonsOpenChange={setMobileSalonsOpen}
+          />
+        )}
+      </div>
+
+      <MobileBottomNav
+        onOpenDM={() => openDM()}
         onOpenNotifications={() => setShowNotif(true)}
         onOpenSettings={openSettings}
+        onOpenSalons={() => {
+          if (currentSalon) setCurrentSalon(null);
+          setMobileSalonsOpen(true);
+        }}
+        showSalonsButton
       />
-
-      {currentSalon ? (
-        /* ── Vue salon ── */
-        <>
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <ChatArea micActive={micActive} micLevel={micLevel} onOpenDM={openDM} />
-            <WebRtcRemotePanel streams={remoteStreams} />
-            <MediaBar onMicChange={handleMicChange} onRemoteStreams={setRemoteStreams} />
-          </div>
-          <RightPanel onOpenDM={openDM} />
-        </>
-      ) : (
-        /* ── Accueil 3 colonnes ── */
-        <WelcomeScreen onOpenDM={openDM} />
-      )}
 
       {showAdmin && <AdminPanel />}
       {showDM && (

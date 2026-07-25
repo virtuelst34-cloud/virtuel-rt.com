@@ -28,6 +28,10 @@ export default function WelcomeGuideCard() {
 
       {open && (
         <div className="px-4 pb-4 space-y-4 text-[12px] text-muted-foreground/80 leading-relaxed border-t border-purple-500/15 pt-3">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100/90 leading-snug">
+            <strong className="font-semibold">18+ · Interdit aux mineurs.</strong>{' '}
+            Virtuel-RT est réservé aux adultes. Signalez tout contenu inapproprié via le bouton signaler.
+          </div>
           <section>
             <h4 className="text-[11px] font-semibold uppercase tracking-wider text-purple-300 mb-1.5 flex items-center gap-1.5">
               <Scale className="w-3.5 h-3.5" /> Règles du site

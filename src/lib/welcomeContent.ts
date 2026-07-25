@@ -1,12 +1,12 @@
 /** Contenu du guide d’accueil (salon Bienvenue) — français. */
 
 export const WELCOME_RULES = [
+  'Virtuel-RT est réservé aux adultes : vous devez avoir 18 ans ou plus pour vous connecter ou chatter.',
   'Respectez les autres : pas d’insultes hors salon dédié, pas de harcèlement, pas de menaces.',
-  'Interdit : contenus illégaux, pornographie impliquant des mineurs, apologie de la violence, discrimination.',
-  'Les mineurs de moins de 18 ans ne doivent pas utiliser Virtuel-RT ; le salon « 18–25 ans » est réservé aux adultes.',
+  'Interdit : contenus illégaux, pornographie ou sexualisation impliquant des mineurs, apologie de la violence, discrimination.',
+  'Signalez tout contenu suspect via le bouton signaler ; la modération peut muter, bannir ou supprimer du contenu.',
   'Pas de spam, flood, publicité non sollicitée, phishing ou usurpation d’identité.',
   'Respectez la vie privée : ne partagez pas de données personnelles d’autrui sans consentement.',
-  'La modération peut muter, bannir ou supprimer du contenu en cas de manquement.',
 ];
 
 export const WELCOME_HOWTO = [
@@ -18,10 +18,13 @@ export const WELCOME_HOWTO = [
 ];
 
 export const WELCOME_SETTINGS_PATH = [
-  { path: 'Paramètres → Profil', detail: 'avatar, pseudo, bio, signature, humeur (aura)' },
+  { path: 'Paramètres → Profil', detail: 'avatar, pseudo, bio, âge (18+), signature, humeur (aura)' },
   { path: 'Paramètres → Apparence', detail: 'thème, ambiance / party mode, mode compact' },
   { path: 'Paramètres → Compte', detail: 'connexion email, mot de passe, déconnexion' },
   { path: 'Paramètres → Amis / Succès / Bloqués', detail: 'relations, achievements, mute & blocage' },
 ];
 
 export const MENTIONS_LEGALES_HREF = '/mentions-legales';
+
+export const AGE_GATE_LABEL =
+  'J’ai 18 ans ou plus et j’accepte d’utiliser un service interdit aux mineurs.';

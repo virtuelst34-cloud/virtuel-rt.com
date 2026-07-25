@@ -62,6 +62,27 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
         )}
         <div className="flex-1 min-h-2" />
 
+        {user && (
+          <button
+            type="button"
+            onClick={() => onOpenSettings(pendingFriends > 0 ? 'friends' : 'profile')}
+            title={pendingFriends > 0 ? `Mon compte · ${pendingFriends} demande${pendingFriends > 1 ? 's' : ''} d'ami` : 'Mon compte'}
+            aria-label={pendingFriends > 0 ? `Mon compte · ${pendingFriends} demande${pendingFriends > 1 ? 's' : ''} d'ami` : 'Mon compte'}
+            className="relative w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 group border bg-secondary border-border text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.06]"
+          >
+            <Avatar avatarClass={user.avatar} initials={user.initials} size="sm" />
+            <div className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-card rounded-full" />
+            {pendingFriends > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                {pendingFriends > 9 ? '9+' : pendingFriends}
+              </span>
+            )}
+            <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2.5 px-2 py-1 rounded-md bg-popover border border-border text-[11px] text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-[100] shadow-lg">
+              Mon compte
+            </span>
+          </button>
+        )}
+
         <IconBtn
           icon={theme === 'dark' ? Sun : Moon}
           title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
@@ -91,26 +112,6 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
             onClick={() => setShowStaffChat(true)}
             accent="admin"
           />
-        )}
-
-        {user && (
-          <button
-            type="button"
-            onClick={() => onOpenSettings(pendingFriends > 0 ? 'friends' : 'profile')}
-            title={pendingFriends > 0 ? `Paramètres · ${pendingFriends} demande${pendingFriends > 1 ? 's' : ''} d'ami` : 'Paramètres'}
-            className="mt-1 relative group shrink-0"
-          >
-            <Avatar avatarClass={user.avatar} initials={user.initials} size="sm" />
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-card rounded-full" />
-            {pendingFriends > 0 && (
-              <span className="absolute -top-1 -left-1 min-w-[16px] h-4 px-0.5 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
-                {pendingFriends > 9 ? '9+' : pendingFriends}
-              </span>
-            )}
-            <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2.5 px-2 py-1 rounded-md bg-popover border border-border text-[11px] text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-[100] shadow-lg">
-              Paramètres
-            </span>
-          </button>
         )}
 
         {user && (

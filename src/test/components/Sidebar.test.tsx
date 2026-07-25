@@ -70,18 +70,18 @@ describe('Sidebar', () => {
     expect(notificationsButton).toBeInTheDocument();
   });
 
-  it('devrait avoir un bouton Paramètres si l\'utilisateur existe', () => {
+  it('devrait avoir un bouton Mon compte si l\'utilisateur existe', () => {
     render(
       <TestProviders>
         <Sidebar {...defaultProps} />
       </TestProviders>
     );
 
-    // Le bouton Paramètres n'existe que si l'utilisateur est connecté
-    const settingsButton = screen.queryByTitle('Paramètres');
+    // Le bouton Mon compte n'existe que si l'utilisateur est connecté
+    const accountButton = screen.queryByTitle('Mon compte');
     // On ne vérifie que s'il existe, pas qu'il doit exister
-    if (settingsButton) {
-      expect(settingsButton).toBeInTheDocument();
+    if (accountButton) {
+      expect(accountButton).toBeInTheDocument();
     }
   });
 });

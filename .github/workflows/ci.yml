@@ -39,7 +39,7 @@ jobs:
         run: npx vitest run --coverage
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-report
           path: coverage/
@@ -86,7 +86,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: build
           path: dist/
@@ -129,7 +129,7 @@ jobs:
         run: npm run build
 
       - name: Upload dist fallback artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: hostinger-dist-${{ github.sha }}
           path: dist/

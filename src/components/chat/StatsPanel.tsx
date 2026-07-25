@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { X, TrendingUp, MessageSquare, Clock, Award, Users } from 'lucide-react';
 import { useUser, useXP, useMessages } from '@/lib/contexts';
@@ -81,7 +82,7 @@ export function StatsPanel({ onClose }: StatsPanelProps) {
     hourlyActivity[0] || { hour: '-', count: 0 },
   );
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-background rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-4 border-b flex items-center justify-between">
@@ -181,6 +182,7 @@ export function StatsPanel({ onClose }: StatsPanelProps) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

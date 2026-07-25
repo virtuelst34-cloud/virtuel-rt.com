@@ -4,7 +4,7 @@ import { supabaseAuthService } from '@/lib/supabaseAuth';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import { getBadgeForLevel, getUnlockedBadges } from '@/lib/diamondBadges';
-import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare } from 'lucide-react';
+import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare, Scale, Zap, Bookmark } from 'lucide-react';
 import AchievementsSection from './AchievementsSection';
 import TwoFactorSection from './TwoFactorSection';
 import DailySparkCard from './DailySparkCard';
@@ -17,8 +17,14 @@ import {
   setMood,
   getSignature,
   setSignature,
+  getQuickReplies,
+  setQuickReplies,
+  getBookmarks,
   type MoodId,
+  type QuickReply,
 } from '@/lib/funFeatures';
+import { Link } from 'react-router-dom';
+import { MENTIONS_LEGALES_HREF } from '@/lib/welcomeContent';
 
 interface Tab {
   id: string;
@@ -30,6 +36,7 @@ const TABS: Tab[] = [
   { id: 'profile',  label: 'Profil',    icon: User },
   { id: 'account',  label: 'Compte',    icon: Mail },
   { id: 'theme',    label: 'Apparence', icon: Palette },
+  { id: 'extras',   label: 'Extras',    icon: Zap },
   { id: 'friends',  label: 'Amis',      icon: UserCheck },
   { id: 'achievements', label: 'Succès', icon: Trophy },
   { id: 'blocked',  label: 'Bloqués',   icon: Shield },
@@ -80,6 +87,9 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
     mood: (user?.name ? getMood(user.name) : 'off') as MoodId,
     signature: user?.name ? getSignature(user.name) : '',
   });
+  const [quickRepliesDraft, setQuickRepliesDraft] = useState<QuickReply[]>(() => getQuickReplies(user?.name));
+  const [newReplyLabel, setNewReplyLabel] = useState('');
+  const [newReplyText, setNewReplyText] = useState('');
   const [saved, setSaved]         = useState(false);
   const savedTimerRef             = useRef<number | null>(null);
 
@@ -921,7 +931,102 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
               </div>
             )}
 
-            {/* ── Bloqués ── */}
+            {/* ── Extras ── */}
+            {activeTab === 'extras' && (
+              <div className="space-y-6">
+                <h3 className="text-[13px] font-semibold text-foreground">Extras</h3>
+
+                <div>
+                  <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <Zap className="w-3 h-3 text-purple-300" /> Réponses rapides
+                  </div>
+                  <p className="text-[11px] text-muted-foreground/55 mb-3">
+                    Accessibles dans le chat via l’icône éclair à côté des emojis.
+                  </p>
+                  <div className="space-y-1.5 mb-3">
+                    {quickRepliesDraft.map(qr => (
+                      <div key={qr.id} className="flex items-center gap-2 bg-secondary border border-border rounded-xl px-3 py-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-purple-300 font-medium">{qr.label}</div>
+                          <div className="text-[10px] text-muted-foreground/60 truncate">{qr.text}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = quickRepliesDraft.filter(r => r.id !== qr.id);
+                            setQuickRepliesDraft(next);
+                            if (user?.name) setQuickReplies(user.name, next);
+                          }}
+                          className="text-[10px] text-red-400 hover:text-red-300"
+                        >
+                          Suppr.
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={newReplyLabel}
+                      onChange={e => setNewReplyLabel(e.target.value.slice(0, 20))}
+                      placeholder="Libellé"
+                      className="bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs"
+                    />
+                    <input
+                      value={newReplyText}
+                      onChange={e => setNewReplyText(e.target.value.slice(0, 120))}
+                      placeholder="Texte du message"
+                      className="bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newReplyLabel.trim() || !newReplyText.trim() || !user?.name) return;
+                        const next = [
+                          ...quickRepliesDraft,
+                          { id: `qr_${Date.now()}`, label: newReplyLabel.trim(), text: newReplyText.trim() },
+                        ].slice(0, 12);
+                        setQuickRepliesDraft(next);
+                        setQuickReplies(user.name, next);
+                        setNewReplyLabel('');
+                        setNewReplyText('');
+                        addNotification({ type: 'system', message: 'Réponse rapide ajoutée.' });
+                      }}
+                      className="col-span-2 py-2 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-semibold hover:bg-purple-500/25"
+                    >
+                      Ajouter une réponse
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <Bookmark className="w-3 h-3 text-rose-400" /> Favoris messages
+                  </div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {getBookmarks(user?.name).length === 0 && (
+                      <p className="text-[11px] text-muted-foreground/45 italic">Aucun favori — cliquez ★ sur un message dans un salon.</p>
+                    )}
+                    {getBookmarks(user?.name).slice(0, 20).map(b => (
+                      <div key={b.id + b.savedAt} className="bg-secondary/70 border border-border rounded-xl px-3 py-2">
+                        <div className="text-[10px] text-purple-300">{b.author_name} · {b.salonName || b.salonId}</div>
+                        <p className="text-[11px] text-muted-foreground/70 truncate">{b.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-border">
+                  <Link
+                    to={MENTIONS_LEGALES_HREF}
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-purple-300 transition-colors"
+                  >
+                    <Scale className="w-3.5 h-3.5" /> Mentions légales
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* ── Amis ── */}
             {activeTab === 'friends' && (
               <div>
                 <h3 className="text-[13px] font-semibold text-foreground mb-5">Amis et demandes</h3>

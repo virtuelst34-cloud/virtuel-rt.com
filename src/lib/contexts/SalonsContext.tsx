@@ -15,6 +15,9 @@ interface Salon {
   live?: boolean;
   count?: number;
   welcome?: string;
+  description?: string;
+  sort_order?: number;
+  created_by?: string;
 }
 
 interface SalonsContextType {
@@ -22,10 +25,13 @@ interface SalonsContextType {
   setCustomSalons: React.Dispatch<React.SetStateAction<Salon[]>>;
   hiddenSalons: string[];
   setHiddenSalons: React.Dispatch<React.SetStateAction<string[]>>;
+  displayOrder: Record<string, number>;
   currentSalon: string | null;
   setCurrentSalon: (id: string | null) => void;
   addSalon: (salon: Salon) => void;
+  updateSalon: (salonId: string, updates: Partial<Salon>) => Promise<void>;
   deleteSalon: (salonId: string) => void;
+  reorderSalons: (orderedIds: string[]) => Promise<void>;
   isSalonLocked: (salonId: string) => boolean;
   verifySalonPassword: (salonId: string, password: string) => boolean;
   loadCustomSalons: () => Promise<void>;
@@ -47,6 +53,9 @@ function convertSupabaseSalon(supabaseSalon: SupabaseSalon): Salon {
     live: supabaseSalon.live || undefined,
     count: supabaseSalon.count || undefined,
     welcome: supabaseSalon.welcome,
+    description: supabaseSalon.description || '',
+    sort_order: supabaseSalon.sort_order,
+    created_by: supabaseSalon.created_by || undefined,
   };
 }
 
@@ -56,13 +65,16 @@ function mergeSalonLists(existing: Salon[], incoming: Salon[]): Salon[] {
   for (const salon of existing) {
     if (!map.has(salon.id)) map.set(salon.id, salon);
   }
-  return Array.from(map.values());
+  return Array.from(map.values()).sort(
+    (a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999),
+  );
 }
 
 export function SalonsProvider({ children }: { children: ReactNode }) {
   const [customSalons, setCustomSalons] = useState<Salon[]>([]);
   const [hiddenSalons, setHiddenSalons] = useState<string[]>([]);
   const [unlockedSalons, setUnlockedSalons] = useState<Record<string, boolean>>({});
+  const [displayOrder, setDisplayOrder] = useState<Record<string, number>>({});
   const [currentSalon, setCurrentSalonRaw] = useState<string | null>(null);
   const { user, supabaseUser } = useUser();
 
@@ -110,8 +122,12 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
 
   const loadCustomSalons = useCallback(async () => {
     try {
-      const salons = await supabaseDbService.getSalons();
+      const [salons, order] = await Promise.all([
+        supabaseDbService.getSalons(),
+        supabaseDbService.getSalonDisplayOrder(),
+      ]);
       setCustomSalons(prev => mergeSalonLists(prev, salons.map(convertSupabaseSalon)));
+      setDisplayOrder(order);
     } catch (error) {
       console.error('Erreur lors du chargement des salons:', error);
     }
@@ -139,6 +155,13 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
           if (!row?.id) return;
           const salon = convertSupabaseSalon(row);
           setCustomSalons(prev => mergeSalonLists(prev, [salon]));
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'salon_display_order' },
+        () => {
+          void supabaseDbService.getSalonDisplayOrder().then(setDisplayOrder);
         },
       )
       .subscribe();
@@ -174,10 +197,17 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
         live: salon.live,
         welcome: salon.welcome || '',
         password: salon.password,
+        description: salon.description || '',
+        sort_order: salon.sort_order ?? 1000,
+        created_by: user?.name || salon.created_by,
       };
       const saved = await supabaseDbService.addSalon(supabaseSalon, user?.name);
-      setCustomSalons(prev => mergeSalonLists(prev, [convertSupabaseSalon(saved)]));
-      addNotification({ type: 'system', message: `✅ Salon « ${salon.name} » créé.` });
+      if (saved) {
+        setCustomSalons(prev => mergeSalonLists(prev, [convertSupabaseSalon(saved)]));
+        const order = await supabaseDbService.getSalonDisplayOrder();
+        setDisplayOrder(order);
+      }
+      addNotification({ type: 'system', message: `✅ Salon « ${salon.name} » créé. Droits créateur accordés.` });
     } catch (error) {
       setCustomSalons(prev => prev.filter(s => s.id !== salon.id));
       console.error('Erreur lors de l\'ajout du salon:', error);
@@ -187,6 +217,36 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
       });
     }
   }, [addNotification, user?.name]);
+
+  const updateSalon = useCallback(async (salonId: string, updates: Partial<Salon>) => {
+    setCustomSalons(prev => prev.map(s => (s.id === salonId ? { ...s, ...updates } : s)));
+
+    try {
+      const dbUpdates: Partial<Omit<SupabaseSalon, 'id' | 'created_at'>> = {};
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.type !== undefined) dbUpdates.type = updates.type;
+      if (updates.emoji !== undefined) dbUpdates.icon = updates.emoji;
+      if (updates.welcome !== undefined) dbUpdates.welcome = updates.welcome;
+      if (updates.description !== undefined) dbUpdates.description = updates.description;
+      if (updates.sort_order !== undefined) dbUpdates.sort_order = updates.sort_order;
+      if (updates.password !== undefined) dbUpdates.password = updates.password;
+      if (updates.isPrivate === false) dbUpdates.password = undefined;
+      if (updates.live !== undefined) dbUpdates.live = updates.live;
+
+      const saved = await supabaseDbService.updateSalon(salonId, dbUpdates);
+      if (saved) {
+        setCustomSalons(prev => mergeSalonLists(prev, [convertSupabaseSalon(saved)]));
+      }
+      addNotification({ type: 'system', message: 'Salon mis à jour.' });
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du salon:', error);
+      addNotification({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Impossible de mettre à jour le salon.',
+      });
+      await loadCustomSalons();
+    }
+  }, [addNotification, loadCustomSalons]);
 
   const deleteSalon = useCallback(async (salonId: string) => {
     setCustomSalons(prev => prev.filter(s => s.id !== salonId));
@@ -198,6 +258,30 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
       console.error('Erreur lors de la suppression du salon:', error);
     }
   }, []);
+
+  const reorderSalons = useCallback(async (orderedIds: string[]) => {
+    const next: Record<string, number> = {};
+    orderedIds.forEach((id, i) => { next[id] = i * 10; });
+    setDisplayOrder(next);
+
+    // Sync sort_order on custom salons locally
+    setCustomSalons(prev => prev.map(s => ({
+      ...s,
+      sort_order: next[s.id] ?? s.sort_order,
+    })));
+
+    try {
+      await supabaseDbService.setSalonDisplayOrder(orderedIds);
+      addNotification({ type: 'system', message: 'Ordre des salons enregistré.' });
+    } catch (error) {
+      console.error('Erreur lors du réordonnancement:', error);
+      addNotification({
+        type: 'error',
+        message: 'Impossible d\'enregistrer l\'ordre des salons.',
+      });
+      await loadCustomSalons();
+    }
+  }, [addNotification, loadCustomSalons]);
 
   const isSalonLocked = useCallback((salonId: string): boolean => {
     const salon = customSalons.find(s => s.id === salonId);
@@ -216,8 +300,9 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
 
   const value: SalonsContextType = {
     customSalons, setCustomSalons, hiddenSalons, setHiddenSalons,
+    displayOrder,
     currentSalon, setCurrentSalon,
-    addSalon, deleteSalon,
+    addSalon, updateSalon, deleteSalon, reorderSalons,
     isSalonLocked, verifySalonPassword,
     loadCustomSalons
   };

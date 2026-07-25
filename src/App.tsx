@@ -7,6 +7,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 // Home est toujours affiché : import statique (évite le bug React.lazy
 // où Rollup réécrit `import().then(m => m.H)` sans `{ default: … }`).
 import Home from '@/pages/Home';
+import MentionsLegales from '@/pages/MentionsLegales';
 
 function SalonInitializer({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -33,6 +34,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/salon/:id" element={<Home />} />
+              <Route path="/mentions-legales" element={<MentionsLegales />} />
               <Route path="*" element={<Home />} />
             </Routes>
           </SalonInitializer>

@@ -126,3 +126,156 @@ export function broadcastApplause(from: string, at = Date.now()) {
   } catch { /* ignore */ }
   return detail;
 }
+
+/* ── Favoris messages ── */
+
+export type MessageBookmark = {
+  id: string;
+  salonId: string;
+  salonName?: string;
+  author_name: string;
+  text: string;
+  created_date?: string;
+  savedAt: number;
+};
+
+const BOOKMARKS_KEY = (name: string) => `virtuel_rt_bookmarks_${normalizeKey(name)}`;
+export const BOOKMARKS_EVENT = 'virtuel-rt-bookmarks-changed';
+
+export function getBookmarks(userName: string | undefined | null): MessageBookmark[] {
+  if (!userName) return [];
+  try {
+    const raw = localStorage.getItem(BOOKMARKS_KEY(userName));
+    return raw ? (JSON.parse(raw) as MessageBookmark[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function isBookmarked(userName: string | undefined | null, messageId: string): boolean {
+  return getBookmarks(userName).some(b => b.id === messageId);
+}
+
+export function toggleBookmark(
+  userName: string,
+  bookmark: Omit<MessageBookmark, 'savedAt'>,
+): boolean {
+  if (!userName.trim()) return false;
+  const list = getBookmarks(userName);
+  const exists = list.some(b => b.id === bookmark.id);
+  const next = exists
+    ? list.filter(b => b.id !== bookmark.id)
+    : [{ ...bookmark, savedAt: Date.now() }, ...list].slice(0, 80);
+  try {
+    localStorage.setItem(BOOKMARKS_KEY(userName), JSON.stringify(next));
+  } catch { /* ignore */ }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(BOOKMARKS_EVENT));
+  }
+  return !exists;
+}
+
+/* ── Réponses rapides ── */
+
+export type QuickReply = { id: string; label: string; text: string };
+
+const QUICK_REPLIES_KEY = (name: string) => `virtuel_rt_quick_replies_${normalizeKey(name)}`;
+
+export const DEFAULT_QUICK_REPLIES: QuickReply[] = [
+  { id: 'salut', label: 'Salut', text: 'Salut ! 👋' },
+  { id: 'merci', label: 'Merci', text: 'Merci beaucoup ! 🙏' },
+  { id: 'bravo', label: 'Bravo', text: 'Bravo, bien joué ! 🎉' },
+  { id: 'plus-tard', label: 'Plus tard', text: 'Je reviens plus tard 👋' },
+];
+
+export function getQuickReplies(userName: string | undefined | null): QuickReply[] {
+  if (!userName) return DEFAULT_QUICK_REPLIES;
+  try {
+    const raw = localStorage.getItem(QUICK_REPLIES_KEY(userName));
+    if (!raw) return DEFAULT_QUICK_REPLIES;
+    const parsed = JSON.parse(raw) as QuickReply[];
+    return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_QUICK_REPLIES;
+  } catch {
+    return DEFAULT_QUICK_REPLIES;
+  }
+}
+
+export function setQuickReplies(userName: string, replies: QuickReply[]) {
+  if (!userName.trim()) return;
+  try {
+    localStorage.setItem(QUICK_REPLIES_KEY(userName), JSON.stringify(replies.slice(0, 12)));
+  } catch { /* ignore */ }
+}
+
+/* ── Mute notifications salon ── */
+
+const MUTED_SALONS_KEY = (name: string) => `virtuel_rt_muted_salons_${normalizeKey(name)}`;
+export const MUTED_SALONS_EVENT = 'virtuel-rt-muted-salons';
+
+export function getMutedSalons(userName: string | undefined | null): string[] {
+  if (!userName) return [];
+  try {
+    const raw = localStorage.getItem(MUTED_SALONS_KEY(userName));
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function isSalonMuted(userName: string | undefined | null, salonId: string): boolean {
+  return getMutedSalons(userName).includes(salonId);
+}
+
+export function toggleSalonMute(userName: string, salonId: string): boolean {
+  if (!userName.trim() || !salonId) return false;
+  const list = getMutedSalons(userName);
+  const muted = list.includes(salonId);
+  const next = muted ? list.filter(id => id !== salonId) : [...list, salonId];
+  try {
+    localStorage.setItem(MUTED_SALONS_KEY(userName), JSON.stringify(next));
+  } catch { /* ignore */ }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(MUTED_SALONS_EVENT, { detail: { salonId, muted: !muted } }));
+  }
+  return !muted;
+}
+
+/* ── Dés virtuels ── */
+
+export function rollDice(sides = 6, count = 1): number[] {
+  const n = Math.min(5, Math.max(1, count));
+  const s = Math.min(100, Math.max(2, sides));
+  return Array.from({ length: n }, () => 1 + Math.floor(Math.random() * s));
+}
+
+export function formatDiceResult(rolls: number[], sides: number): string {
+  const total = rolls.reduce((a, b) => a + b, 0);
+  if (rolls.length === 1) return `🎲 Dé ${sides} → ${rolls[0]}`;
+  return `🎲 ${rolls.length}d${sides} → ${rolls.join(' + ')} = ${total}`;
+}
+
+/* ── Pluie de réactions ── */
+
+export const REACTION_RAIN_EVENT = 'virtuel-rt-reaction-rain';
+export type ReactionRainDetail = { from: string; emoji: string; at: number };
+
+export function broadcastReactionRain(from: string, emoji = '✨') {
+  if (typeof window === 'undefined' || !from) return;
+  const detail: ReactionRainDetail = { from, emoji, at: Date.now() };
+  window.dispatchEvent(new CustomEvent(REACTION_RAIN_EVENT, { detail }));
+  return detail;
+}
+
+/* ── Mémoire cosmique (mini-jeu) ── */
+
+export const MEMORY_EMOJIS = ['🌙', '⭐', '🪐', '☄️', '🌌', '🔮', '💎', '🚀'];
+
+export function shuffleMemoryDeck(pairs = 6): string[] {
+  const chosen = MEMORY_EMOJIS.slice(0, Math.min(pairs, MEMORY_EMOJIS.length));
+  const deck = [...chosen, ...chosen];
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}

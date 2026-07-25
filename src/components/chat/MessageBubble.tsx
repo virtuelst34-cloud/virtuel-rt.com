@@ -2,12 +2,12 @@ import React, { useState, useRef, memo, RefObject, useCallback, useMemo, useEffe
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import SafeMessageContent from './SafeMessageContent';
-import { useUser, usePreferences, useMuteBlock } from '@/lib/contexts';
+import { useUser, usePreferences, useMuteBlock, useNotifications } from '@/lib/contexts';
 import { useModeration } from '@/lib/contexts';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { Smile, Trash2, Flag, UserX, Pin, Pencil, Reply } from 'lucide-react';
+import { Smile, Trash2, Flag, UserX, Pin, Pencil, Reply, Bookmark } from 'lucide-react';
 import { format } from 'date-fns';
-import { getMood, getSignature, SIGNATURE_EVENT } from '@/lib/funFeatures';
+import { getMood, getSignature, SIGNATURE_EVENT, isBookmarked, toggleBookmark } from '@/lib/funFeatures';
 
 interface Message {
   id: string;
@@ -35,15 +35,23 @@ interface MessageBubbleContentProps {
   onViewProfile?: (authorName: string) => void;
   onReply?: (message: Message) => void;
   onReport?: (messageId: string, authorName: string, text: string) => void;
+  salonId?: string;
+  salonName?: string;
 }
 
-const MessageBubbleContent = function MessageBubbleContent({ message, onReact, onDelete, onPin, onEdit, onViewProfile, onReply, onReport }: MessageBubbleContentProps) {
+const MessageBubbleContent = function MessageBubbleContent({ message, onReact, onDelete, onPin, onEdit, onViewProfile, onReply, onReport, salonId, salonName }: MessageBubbleContentProps) {
   const { user } = useUser();
   const { compactMode } = usePreferences();
   const { reportMessage } = useModeration();
   const { blockUser } = useMuteBlock();
+  const { addNotification } = useNotifications();
   const { can, isAdmin } = usePermissions();
   const [canDeleteAny, setCanDeleteAny] = useState(false);
+  const [bookmarked, setBookmarked] = useState(() => isBookmarked(user?.name, message.id));
+
+  useEffect(() => {
+    setBookmarked(isBookmarked(user?.name, message.id));
+  }, [user?.name, message.id]);
 
   useEffect(() => {
     void can('chat', 'delete_any').then(setCanDeleteAny);
@@ -255,6 +263,30 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
                 <Smile className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
 
+              {/* Favoris */}
+              <button
+                onClick={() => {
+                  if (!user?.name) return;
+                  const added = toggleBookmark(user.name, {
+                    id: message.id,
+                    salonId: salonId || '',
+                    salonName,
+                    author_name: message.author_name,
+                    text: message.text,
+                    created_date: message.created_date,
+                  });
+                  setBookmarked(added);
+                  addNotification({
+                    type: 'system',
+                    message: added ? 'Message ajouté aux favoris.' : 'Favori retiré.',
+                  });
+                }}
+                className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 ${bookmarked ? 'text-rose-400 bg-rose-500/10' : 'text-muted-foreground/60 hover:bg-white/[0.08] hover:text-rose-400'}`}
+                aria-label={bookmarked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                title={bookmarked ? 'Retirer des favoris' : 'Favori'}>
+                <Bookmark className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+
               {/* Épingler */}
               <button 
                 onClick={() => onPin(message.id)}
@@ -358,6 +390,8 @@ export default memo(MessageBubbleContent, (prevProps, nextProps) => {
     prevProps.onViewProfile === nextProps.onViewProfile &&
     prevProps.onReply === nextProps.onReply &&
     prevProps.onReport === nextProps.onReport &&
-    prevProps.onEdit === nextProps.onEdit
+    prevProps.onEdit === nextProps.onEdit &&
+    prevProps.salonId === nextProps.salonId &&
+    prevProps.salonName === nextProps.salonName
   );
 });

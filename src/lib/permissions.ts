@@ -44,7 +44,7 @@ export type PermissionAction =
   | 'view_reports' | 'ban_users' | 'mute_users' | 'unblock_users'
   | 'access_panel' | 'manage_permissions' | 'view_analytics'
   | 'view_own' | 'edit_own' | 'edit_any'
-  | 'view_all' | 'create_custom' | 'delete_custom'
+  | 'view_all' | 'create_custom' | 'delete_custom' | 'edit_custom' | 'reorder' | 'manage_messages' | 'pin_messages'
   | 'view_all_badges' | 'assign_special'
   | 'view_own_xp' | 'view_all_xp' | 'modify_any_xp';
 

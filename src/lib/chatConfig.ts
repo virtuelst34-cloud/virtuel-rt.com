@@ -12,6 +12,7 @@ export interface Salon {
 }
 
 export const SALONS: Salon[] = [
+  { id: 'bienvenue', name: 'Bienvenue',     type: 'chat',       icon: 'DoorOpen',   emoji: '👋', count: 0,  welcome: '👋 Bienvenue sur Virtuel-RT ! Lisez les règles et le guide épinglés ci-dessous, puis explorez les salons.' },
   { id: 'musique60', name: 'Musique 60s',   type: 'chat vocal', icon: 'Music',      count: 128, welcome: '🎵 Bienvenue dans le salon Musique 60s ! Partagez vos coups de cœur des années 60.' },
   { id: 'musique80', name: 'Musique 80s',   type: 'chat vocal', icon: 'Music',      count: 84,  welcome: '🎸 Bienvenue dans le salon Musique 80s ! Les synthés et les hits de la décennie vous attendent.' },
   { id: 'karaoke',   name: 'Karaoké',       type: 'vocal',      icon: 'Mic',        live: true, welcome: '🎤 Bienvenue au Karaoké ! Prenez le micro et chantez sans retenue !' },

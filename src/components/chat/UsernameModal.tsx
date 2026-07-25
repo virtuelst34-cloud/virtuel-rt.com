@@ -3,7 +3,9 @@ import { useUser, useGlobalSettings } from '@/lib/contexts';
 import { supabaseAuthService } from '@/lib/supabaseAuth';
 import Avatar from './Avatar';
 import { AVATAR_IDS } from '@/lib/chatConfig';
-import { Mail, Lock, User, Eye, EyeOff, AlertCircle, KeyRound } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, AlertCircle, KeyRound, Scale } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { MENTIONS_LEGALES_HREF } from '@/lib/welcomeContent';
 
 export default function UsernameModal() {
   const { login, loginWithSupabase } = useUser();
@@ -357,6 +359,12 @@ export default function UsernameModal() {
           </form>
         )}
       </div>
+      <Link
+        to={MENTIONS_LEGALES_HREF}
+        className="absolute bottom-4 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 text-[10px] text-muted-foreground/40 hover:text-purple-300 transition-colors"
+      >
+        <Scale className="w-3 h-3" /> Mentions légales
+      </Link>
     </div>
   );
 }

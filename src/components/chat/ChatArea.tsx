@@ -23,9 +23,13 @@ import { recordMessageSent, recordReaction, recordMention } from '@/lib/userActi
 import { uploadChatMedia, uploadChatFile } from '@/lib/storageService';
 import { supabaseDbService } from '@/lib/supabaseDb';
 import { mediaBroadcastService } from '@/lib/mediaBroadcastService';
-import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown, Filter as FilterIcon, Download, PartyPopper } from 'lucide-react';
-import { APPLAUSE_EVENT, broadcastApplause, type ApplauseDetail } from '@/lib/funFeatures';
+import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown, Filter as FilterIcon, Download, PartyPopper, Zap } from 'lucide-react';
+import { APPLAUSE_EVENT, broadcastApplause, isSalonMuted, REACTION_RAIN_EVENT, type ApplauseDetail, type ReactionRainDetail } from '@/lib/funFeatures';
 import DailySparkCard from './DailySparkCard';
+import WelcomeGuideCard from './WelcomeGuideCard';
+import ChatToolsPanel from './ChatToolsPanel';
+import ReactionRainOverlay from './ReactionRainOverlay';
+import { mergeAndSortSalons } from '@/lib/salonUtils';
 
 interface JoinToastProps {
   name: string;
@@ -64,7 +68,7 @@ interface ChatAreaProps {
 
 export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProps) {
   const { user, profiles } = useUser();
-  const { currentSalon, setCurrentSalon, customSalons, hiddenSalons } = useSalons();
+  const { currentSalon, setCurrentSalon, customSalons, hiddenSalons, displayOrder } = useSalons();
   const { awardXP, sounds } = useXP();
   const { isUserBanned, isUserMuted, isBlocked } = useModeration();
   const { isMuted: isLocallyMuted, isBlocked: isLocallyBlocked } = useMuteBlock();
@@ -100,8 +104,10 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const [, setPresenceTick]                 = useState(0);
   const [remoteMic, setRemoteMic]           = useState<Record<string, { active: boolean; level: number }>>({});
   const [applauseBurst, setApplauseBurst]   = useState<{ id: number; from: string } | null>(null);
+  const [showTools, setShowTools]           = useState(false);
+  const [reactionRain, setReactionRain]     = useState<ReactionRainDetail | null>(null);
 
-  const allSalons    = [...SALONS, ...(customSalons || [])].filter(s => !(hiddenSalons || []).includes(s.id));
+  const allSalons    = mergeAndSortSalons(customSalons || [], hiddenSalons || [], displayOrder || {});
   const salon        = allSalons.find(s => s.id === currentSalon);
   const onlineUsers  = currentSalon
     ? presenceService.getOnlineUsersInSalon(currentSalon).filter(u => !isLocallyMuted(u.name) && !isLocallyBlocked(u.name))
@@ -125,6 +131,15 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     };
     window.addEventListener(APPLAUSE_EVENT, onApplause);
     return () => window.removeEventListener(APPLAUSE_EVENT, onApplause);
+  }, []);
+
+  useEffect(() => {
+    const onRain = (e: Event) => {
+      const detail = (e as CustomEvent<ReactionRainDetail>).detail;
+      if (detail?.from) setReactionRain(detail);
+    };
+    window.addEventListener(REACTION_RAIN_EVENT, onRain);
+    return () => window.removeEventListener(REACTION_RAIN_EVENT, onRain);
   }, []);
 
   useEffect(() => {
@@ -225,14 +240,14 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
       setUnreadNew(prev => prev + added);
     }
 
-    // Notification push pour les mentions
-    if (user && added > 0) {
+    // Notification push pour les mentions (sauf salon muté)
+    if (user && added > 0 && currentSalon && !isSalonMuted(user.name, currentSalon)) {
       const last = messages[messages.length - 1];
       if (last && last.author_name !== user.name && last.text?.includes(`@${user.name}`)) {
-        sendPush(`${last.author_name} vous a mentionn�`, last.text);
+        sendPush(`${last.author_name} vous a mentionné`, last.text);
         addNotification({
           type: 'mention',
-          message: `@ ${last.author_name} vous a mentionn� dans #${salon?.name}`,
+          message: `@ ${last.author_name} vous a mentionné dans #${salon?.name}`,
           groupKey: `mention:${last.author_name}`,
         });
         recordMention(user.name);
@@ -449,6 +464,26 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
       {joinToast && <JoinToast name={joinToast} onDone={() => setJoinToast(null)} />}
       <OfflineBanner />
 
+      {showTools && currentSalon && (
+        <ChatToolsPanel
+          open={showTools}
+          onClose={() => setShowTools(false)}
+          userName={user?.name}
+          salonId={currentSalon}
+          salonName={salon?.name}
+          onDiceResult={(text) => {
+            void handleSend(text, null, null);
+          }}
+          onReactionRain={(emoji) => {
+            if (user?.name) {
+              setReactionRain({ from: user.name, emoji, at: Date.now() });
+              addNotification({ type: 'system', message: `Pluie de ${emoji} lancée !` });
+            }
+          }}
+          addNotification={addNotification}
+        />
+      )}
+
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-border flex items-center gap-2.5 shrink-0 bg-card overflow-x-auto">
         <button onClick={() => setCurrentSalon(null)}
@@ -456,7 +491,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center text-lg shrink-0">
-          {salon.emoji || ({'musique60':'??','musique80':'??','karaoke':'??','debat':'?','quiz':'??','jeunes':'??','lgbt':'??','divorce':'??','libre':'??','insulte':'??','cameras':'??','bar':'??'})[currentSalon || ''] || '#'}
+          {salon.emoji || ({'bienvenue':'👋','musique60':'🎵','musique80':'🎸','karaoke':'🎤','debat':'⚡','quiz':'🧠','jeunes':'👋','lgbt':'🌈','divorce':'💙','libre':'🚪','insulte':'😤','cameras':'📹','bar':'🍷'})[currentSalon || ''] || '#'}
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-foreground truncate">{salon.name}</div>
@@ -481,6 +516,14 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
           className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 transition-colors shrink-0"
           title="Exporter" aria-label="Exporter les messages">
           <Download className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowTools(o => !o)}
+          className={`p-1.5 rounded-lg border transition-colors shrink-0 ${showTools ? 'border-purple-500/40 bg-purple-500/10 text-purple-300' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+          title="Outils du salon"
+          aria-label="Ouvrir les outils du salon">
+          <Zap className="w-4 h-4" />
         </button>
         <button
           type="button"
@@ -584,7 +627,11 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
 
           {/* Zone messages avec scroll intelligent */}
           <div ref={scrollRef} onScroll={handleScroll}
-            className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-0.5">
+            className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-0.5 relative">
+            <ReactionRainOverlay burst={reactionRain} />
+            {!searchQuery && currentSalon === 'bienvenue' && (
+              <WelcomeGuideCard />
+            )}
             {!searchQuery && (
               <div className="text-center text-[10px] text-muted-foreground/40 py-2 flex items-center gap-2">
                 <div className="flex-1 h-px bg-border" /><span>Aujourd'hui</span><div className="flex-1 h-px bg-border" />
@@ -604,6 +651,8 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
                   onViewProfile={handleViewProfile}
                   onReply={handleReply}
                   onReport={(id, name, content) => handleReport(id, 'message', name, content)}
+                  salonId={currentSalon || undefined}
+                  salonName={salon?.name}
                 />
               </div>
             ))}

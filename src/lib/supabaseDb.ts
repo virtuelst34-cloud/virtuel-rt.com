@@ -36,6 +36,9 @@ export interface Salon {
   live?: boolean;
   welcome: string;
   password?: string;
+  sort_order?: number;
+  description?: string;
+  created_by?: string | null;
   created_at: string;
 }
 
@@ -167,7 +170,10 @@ export const supabaseDbService = {
   // Salons
   async getSalons(): Promise<Salon[]> {
     try {
-      const { data, error } = await supabase.from('salons').select('*');
+      const { data, error } = await supabase
+        .from('salons')
+        .select('*')
+        .order('sort_order', { ascending: true });
       if (error) throw error;
       return data || [];
     } catch (error) {
@@ -176,14 +182,53 @@ export const supabaseDbService = {
     }
   },
 
+  async getSalonDisplayOrder(): Promise<Record<string, number>> {
+    try {
+      const { data, error } = await supabase
+        .from('salon_display_order')
+        .select('salon_id, sort_order');
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const row of data || []) {
+        map[row.salon_id] = row.sort_order;
+      }
+      return map;
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'ordre des salons:', error);
+      return {};
+    }
+  },
+
+  async setSalonDisplayOrder(orderedIds: string[]): Promise<void> {
+    const rows = orderedIds.map((salon_id, index) => ({
+      salon_id,
+      sort_order: index * 10,
+      updated_at: new Date().toISOString(),
+    }));
+    const { error } = await supabase
+      .from('salon_display_order')
+      .upsert(rows, { onConflict: 'salon_id' });
+    if (error) {
+      console.error('Erreur lors de la sauvegarde de l\'ordre des salons:', error);
+      throw error;
+    }
+  },
+
   async addSalon(salon: Omit<Salon, 'created_at'>, creatorName?: string): Promise<Salon | null> {
     if (creatorName) {
       await enforceRateLimit('salon_create', creatorName);
     }
 
+    const payload = {
+      ...salon,
+      created_by: salon.created_by ?? creatorName ?? null,
+      sort_order: salon.sort_order ?? 1000 + Date.now() % 100000,
+      description: salon.description ?? '',
+    };
+
     const { data, error } = await supabase
       .from('salons')
-      .insert(salon)
+      .insert(payload)
       .select()
       .maybeSingle();
 
@@ -192,12 +237,49 @@ export const supabaseDbService = {
       throw error;
     }
 
+    if (data?.id != null) {
+      try {
+        await supabase.from('salon_display_order').upsert({
+          salon_id: data.id,
+          sort_order: data.sort_order ?? 1000,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'salon_id' });
+      } catch { /* ignore order sync */ }
+    }
+
+    return data;
+  },
+
+  async updateSalon(salonId: string, updates: Partial<Omit<Salon, 'id' | 'created_at'>>): Promise<Salon | null> {
+    const { data, error } = await supabase
+      .from('salons')
+      .update(updates)
+      .eq('id', salonId)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('Erreur lors de la mise à jour du salon:', error);
+      throw error;
+    }
+
+    if (updates.sort_order !== undefined) {
+      try {
+        await supabase.from('salon_display_order').upsert({
+          salon_id: salonId,
+          sort_order: updates.sort_order,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'salon_id' });
+      } catch { /* ignore */ }
+    }
+
     return data;
   },
 
   async deleteSalon(salonId: string): Promise<void> {
     try {
       await supabase.from('salons').delete().eq('id', salonId);
+      await supabase.from('salon_display_order').delete().eq('salon_id', salonId);
     } catch (error) {
       console.error('Erreur lors de la suppression du salon:', error);
     }

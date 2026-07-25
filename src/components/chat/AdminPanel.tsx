@@ -43,7 +43,7 @@ const TABS: Tab[] = [
 export default function AdminPanel() {
   const { setShowAdmin } = useUI();
   const { user, supabaseUser, profiles, setProfiles, setUserStatusAdmin } = useUser();
-  const { customSalons, addSalon, deleteSalon, hiddenSalons, setHiddenSalons } = useSalons();
+  const { customSalons, addSalon, updateSalon, deleteSalon, reorderSalons, displayOrder, hiddenSalons, setHiddenSalons } = useSalons();
   const { salonMessages } = useMessages();
   const { monthlyXP } = useXP();
   const { banUser, unbanUser, muteUser, unmuteUser } = useModeration();
@@ -164,7 +164,7 @@ export default function AdminPanel() {
           <div className="flex-1 overflow-y-auto p-5" role="tabpanel" aria-live="polite">
             {activeTab === 'dashboard'      && <DashboardSection profiles={profiles} customSalons={customSalons} salonMessages={salonMessages} monthlyXP={monthlyXP} />}
             {activeTab === 'stats'          && <StatsSection profiles={profiles} customSalons={customSalons} salonMessages={salonMessages} monthlyXP={monthlyXP} />}
-            {activeTab === 'salons'         && <SalonsSection readOnly={isReadOnly} customSalons={customSalons} addSalon={addSalon} deleteSalon={deleteSalon} hiddenSalons={hiddenSalons} setHiddenSalons={setHiddenSalons} />}
+            {activeTab === 'salons'         && <SalonsSection readOnly={isReadOnly} customSalons={customSalons} addSalon={addSalon} updateSalon={updateSalon} deleteSalon={deleteSalon} reorderSalons={reorderSalons} displayOrder={displayOrder} hiddenSalons={hiddenSalons} setHiddenSalons={setHiddenSalons} />}
             {activeTab === 'users'          && <UsersSection readOnly={isReadOnly} profiles={profiles} setProfiles={setProfiles} setUserStatusAdmin={setUserStatusAdmin} banUser={banUser} unbanUser={unbanUser} muteUser={muteUser} unmuteUser={unmuteUser} />}
             {activeTab === 'moderation'     && <ModerationSection readOnly={isReadOnly} profiles={profiles} unbanUser={unbanUser} unmuteUser={unmuteUser} />}
             {activeTab === 'badges'         && <BadgesSection readOnly={isReadOnly} customBadges={customBadges} setCustomBadges={setCustomBadges} />}

@@ -1,16 +1,19 @@
 import React, { useState, useRef, useCallback, FormEvent, useEffect } from 'react';
 import { useUser, useSalons, useNotifications, useXP, useMuteBlock } from '@/lib/contexts';
-import { SALONS, Salon } from '@/lib/chatConfig';
+import { Salon } from '@/lib/chatConfig';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
 import UserProfileView from './UserProfileView';
 import { SupabaseLogin } from '../auth/SupabaseLogin';
-import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users } from 'lucide-react';
+import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users, Scale } from 'lucide-react';
 import { getSpecialBadgeForUser, getSpecialBadgeIdsForUser, SPECIAL_BADGES } from '@/lib/diamondBadges';
 import { presenceService } from '@/lib/presenceService';
 import MembersPanel from './MembersPanel';
 import DailySparkCard from './DailySparkCard';
+import { Link } from 'react-router-dom';
+import { mergeAndSortSalons } from '@/lib/salonUtils';
+import { MENTIONS_LEGALES_HREF } from '@/lib/welcomeContent';
 
 interface DisplayOnlineUser {
   name: string;
@@ -47,7 +50,7 @@ function PulseDot({ color = 'bg-emerald-500' }: { color?: string }) {
 }
 
 export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
-  const { setCurrentSalon, customSalons, hiddenSalons, isSalonLocked, verifySalonPassword } = useSalons();
+  const { setCurrentSalon, customSalons, hiddenSalons, displayOrder, isSalonLocked, verifySalonPassword } = useSalons();
   const { user, profiles, loginWithSupabase, logout } = useUser();
   const { addNotification } = useNotifications();
   const { xpProgress, xpForLevel, monthlyXP } = useXP();
@@ -107,7 +110,7 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
     return unsubscribe;
   }, [profiles, user?.name, isMuted, isBlocked]);
 
-  const allSalons = [...SALONS, ...(customSalons || [])].filter(s => !(hiddenSalons || []).includes(s.id));
+  const allSalons = mergeAndSortSalons(customSalons || [], hiddenSalons || [], displayOrder || {});
 
   // Données XP
   const lvl = user?.level || 1;
@@ -242,6 +245,12 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
           Choisissez un salon à gauche pour rejoindre une discussion,<br />
           ou envoyez un message privé à quelqu'un à droite.
         </p>
+        <Link
+          to={MENTIONS_LEGALES_HREF}
+          className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/45 hover:text-purple-300 transition-colors"
+        >
+          <Scale className="w-3 h-3" /> Mentions légales
+        </Link>
         {user ? (
           <div className="mt-2 flex items-center gap-3">
             <div className="flex items-center gap-2 bg-secondary border border-border rounded-full px-4 py-2">

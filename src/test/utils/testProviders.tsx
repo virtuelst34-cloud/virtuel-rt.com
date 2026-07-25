@@ -1,4 +1,5 @@
 import { ReactNode } from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { UserProvider } from '@/lib/contexts/UserContext'
 import { PreferencesProvider } from '@/lib/contexts/PreferencesContext'
 import { NotificationsProvider } from '@/lib/contexts/NotificationsContext'
@@ -17,36 +18,38 @@ import { GlobalSettingsProvider } from '@/lib/contexts/GlobalSettingsContext'
 
 export function TestProviders({ children }: { children: ReactNode }) {
   return (
-    <GlobalSettingsProvider>
-      <NotificationsProvider>
-        <UserProvider>
-          <PreferencesProvider>
-            <MessagesProvider>
-              <TypingProvider>
-                <DMProvider>
-                  <FriendsProvider>
-                    <MuteBlockProvider>
-                      <ModerationProvider>
-                        <SalonsProvider>
-                          <UIProvider>
-                            <XPProvider>
-                              <BadgesProvider>
-                                <CustomEmojisProvider>
-                                  {children}
-                                </CustomEmojisProvider>
-                              </BadgesProvider>
-                            </XPProvider>
-                          </UIProvider>
-                        </SalonsProvider>
-                      </ModerationProvider>
-                    </MuteBlockProvider>
-                  </FriendsProvider>
-                </DMProvider>
-              </TypingProvider>
-            </MessagesProvider>
-          </PreferencesProvider>
-        </UserProvider>
-      </NotificationsProvider>
-    </GlobalSettingsProvider>
+    <MemoryRouter>
+      <GlobalSettingsProvider>
+        <NotificationsProvider>
+          <UserProvider>
+            <PreferencesProvider>
+              <MessagesProvider>
+                <TypingProvider>
+                  <DMProvider>
+                    <FriendsProvider>
+                      <MuteBlockProvider>
+                        <ModerationProvider>
+                          <SalonsProvider>
+                            <UIProvider>
+                              <XPProvider>
+                                <BadgesProvider>
+                                  <CustomEmojisProvider>
+                                    {children}
+                                  </CustomEmojisProvider>
+                                </BadgesProvider>
+                              </XPProvider>
+                            </UIProvider>
+                          </SalonsProvider>
+                        </ModerationProvider>
+                      </MuteBlockProvider>
+                    </FriendsProvider>
+                  </DMProvider>
+                </TypingProvider>
+              </MessagesProvider>
+            </PreferencesProvider>
+          </UserProvider>
+        </NotificationsProvider>
+      </GlobalSettingsProvider>
+    </MemoryRouter>
   )
 }

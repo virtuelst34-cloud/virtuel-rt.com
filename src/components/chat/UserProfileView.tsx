@@ -7,6 +7,7 @@ import { getBadgeForLevel, getUnlockedBadges, getBadgeStats, SPECIAL_BADGES, get
 import { X, MessageSquare, UserX, Flame, Calendar, VolumeX, UserCheck, UserPlus, UserMinus } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { getMood, getSignature } from '@/lib/funFeatures';
 
 interface UserProfileViewProps {
   targetName: string;
@@ -105,7 +106,7 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
           {/* Avatar + nom */}
           <div className="-mt-7 mb-4 flex items-end justify-between">
             <div className="relative">
-              <Avatar avatarClass={target.avatar} initials={target.initials} size="lg" />
+              <Avatar avatarClass={target.avatar} initials={target.initials} size="lg" mood={getMood(targetName)} />
               <div className="absolute -bottom-2 -right-2">
                 <DiamondBadge level={lvl} size="sm" specialBadge={getSpecialBadgeForUser(target) || undefined} />
               </div>
@@ -208,6 +209,13 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
               {(target as any).bio || 'Cet utilisateur n\'a pas encore de bio.'}
             </p>
           </div>
+
+          {getSignature(targetName) && (
+            <div className="mb-4 bg-secondary/60 border border-border rounded-xl px-3 py-2">
+              <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1">Signature</div>
+              <p className="text-xs text-muted-foreground/70 italic">{getSignature(targetName)}</p>
+            </div>
+          )}
 
           {/* XP & Niveau */}
           <div className="bg-secondary border border-border rounded-xl p-3 mb-4">

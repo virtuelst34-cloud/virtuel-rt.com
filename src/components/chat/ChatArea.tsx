@@ -23,7 +23,8 @@ import { recordMessageSent, recordReaction, recordMention } from '@/lib/userActi
 import { uploadChatMedia, uploadChatFile } from '@/lib/storageService';
 import { supabaseDbService } from '@/lib/supabaseDb';
 import { mediaBroadcastService } from '@/lib/mediaBroadcastService';
-import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown, Filter as FilterIcon, Download } from 'lucide-react';
+import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown, Filter as FilterIcon, Download, PartyPopper } from 'lucide-react';
+import { APPLAUSE_EVENT, broadcastApplause, type ApplauseDetail } from '@/lib/funFeatures';
 
 interface JoinToastProps {
   name: string;
@@ -97,6 +98,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const [reportTarget, setReportTarget]     = useState<{ id: string; type: 'message' | 'user'; name?: string; content?: string } | null>(null);
   const [, setPresenceTick]                 = useState(0);
   const [remoteMic, setRemoteMic]           = useState<Record<string, { active: boolean; level: number }>>({});
+  const [applauseBurst, setApplauseBurst]   = useState<{ id: number; from: string } | null>(null);
 
   const allSalons    = [...SALONS, ...(customSalons || [])].filter(s => !(hiddenSalons || []).includes(s.id));
   const salon        = allSalons.find(s => s.id === currentSalon);
@@ -110,6 +112,17 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
 
   // Demander permission push au montage
   useEffect(() => { requestPushPermission(); }, []);
+
+  useEffect(() => {
+    const onApplause = (e: Event) => {
+      const detail = (e as CustomEvent<ApplauseDetail>).detail;
+      if (!detail?.from) return;
+      setApplauseBurst({ id: detail.at, from: detail.from });
+      window.setTimeout(() => setApplauseBurst(prev => (prev?.id === detail.at ? null : prev)), 2200);
+    };
+    window.addEventListener(APPLAUSE_EVENT, onApplause);
+    return () => window.removeEventListener(APPLAUSE_EVENT, onApplause);
+  }, []);
 
   useEffect(() => {
     return presenceService.subscribe(() => {
@@ -457,12 +470,45 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
           title="Exporter" aria-label="Exporter les messages">
           <Download className="w-4 h-4" />
         </button>
+        <button
+          onClick={() => {
+            if (!user?.name) return;
+            broadcastApplause(user.name);
+            addNotification({ type: 'system', message: '👏 Applaudissements envoyés !' });
+          }}
+          className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-amber-500/10 hover:text-amber-300 hover:border-amber-500/30 transition-colors"
+          title="Applaudir" aria-label="Applaudir le salon">
+          <PartyPopper className="w-4 h-4" />
+        </button>
         <button onClick={() => setShowMembers(o => !o)}
           className={`p-1.5 rounded-lg border transition-colors ${showMembers ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
           title="Membres" aria-label="Voir les membres du salon">
           <Users className="w-4 h-4" />
         </button>
       </div>
+
+      {applauseBurst && (
+        <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden" aria-hidden>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <span
+              key={`${applauseBurst.id}-${i}`}
+              className="absolute text-2xl animate-fade-in-down"
+              style={{
+                left: `${8 + (i * 7) % 84}%`,
+                top: `${12 + (i % 5) * 14}%`,
+                animationDelay: `${i * 60}ms`,
+                opacity: 0.85,
+                transform: `rotate(${(i % 5) * 12 - 24}deg)`,
+              }}
+            >
+              👏
+            </span>
+          ))}
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
+            {applauseBurst.from} applaudit !
+          </div>
+        </div>
+      )}
 
       {/* Recherche */}
       {searchOpen && (

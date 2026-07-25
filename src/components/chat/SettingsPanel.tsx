@@ -9,8 +9,15 @@ import AchievementsSection from './AchievementsSection';
 import TwoFactorSection from './TwoFactorSection';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-
-const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9', 'av10', 'av11', 'av12'] as const;
+import { AVATAR_IDS } from '@/lib/chatConfig';
+import {
+  MOOD_OPTIONS,
+  getMood,
+  setMood,
+  getSignature,
+  setSignature,
+  type MoodId,
+} from '@/lib/funFeatures';
 
 interface Tab {
   id: string;
@@ -68,7 +75,9 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
     name: user?.name || '',
     age: user?.age || '',
     city: user?.city || '',
-    gender: user?.gender || 'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say'
+    gender: user?.gender || 'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say',
+    mood: (user?.name ? getMood(user.name) : 'off') as MoodId,
+    signature: user?.name ? getSignature(user.name) : '',
   });
   const [saved, setSaved]         = useState(false);
   const savedTimerRef             = useRef<number | null>(null);
@@ -82,6 +91,10 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
   const [linkSuccess, setLinkSuccess] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -99,7 +112,9 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
       name: user?.name || '',
       age: user?.age || '',
       city: user?.city || '',
-      gender: user?.gender || 'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say'
+      gender: user?.gender || 'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say',
+      mood: (user?.name ? getMood(user.name) : 'off') as MoodId,
+      signature: user?.name ? getSignature(user.name) : '',
     });
   }, [user]);
 
@@ -139,10 +154,35 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
       city: draft.city,
       gender: draft.gender
     });
+    setMood(draft.name || user.name, draft.mood);
+    setSignature(draft.name || user.name, draft.signature);
     setEditing(false);
     setSaved(true);
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordMsg(null);
+    if (newPassword.length < 6) {
+      setPasswordMsg({ type: 'err', text: 'Au moins 6 caractères.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({ type: 'err', text: 'Les mots de passe ne correspondent pas.' });
+      return;
+    }
+    setChangingPassword(true);
+    const result = await supabaseAuthService.updatePassword(newPassword);
+    setChangingPassword(false);
+    if (result.success) {
+      setPasswordMsg({ type: 'ok', text: 'Mot de passe mis à jour.' });
+      setNewPassword('');
+      setConfirmPassword('');
+      addNotification({ type: 'system', message: 'Mot de passe modifié' });
+    } else {
+      setPasswordMsg({ type: 'err', text: result.error || 'Échec de la mise à jour' });
+    }
   };
 
   const handleLinkEmail = async () => {
@@ -281,7 +321,9 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                             name: user.name||'',
                             age: user.age||'',
                             city: user.city||'',
-                            gender: user.gender||'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say'
+                            gender: user.gender||'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say',
+                            mood: getMood(user.name),
+                            signature: getSignature(user.name),
                           }); 
                           setEditing(false); 
                         }} className="flex items-center justify-center px-3 py-1.5 rounded-lg bg-white/5 border border-border text-muted-foreground text-xs hover:bg-white/10 transition-all active:scale-95 cursor-pointer">Annuler</button>
@@ -308,23 +350,45 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                 <div className="mb-4">
                   <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-2">Avatar</div>
                   {editing ? (
-                    <div className="grid grid-cols-6 gap-2.5 max-w-[260px]">
-                      {AVATARS.map((av, index) => (
-                        <button key={av} onClick={() => setDraft(d => ({ ...d, avatar: av }))}
+                    <div className="grid grid-cols-6 gap-2 max-h-[180px] overflow-y-auto p-1 pr-2">
+                      {AVATAR_IDS.map((av, index) => (
+                        <button key={av} type="button" onClick={() => setDraft(d => ({ ...d, avatar: av }))}
                           className={`rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ${draft.avatar === av ? 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-110' : 'opacity-60 hover:opacity-100'}`}
-                          style={{ animationDelay: `${index * 30}ms` }}>
-                          <Avatar avatarClass={av} initials={user.initials} size="md" />
+                          style={{ animationDelay: `${index * 20}ms` }}>
+                          <Avatar avatarClass={av} initials={user.initials} size="md" mood={draft.mood} />
                         </button>
                       ))}
                     </div>
                   ) : (
                     <div className="relative inline-block transition-transform duration-200 hover:scale-110">
-                      <Avatar avatarClass={user.avatar} initials={user.initials} size="lg" />
+                      <Avatar avatarClass={user.avatar} initials={user.initials} size="lg" mood={getMood(user.name)} />
                       <div className="absolute -bottom-2 -right-2 animate-float">
                         <DiamondBadge level={lvl} size="sm" />
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Humeur */}
+                <div className="mb-4">
+                  <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-2">Aura d&apos;humeur</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {MOOD_OPTIONS.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        disabled={!editing}
+                        onClick={() => setDraft(d => ({ ...d, mood: m.id }))}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] transition-all ${
+                          (editing ? draft.mood : getMood(user.name)) === m.id
+                            ? 'bg-primary/12 border-primary/30 text-primary'
+                            : 'bg-secondary border-border text-muted-foreground/60'
+                        } ${editing ? 'hover:scale-105' : 'opacity-80'}`}
+                      >
+                        <span>{m.emoji}</span>{m.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Nom */}
@@ -455,6 +519,27 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                   )}
                 </div>
 
+                {/* Signature chat */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest">Signature chat</div>
+                    {editing && <div className="text-[10px] text-muted-foreground/40">{draft.signature.length}/40</div>}
+                  </div>
+                  {editing ? (
+                    <input
+                      value={draft.signature}
+                      onChange={e => setDraft(d => ({ ...d, signature: e.target.value.slice(0, 40) }))}
+                      maxLength={40}
+                      placeholder="Ex: Toujours de bonne humeur ✨"
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200"
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground/80 italic">
+                      {getSignature(user.name) || 'Aucune signature.'}
+                    </p>
+                  )}
+                </div>
+
                 {/* XP */}
                 <div className="bg-secondary border border-border rounded-xl p-3.5 mb-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-lg hover:shadow-primary/10">
                   <div className="flex items-center justify-between mb-2">
@@ -563,6 +648,68 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                 {supabaseUser && user.email && (
                   <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
                     <TwoFactorSection userId={supabaseUser.id} email={user.email} />
+                  </div>
+                )}
+
+                {/* Changer le mot de passe (compte connecté) */}
+                {supabaseUser && (
+                  <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Lock className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-semibold text-foreground">Changer le mot de passe</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5 block">Nouveau mot de passe</label>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          autoComplete="new-password"
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5 block">Confirmer</label>
+                        <input
+                          type="password"
+                          value={confirmPassword}
+                          onChange={e => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          autoComplete="new-password"
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200"
+                        />
+                      </div>
+                      {passwordMsg && (
+                        <div className={`rounded-lg p-2 text-xs flex items-center gap-2 border ${
+                          passwordMsg.type === 'ok'
+                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                            : 'bg-red-500/15 border-red-500/30 text-red-400'
+                        }`}>
+                          {passwordMsg.type === 'ok' ? <Check className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+                          {passwordMsg.text}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void handleChangePassword()}
+                        disabled={changingPassword || !newPassword || !confirmPassword}
+                        className="w-full py-2.5 rounded-lg bg-primary text-white font-medium text-sm flex items-center justify-center gap-2 hover:bg-primary/80 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {changingPassword ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Mise à jour...
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-4 h-4" />
+                            Mettre à jour le mot de passe
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
 

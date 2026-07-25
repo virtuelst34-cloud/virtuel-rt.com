@@ -261,6 +261,33 @@ export const supabaseAuthService = {
     }
   },
 
+  /** Envoie un email de réinitialisation de mot de passe. */
+  async resetPassword(email: string): Promise<AuthResponse> {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+      });
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /** Change le mot de passe de l'utilisateur connecté. */
+  async updatePassword(newPassword: string): Promise<AuthResponse> {
+    try {
+      if (!newPassword || newPassword.length < 6) {
+        return { success: false, error: 'Le mot de passe doit contenir au moins 6 caractères' };
+      }
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  },
+
   // Écouter les changements d'authentification
   onAuthStateChange(callback: (user: UserProfile | null) => void) {
     return supabase.auth.onAuthStateChange(async (event, session) => {

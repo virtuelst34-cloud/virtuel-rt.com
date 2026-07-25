@@ -6,10 +6,11 @@ import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
 import UserProfileView from './UserProfileView';
 import { SupabaseLogin } from '../auth/SupabaseLogin';
-import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users } from 'lucide-react';
+import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users, Sparkles } from 'lucide-react';
 import { getSpecialBadgeForUser, getSpecialBadgeIdsForUser, SPECIAL_BADGES } from '@/lib/diamondBadges';
 import { presenceService, OnlineUser as PresenceOnlineUser } from '@/lib/presenceService';
 import MembersPanel from './MembersPanel';
+import { getDailySpark, isDailySparkDone, markDailySparkDone } from '@/lib/funFeatures';
 
 interface DisplayOnlineUser {
   name: string;
@@ -61,6 +62,8 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
   const [salonCounts, setSalonCounts] = useState<Record<string, number>>({});
   const [showMembersPanel, setShowMembersPanel] = useState(false);
   const waveTimersRef                 = useRef<Record<string, number>>({});
+  const spark = getDailySpark();
+  const [sparkDone, setSparkDone] = useState(() => isDailySparkDone(spark.key));
 
   // Charger les utilisateurs en ligne et les counts de salons
   useEffect(() => {
@@ -235,6 +238,29 @@ export default function WelcomeScreen({ onOpenDM }: WelcomeScreenProps) {
         <h2 className="text-xl font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
         <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg px-4 py-2 mb-2">
           <p className="text-sm font-semibold text-purple-300">🎉 Pour l'ouverture, Premium offert en essai !</p>
+        </div>
+        <div className="w-full max-w-sm rounded-xl border border-violet-500/25 bg-violet-500/10 px-4 py-3 text-left">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-violet-300" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-violet-300">{spark.title}</span>
+          </div>
+          <p className="text-xs text-muted-foreground/80 leading-relaxed">{spark.text}</p>
+          <button
+            type="button"
+            onClick={() => {
+              markDailySparkDone(spark.key);
+              setSparkDone(true);
+              addNotification({ type: 'system', message: 'Éclat du jour coché — belle journée !' });
+            }}
+            disabled={sparkDone}
+            className={`mt-2.5 text-[11px] px-3 py-1.5 rounded-lg border transition-all ${
+              sparkDone
+                ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400 cursor-default'
+                : 'border-violet-500/30 bg-violet-500/15 text-violet-200 hover:bg-violet-500/25'
+            }`}
+          >
+            {sparkDone ? 'Fait aujourd\'hui ✓' : 'Je le fais'}
+          </button>
         </div>
         <p className="text-sm text-muted-foreground/50 max-w-xs leading-relaxed">
           Choisissez un salon à gauche pour rejoindre une discussion,<br />

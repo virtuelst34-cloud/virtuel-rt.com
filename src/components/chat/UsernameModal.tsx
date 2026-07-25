@@ -3,7 +3,7 @@ import { useUser, useGlobalSettings } from '@/lib/contexts';
 import { supabaseAuthService } from '@/lib/supabaseAuth';
 import Avatar from './Avatar';
 import { AVATAR_IDS } from '@/lib/chatConfig';
-import { Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, AlertCircle, KeyRound } from 'lucide-react';
 
 export default function UsernameModal() {
   const { login, loginWithSupabase } = useUser();
@@ -19,6 +19,8 @@ export default function UsernameModal() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
+  const [showReset, setShowReset] = useState(false);
 
   useEffect(() => {
     if (settings.maintenance_mode) return;
@@ -54,6 +56,7 @@ export default function UsernameModal() {
 
     setLoading(true);
     setError('');
+    setInfo('');
 
     try {
       const result = await supabaseAuthService.signIn(email, password);
@@ -64,6 +67,30 @@ export default function UsernameModal() {
       }
     } catch (err: any) {
       setError(err.message || 'Erreur lors de la connexion');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setError('Indique ton email pour recevoir le lien.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setInfo('');
+    try {
+      const result = await supabaseAuthService.resetPassword(email);
+      if (result.success) {
+        setInfo('Email envoyé ! Vérifie ta boîte pour changer ton mot de passe.');
+        setShowReset(false);
+      } else {
+        setError(result.error || 'Impossible d\'envoyer l\'email');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Impossible d\'envoyer l\'email');
     } finally {
       setLoading(false);
     }
@@ -109,14 +136,14 @@ export default function UsernameModal() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300 p-4">
-      <div className="bg-card border border-border/50 rounded-3xl p-8 w-full max-w-[400px] flex flex-col gap-6 shadow-[0_32px_64px_rgba(0,0,0,0.4)] animate-in zoom-in-95 duration-300">
-        <div className="text-center">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden bg-black/40 shadow-lg shadow-primary/25 ring-1 ring-primary/20">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300 p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-card border border-border/50 rounded-3xl p-5 sm:p-8 w-full max-w-[400px] max-h-[min(92vh,720px)] overflow-y-auto flex flex-col gap-4 sm:gap-6 shadow-[0_32px_64px_rgba(0,0,0,0.4)] animate-in zoom-in-95 duration-300 my-auto">
+        <div className="text-center shrink-0">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4 overflow-hidden bg-black/40 shadow-lg shadow-primary/25 ring-1 ring-primary/20">
             <img src="/logo.png" alt="Virtuel-RT" className="w-full h-full object-contain p-0.5" />
           </div>
-          <h2 className="text-lg font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
-          <p className="text-sm text-muted-foreground mt-1">Choisissez comment vous connecter</p>
+          <h2 className="text-base sm:text-lg font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Choisissez comment vous connecter</p>
         </div>
 
         <div className="flex gap-2 bg-secondary/50 rounded-xl p-1">
@@ -154,19 +181,25 @@ export default function UsernameModal() {
         </div>
 
         {error && (
-          <div className="bg-red-500/15 border border-red-500/30 rounded-lg p-3 text-xs text-red-400 flex items-center gap-2">
+          <div className="bg-red-500/15 border border-red-500/30 rounded-lg p-3 text-xs text-red-400 flex items-center gap-2 shrink-0">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             {error}
           </div>
         )}
+        {info && (
+          <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-lg p-3 text-xs text-emerald-400 flex items-center gap-2 shrink-0">
+            <KeyRound className="w-3.5 h-3.5 shrink-0" />
+            {info}
+          </div>
+        )}
 
         {mode === 'guest' && (
-          <form onSubmit={handleGuestSubmit} className="flex flex-col gap-4">
-            <div className="flex gap-3 flex-wrap justify-center">
+          <form onSubmit={handleGuestSubmit} className="flex flex-col gap-4 min-h-0">
+            <div className="grid grid-cols-6 sm:grid-cols-7 gap-2 max-h-[28vh] sm:max-h-[200px] overflow-y-auto p-1 justify-items-center">
               {AVATAR_IDS.map(av => (
                 <button key={av} type="button" onClick={() => setSelectedAv(av)}
-                  className={`rounded-full transition-all duration-200 ${selectedAv === av ? 'ring-4 ring-primary/50 scale-110 shadow-lg shadow-primary/25' : 'opacity-60 hover:opacity-100 hover:scale-105'}`}>
-                  <Avatar avatarClass={av} initials={initials} size="lg" />
+                  className={`rounded-full transition-all duration-200 ${selectedAv === av ? 'ring-2 ring-primary/60 scale-110 shadow-lg shadow-primary/25' : 'opacity-60 hover:opacity-100 hover:scale-105'}`}>
+                  <Avatar avatarClass={av} initials={initials} size="md" />
                 </button>
               ))}
             </div>
@@ -194,7 +227,7 @@ export default function UsernameModal() {
         )}
 
         {mode === 'login' && (
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+          <form onSubmit={showReset ? handleResetPassword : handleLogin} className="flex flex-col gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2 bg-secondary/50 border border-border/50 rounded-xl px-4 py-3">
                 <Mail className="w-4 h-4 text-muted-foreground/50" />
@@ -208,35 +241,49 @@ export default function UsernameModal() {
                 />
               </div>
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 bg-secondary/50 border border-border/50 rounded-xl px-4 py-3">
-                <Lock className="w-4 h-4 text-muted-foreground/50" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Mot de passe"
-                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            {!showReset && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 bg-secondary/50 border border-border/50 rounded-xl px-4 py-3">
+                  <Lock className="w-4 h-4 text-muted-foreground/50" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Mot de passe"
+                    className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-            </div>
-            <button type="submit" disabled={!email || !password || loading}
+            )}
+            {showReset && (
+              <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+                Tu recevras un lien par email pour définir un nouveau mot de passe.
+              </p>
+            )}
+            <button type="submit" disabled={!email || (!showReset && !password) || loading}
               className="w-full bg-gradient-to-r from-primary to-purple-600 rounded-xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:shadow-lg hover:shadow-primary/25 hover:scale-[1.02] active:scale-[0.98]">
               {loading ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Connexion...
+                  {showReset ? 'Envoi...' : 'Connexion...'}
                 </div>
               ) : (
-                'Se connecter'
+                showReset ? 'Envoyer le lien' : 'Se connecter'
               )}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowReset(v => !v); setError(''); setInfo(''); }}
+              className="text-[11px] text-primary/90 hover:text-primary underline-offset-2 hover:underline self-center"
+            >
+              {showReset ? 'Retour à la connexion' : 'Changer / oublier mon mot de passe'}
             </button>
           </form>
         )}
@@ -257,11 +304,11 @@ export default function UsernameModal() {
                 />
               </div>
             </div>
-            <div className="flex gap-3 flex-wrap justify-center">
+            <div className="grid grid-cols-6 sm:grid-cols-7 gap-2 max-h-[22vh] sm:max-h-[160px] overflow-y-auto p-1 justify-items-center">
               {AVATAR_IDS.map(av => (
                 <button key={av} type="button" onClick={() => setSelectedAv(av)}
-                  className={`rounded-full transition-all duration-200 ${selectedAv === av ? 'ring-4 ring-primary/50 scale-110 shadow-lg shadow-primary/25' : 'opacity-60 hover:opacity-100 hover:scale-105'}`}>
-                  <Avatar avatarClass={av} initials={initials} size="lg" />
+                  className={`rounded-full transition-all duration-200 ${selectedAv === av ? 'ring-2 ring-primary/60 scale-110 shadow-lg shadow-primary/25' : 'opacity-60 hover:opacity-100 hover:scale-105'}`}>
+                  <Avatar avatarClass={av} initials={initials} size="md" />
                 </button>
               ))}
             </div>

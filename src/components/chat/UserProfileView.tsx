@@ -212,7 +212,7 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
 
           {getSignature(targetName) && (
             <div className="mb-4 bg-secondary/60 border border-border rounded-xl px-3 py-2">
-              <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1">Signature</div>
+              <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1">Signature chat</div>
               <p className="text-xs text-muted-foreground/70 italic">{getSignature(targetName)}</p>
             </div>
           )}

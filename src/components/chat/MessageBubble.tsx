@@ -7,7 +7,7 @@ import { useModeration } from '@/lib/contexts';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { Smile, Trash2, Flag, UserX, Pin, Pencil, Reply } from 'lucide-react';
 import { format } from 'date-fns';
-import { getMood, getSignature } from '@/lib/funFeatures';
+import { getMood, getSignature, SIGNATURE_EVENT } from '@/lib/funFeatures';
 
 interface Message {
   id: string;
@@ -51,7 +51,20 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
 
   const isOwn = message.author_name === user?.name;
   const authorMood = getMood(message.author_name);
-  const authorSignature = getSignature(message.author_name);
+  const [authorSignature, setAuthorSignature] = useState(() => getSignature(message.author_name));
+
+  useEffect(() => {
+    setAuthorSignature(getSignature(message.author_name));
+  }, [message.author_name]);
+
+  useEffect(() => {
+    const onSig = () => {
+      setAuthorSignature(getSignature(message.author_name));
+    };
+    window.addEventListener(SIGNATURE_EVENT, onSig);
+    return () => window.removeEventListener(SIGNATURE_EVENT, onSig);
+  }, [message.author_name]);
+
   const showCreatorBadges =
     isOwn &&
     !!user &&
@@ -146,8 +159,11 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
           <span className={`${compactMode ? 'text-[9px]' : 'text-[10px]'} text-muted-foreground/40`} aria-label={`Envoyé à ${time}`}>{time}</span>
           {message.pinned && <Pin className="w-3 h-3 text-amber-400 animate-bounce" aria-label="Message épinglé" />}
         </div>
-        {authorSignature && !compactMode && (
-          <span className={`text-[10px] text-muted-foreground/45 italic ${isOwn ? 'text-right' : ''} -mt-0.5 mb-0.5`}>
+        {authorSignature && (
+          <span
+            className={`${compactMode ? 'text-[9px]' : 'text-[10px]'} text-muted-foreground/50 italic ${isOwn ? 'text-right' : ''} -mt-0.5 mb-0.5`}
+            title="Signature chat"
+          >
             {authorSignature}
           </span>
         )}

@@ -33,7 +33,7 @@ describe('Sidebar', () => {
       </TestProviders>
     );
 
-    const homeButton = screen.getByTitle('Accueil');
+    const homeButton = screen.getByTitle('Accueil — Étincelle du jour');
     expect(homeButton).toBeInTheDocument();
   });
 
@@ -44,7 +44,7 @@ describe('Sidebar', () => {
       </TestProviders>
     );
 
-    const homeButton = screen.getByTitle('Accueil');
+    const homeButton = screen.getByTitle('Accueil — Étincelle du jour');
     expect(homeButton).toBeInTheDocument();
   });
 

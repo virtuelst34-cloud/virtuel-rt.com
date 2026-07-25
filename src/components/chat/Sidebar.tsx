@@ -45,7 +45,7 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
         />
       </div>
 
-      <IconBtn icon={Home} title="Accueil" onClick={() => setCurrentSalon(null)} />
+      <IconBtn icon={Home} title="Accueil — Étincelle du jour" onClick={() => setCurrentSalon(null)} />
       <IconBtn icon={Search} title="Recherche" onClick={() => setShowSearch(true)} />
       <IconBtn icon={TrendingUp} title="Statistiques" onClick={() => setShowStats(true)} />
       {settings.enable_dm && (

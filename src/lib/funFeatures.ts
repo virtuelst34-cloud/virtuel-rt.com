@@ -16,8 +16,10 @@ export const MOOD_OPTIONS: {
   { id: 'focus', label: 'Focus', emoji: '🎯', ring: 'ring-2 ring-emerald-400/70 shadow-[0_0_12px_rgba(52,211,153,0.45)]' },
 ];
 
-const MOOD_KEY = (name: string) => `virtuel_rt_mood_${name}`;
-const SIG_KEY = (name: string) => `virtuel_rt_signature_${name}`;
+const normalizeKey = (name: string) => name.trim();
+
+const MOOD_KEY = (name: string) => `virtuel_rt_mood_${normalizeKey(name)}`;
+const SIG_KEY = (name: string) => `virtuel_rt_signature_${normalizeKey(name)}`;
 
 export function getMood(name: string | undefined | null): MoodId {
   if (!name) return 'off';
@@ -29,10 +31,15 @@ export function getMood(name: string | undefined | null): MoodId {
 }
 
 export function setMood(name: string, mood: MoodId) {
+  if (!name.trim()) return;
   try {
     localStorage.setItem(MOOD_KEY(name), mood);
   } catch { /* ignore */ }
 }
+
+export const SIGNATURE_EVENT = 'virtuel-rt-signature-changed';
+
+export type SignatureDetail = { name: string; signature: string };
 
 export function getSignature(name: string | undefined | null): string {
   if (!name) return '';
@@ -43,10 +50,20 @@ export function getSignature(name: string | undefined | null): string {
   }
 }
 
-export function setSignature(name: string, signature: string) {
+export function setSignature(name: string, signature: string, alsoUnder?: string | null) {
+  if (!name.trim()) return;
+  const value = signature.slice(0, 40);
   try {
-    localStorage.setItem(SIG_KEY(name), signature.slice(0, 40));
+    localStorage.setItem(SIG_KEY(name), value);
+    // Keep old username key in sync when the display name changes
+    if (alsoUnder && alsoUnder.trim() && normalizeKey(alsoUnder) !== normalizeKey(name)) {
+      localStorage.setItem(SIG_KEY(alsoUnder), value);
+    }
   } catch { /* ignore */ }
+  if (typeof window !== 'undefined') {
+    const detail: SignatureDetail = { name: normalizeKey(name), signature: value };
+    window.dispatchEvent(new CustomEvent(SIGNATURE_EVENT, { detail }));
+  }
 }
 
 const DAILY_SPARKS = [
@@ -84,8 +101,28 @@ export const APPLAUSE_EVENT = 'virtuel-rt-applause';
 
 export type ApplauseDetail = { from: string; at: number };
 
-export function broadcastApplause(from: string) {
-  if (typeof window === 'undefined') return;
-  const detail: ApplauseDetail = { from, at: Date.now() };
+let applauseChannel: BroadcastChannel | null = null;
+
+function getApplauseChannel(): BroadcastChannel | null {
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null;
+  if (!applauseChannel) {
+    applauseChannel = new BroadcastChannel(APPLAUSE_EVENT);
+    applauseChannel.onmessage = (ev) => {
+      const detail = ev.data as ApplauseDetail;
+      if (detail?.from) {
+        window.dispatchEvent(new CustomEvent(APPLAUSE_EVENT, { detail }));
+      }
+    };
+  }
+  return applauseChannel;
+}
+
+export function broadcastApplause(from: string, at = Date.now()) {
+  if (typeof window === 'undefined' || !from) return;
+  const detail: ApplauseDetail = { from, at };
   window.dispatchEvent(new CustomEvent(APPLAUSE_EVENT, { detail }));
+  try {
+    getApplauseChannel()?.postMessage(detail);
+  } catch { /* ignore */ }
+  return detail;
 }

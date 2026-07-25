@@ -7,6 +7,7 @@ import { getBadgeForLevel, getUnlockedBadges } from '@/lib/diamondBadges';
 import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare } from 'lucide-react';
 import AchievementsSection from './AchievementsSection';
 import TwoFactorSection from './TwoFactorSection';
+import DailySparkCard from './DailySparkCard';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { AVATAR_IDS } from '@/lib/chatConfig';
@@ -155,7 +156,8 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
       gender: draft.gender
     });
     setMood(draft.name || user.name, draft.mood);
-    setSignature(draft.name || user.name, draft.signature);
+    // Always key signature by the name that appears on messages (after rename: both keys)
+    setSignature(draft.name || user.name, draft.signature, user.name);
     setEditing(false);
     setSaved(true);
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
@@ -331,6 +333,8 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                       </div>
                   }
                 </div>
+
+                <DailySparkCard compact className="mb-4" />
 
                 {/* Statut */}
                 <div className="mb-4">
@@ -525,6 +529,9 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                     <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest">Signature chat</div>
                     {editing && <div className="text-[10px] text-muted-foreground/40">{draft.signature.length}/40</div>}
                   </div>
+                  <p className="text-[10px] text-muted-foreground/45 mb-1.5">
+                    Affichée sous vos messages dans les salons. Cliquez Modifier pour la définir.
+                  </p>
                   {editing ? (
                     <input
                       value={draft.signature}

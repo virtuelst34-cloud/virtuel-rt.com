@@ -25,6 +25,7 @@ import { supabaseDbService } from '@/lib/supabaseDb';
 import { mediaBroadcastService } from '@/lib/mediaBroadcastService';
 import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown, Filter as FilterIcon, Download, PartyPopper } from 'lucide-react';
 import { APPLAUSE_EVENT, broadcastApplause, type ApplauseDetail } from '@/lib/funFeatures';
+import DailySparkCard from './DailySparkCard';
 
 interface JoinToastProps {
   name: string;
@@ -114,15 +115,26 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   useEffect(() => { requestPushPermission(); }, []);
 
   useEffect(() => {
-    const onApplause = (e: Event) => {
-      const detail = (e as CustomEvent<ApplauseDetail>).detail;
+    const showBurst = (detail: ApplauseDetail) => {
       if (!detail?.from) return;
       setApplauseBurst({ id: detail.at, from: detail.from });
       window.setTimeout(() => setApplauseBurst(prev => (prev?.id === detail.at ? null : prev)), 2200);
     };
+    const onApplause = (e: Event) => {
+      showBurst((e as CustomEvent<ApplauseDetail>).detail);
+    };
     window.addEventListener(APPLAUSE_EVENT, onApplause);
     return () => window.removeEventListener(APPLAUSE_EVENT, onApplause);
   }, []);
+
+  useEffect(() => {
+    if (!currentSalon) return;
+    return mediaBroadcastService.subscribeApplause(currentSalon, (detail) => {
+      // Local user already animated via CustomEvent; still show remote claps
+      setApplauseBurst({ id: detail.at, from: detail.from });
+      window.setTimeout(() => setApplauseBurst(prev => (prev?.id === detail.at ? null : prev)), 2200);
+    });
+  }, [currentSalon]);
 
   useEffect(() => {
     return presenceService.subscribe(() => {
@@ -438,9 +450,9 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
       <OfflineBanner />
 
       {/* Header */}
-      <div className="px-4 py-2.5 border-b border-border flex items-center gap-2.5 shrink-0 bg-card">
+      <div className="px-4 py-2.5 border-b border-border flex items-center gap-2.5 shrink-0 bg-card overflow-x-auto">
         <button onClick={() => setCurrentSalon(null)}
-          className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 hover:text-foreground transition-colors" title="Retour">
+          className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 hover:text-foreground transition-colors shrink-0" title="Retour à l'accueil (Étincelle du jour)">
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center text-lg shrink-0">
@@ -451,37 +463,44 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
           <div className="text-[11px] text-muted-foreground/60 flex items-center gap-1.5">
             <span>{salon.type}</span>
             {salon.live && <span className="text-[9px] bg-red-600 text-red-100 rounded px-1.5 py-px font-semibold">LIVE</span>}
-            <span className="text-muted-foreground/30">?</span>
+            <span className="text-muted-foreground/30">·</span>
             <span>{allMembers.length} membres</span>
           </div>
         </div>
         <button onClick={() => setSearchOpen(o => !o)}
-          className={`p-1.5 rounded-lg border transition-colors ${searchOpen ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+          className={`p-1.5 rounded-lg border transition-colors shrink-0 ${searchOpen ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
           title="Rechercher" aria-label="Rechercher dans le salon">
           <Search className="w-4 h-4" />
         </button>
         <button onClick={() => setShowFilter(true)}
-          className={`p-1.5 rounded-lg border transition-colors ${filteredMessages ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+          className={`p-1.5 rounded-lg border transition-colors shrink-0 ${filteredMessages ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
           title="Filtres" aria-label="Filtrer les messages">
           <FilterIcon className="w-4 h-4" />
         </button>
         <button onClick={() => setShowExport(true)}
-          className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 transition-colors"
+          className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 transition-colors shrink-0"
           title="Exporter" aria-label="Exporter les messages">
           <Download className="w-4 h-4" />
         </button>
         <button
+          type="button"
           onClick={() => {
-            if (!user?.name) return;
-            broadcastApplause(user.name);
-            addNotification({ type: 'system', message: '👏 Applaudissements envoyés !' });
+            if (!user?.name) {
+              addNotification({ type: 'system', message: 'Connectez-vous pour applaudir.' });
+              return;
+            }
+            const detail = broadcastApplause(user.name);
+            if (currentSalon && detail) mediaBroadcastService.broadcastApplause(currentSalon, detail);
+            addNotification({ type: 'system', message: '👏 Applaudissements envoyés au salon !' });
           }}
-          className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-amber-500/10 hover:text-amber-300 hover:border-amber-500/30 transition-colors"
-          title="Applaudir" aria-label="Applaudir le salon">
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 hover:border-amber-500/50 transition-colors shrink-0"
+          title="Applaudissements — envoie une salve de 👏 visible dans le salon"
+          aria-label="Applaudir le salon">
           <PartyPopper className="w-4 h-4" />
+          <span className="text-[11px] font-medium whitespace-nowrap">Applaudir</span>
         </button>
         <button onClick={() => setShowMembers(o => !o)}
-          className={`p-1.5 rounded-lg border transition-colors ${showMembers ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+          className={`p-1.5 rounded-lg border transition-colors shrink-0 ${showMembers ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
           title="Membres" aria-label="Voir les membres du salon">
           <Users className="w-4 h-4" />
         </button>
@@ -570,6 +589,9 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
               <div className="text-center text-[10px] text-muted-foreground/40 py-2 flex items-center gap-2">
                 <div className="flex-1 h-px bg-border" /><span>Aujourd'hui</span><div className="flex-1 h-px bg-border" />
               </div>
+            )}
+            {!searchQuery && visibleMessages.filter(m => !m.is_system).length === 0 && (
+              <DailySparkCard compact className="mb-3 mx-auto max-w-md w-full" />
             )}
             {visibleMessages.map((msg, index) => (
               <div key={msg.id} className="animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${index * 30}ms` }}>

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App'
 import '@/index.css'
 import '@/lib/sentry'
+import { initAppUpdate } from '@/lib/appUpdate'
 
 // Après un déploiement, d’anciens chunks hashés peuvent 404 → recharger une fois
 window.addEventListener('vite:preloadError', (event) => {
@@ -14,24 +15,15 @@ window.addEventListener('vite:preloadError', (event) => {
   }
 })
 
-// Nouveau SW activé → recharger pour prendre le build frais
-if ('serviceWorker' in navigator && !import.meta.env.DEV) {
-  let refreshing = false
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return
-    refreshing = true
-    window.location.reload()
-  })
-}
+// PWA : enregistrement + détection de MAJ (prod uniquement)
+void initAppUpdate()
 
-// PWA : VitePWA injecte déjà registerSW.js. En local, désenregistrer tout SW résiduel.
-if ('serviceWorker' in navigator) {
+// En local, désenregistrer tout SW résiduel (évite un vieux cache en dev)
+if ('serviceWorker' in navigator && import.meta.env.DEV) {
   window.addEventListener('load', () => {
-    if (import.meta.env.DEV) {
-      void navigator.serviceWorker.getRegistrations().then(regs => {
-        regs.forEach(reg => void reg.unregister())
-      })
-    }
+    void navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((reg) => void reg.unregister())
+    })
   })
 }
 

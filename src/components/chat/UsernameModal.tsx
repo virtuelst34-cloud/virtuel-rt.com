@@ -183,7 +183,7 @@ export default function UsernameModal() {
           <h2 className="text-base sm:text-lg font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">Choisissez comment vous connecter</p>
           <p className="mt-2 inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] text-amber-200/80 bg-amber-500/10 border border-amber-500/25 rounded-full px-2.5 py-1">
-            <ShieldAlert className="w-3 h-3 shrink-0" /> Interdit aux mineurs · 18 ans et plus
+            <ShieldAlert className="w-3 h-3 shrink-0" /> Interdit aux mineurs · 18 ans
           </p>
         </div>
 

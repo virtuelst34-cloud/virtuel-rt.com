@@ -274,7 +274,7 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
         </div>
         <h2 className="text-lg sm:text-xl font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
         <p className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] text-amber-200/85 bg-amber-500/10 border border-amber-500/25 rounded-full px-2.5 py-1">
-          <Scale className="w-3 h-3 shrink-0" /> Interdit aux mineurs · réservé aux 18 ans et plus
+          <Scale className="w-3 h-3 shrink-0" /> Interdit aux mineurs · réservé aux 18 ans
         </p>
         <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg px-4 py-2 mb-1">
           <p className="text-sm font-semibold text-purple-300">🎉 Pour l'ouverture, Premium offert en essai !</p>

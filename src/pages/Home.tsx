@@ -14,6 +14,7 @@ import NotificationsPanel from '@/components/chat/NotificationsPanel';
 import SettingsPanel from '@/components/chat/SettingsPanel';
 import DirectMessagePanel from '@/components/chat/DirectMessagePanel';
 import UserProfileView from '@/components/chat/UserProfileView';
+import AppUpdateBanner from '@/components/AppUpdateBanner';
 
 function ChatApp() {
   const { user, currentSalon, showAdmin, setCurrentSalon } = useChat();
@@ -45,6 +46,7 @@ function ChatApp() {
 
   return (
     <div className="flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-background safe-area-pad">
+      <AppUpdateBanner autoApply={!currentSalon} />
       {!user && <UsernameModal />}
 
       <div className="flex flex-1 min-h-0 overflow-hidden">

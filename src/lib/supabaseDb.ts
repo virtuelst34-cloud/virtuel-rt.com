@@ -39,7 +39,22 @@ export interface Salon {
   sort_order?: number;
   description?: string;
   created_by?: string | null;
+  category_id?: string | null;
+  subcategory?: string;
+  is_coquin?: boolean;
   created_at: string;
+}
+
+export interface SalonCategoryRow {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  sort_order: number;
+  subcategories: string[];
+  is_coquin: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface XPEntry {
@@ -281,6 +296,49 @@ export const supabaseDbService = {
     }
 
     return data;
+  },
+
+  async getSalonCategories(): Promise<SalonCategoryRow[]> {
+    try {
+      const { data, error } = await supabase
+        .from('salon_categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      if (error) throw error;
+      return (data || []).map((row: SalonCategoryRow & { subcategories?: string[] | null }) => ({
+        ...row,
+        subcategories: Array.isArray(row.subcategories) ? row.subcategories : [],
+      }));
+    } catch (error) {
+      console.error('Erreur lors de la récupération des catégories:', error);
+      return [];
+    }
+  },
+
+  async upsertSalonCategory(category: Omit<SalonCategoryRow, 'created_at' | 'updated_at'>): Promise<SalonCategoryRow | null> {
+    const payload = {
+      ...category,
+      subcategories: category.subcategories || [],
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase
+      .from('salon_categories')
+      .upsert(payload, { onConflict: 'id' })
+      .select()
+      .maybeSingle();
+    if (error) {
+      console.error('Erreur lors de la sauvegarde de la catégorie:', error);
+      throw error;
+    }
+    return data;
+  },
+
+  async deleteSalonCategory(categoryId: string): Promise<void> {
+    const { error } = await supabase.from('salon_categories').delete().eq('id', categoryId);
+    if (error) {
+      console.error('Erreur lors de la suppression de la catégorie:', error);
+      throw error;
+    }
   },
 
   async deleteSalon(salonId: string): Promise<void> {

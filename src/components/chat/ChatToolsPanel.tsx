@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Dice5, CloudRain, Gamepad2, BellOff, Bell, Bookmark, Zap, X, Grid3X3 } from 'lucide-react';
+import { Dice5, CloudRain, Gamepad2, BellOff, Bell, Bookmark, Zap, X, Grid3X3, Heart, Flame, Lock, MessageCircleHeart } from 'lucide-react';
 import {
   broadcastReactionRain,
   formatDiceResult,
@@ -10,9 +10,13 @@ import {
   BOOKMARKS_EVENT,
   type MessageBookmark,
 } from '@/lib/funFeatures';
+import { drawCoquinIcebreaker } from '@/lib/coquinFeatures';
+import { usePreferences } from '@/lib/contexts';
 import MemoryGame from './MemoryGame';
 import TicTacToeGame from './TicTacToeGame';
 import ReflexGame from './ReflexGame';
+import CoquinTruthOrDare from './CoquinTruthOrDare';
+import CoquinHotSeat from './CoquinHotSeat';
 
 interface Props {
   open: boolean;
@@ -35,9 +39,12 @@ export default function ChatToolsPanel({
   onReactionRain,
   addNotification,
 }: Props) {
+  const { coquinMode, isPremium, toggleCoquinMode } = usePreferences();
   const [showMemory, setShowMemory] = useState(false);
   const [showMorpion, setShowMorpion] = useState(false);
   const [showReflex, setShowReflex] = useState(false);
+  const [showTruth, setShowTruth] = useState(false);
+  const [showHotSeat, setShowHotSeat] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [bookmarks, setBookmarks] = useState<MessageBookmark[]>([]);
   const [muted, setMuted] = useState(() => isSalonMuted(userName, salonId));
@@ -57,6 +64,12 @@ export default function ChatToolsPanel({
 
   if (!open) return null;
 
+  const openPremiumUpsell = () => {
+    addNotification({ type: 'premium', message: '🔒 Réservé Premium — ouvrez Réglages → Premium pour débloquer le Mode coquin.' });
+    window.dispatchEvent(new CustomEvent('virtuel-rt-open-settings', { detail: { tab: 'premium' } }));
+    onClose();
+  };
+
   return (
     <>
       <div className="absolute right-3 top-14 z-30 w-72 rounded-2xl border border-purple-500/30 bg-card/95 backdrop-blur-md shadow-xl shadow-purple-950/40 overflow-hidden">
@@ -69,8 +82,7 @@ export default function ChatToolsPanel({
           </button>
         </div>
 
-        <div className="p-2 space-y-1">
-          {/* Mute salon */}
+        <div className="p-2 space-y-1 max-h-[70vh] overflow-y-auto">
           <button
             type="button"
             onClick={() => {
@@ -93,7 +105,6 @@ export default function ChatToolsPanel({
             <span className="flex-1">{muted ? 'Réactiver les notifs' : 'Muter ce salon'}</span>
           </button>
 
-          {/* Favoris */}
           <button
             type="button"
             onClick={() => setShowBookmarks(b => !b)}
@@ -117,7 +128,6 @@ export default function ChatToolsPanel({
             </div>
           )}
 
-          {/* Dés */}
           <div className="px-2.5 py-2 rounded-xl hover:bg-white/[0.03]">
             <div className="flex items-center gap-2.5 text-xs mb-2">
               <Dice5 className="w-4 h-4 text-emerald-400" />
@@ -158,7 +168,6 @@ export default function ChatToolsPanel({
             </div>
           </div>
 
-          {/* Pluie de réactions */}
           <button
             type="button"
             onClick={() => {
@@ -166,7 +175,9 @@ export default function ChatToolsPanel({
                 addNotification({ type: 'system', message: 'Connectez-vous pour lancer une pluie.' });
                 return;
               }
-              const emoji = ['✨', '💜', '🎉', '⭐', '🔥'][Math.floor(Math.random() * 5)];
+              const emoji = coquinMode
+                ? ['💋', '🔥', '😏', '🍷', '✨'][Math.floor(Math.random() * 5)]
+                : ['✨', '💜', '🎉', '⭐', '🔥'][Math.floor(Math.random() * 5)];
               broadcastReactionRain(userName, emoji);
               onReactionRain(emoji);
               onClose();
@@ -177,7 +188,6 @@ export default function ChatToolsPanel({
             <span className="flex-1">Pluie de réactions</span>
           </button>
 
-          {/* Mémoire */}
           <button
             type="button"
             onClick={() => setShowMemory(true)}
@@ -187,7 +197,6 @@ export default function ChatToolsPanel({
             <span className="flex-1">Mémoire cosmique</span>
           </button>
 
-          {/* Morpion */}
           <button
             type="button"
             onClick={() => setShowMorpion(true)}
@@ -197,7 +206,6 @@ export default function ChatToolsPanel({
             <span className="flex-1">Morpion</span>
           </button>
 
-          {/* Réflexe */}
           <button
             type="button"
             onClick={() => setShowReflex(true)}
@@ -206,17 +214,80 @@ export default function ChatToolsPanel({
             <Zap className="w-4 h-4 text-amber-400" />
             <span className="flex-1">Réflexe</span>
           </button>
+
+          {/* ── Zone coquine (Premium) ── */}
+          <div className="pt-1 mt-1 border-t border-rose-500/20">
+            <div className="px-2.5 py-1 text-[9px] uppercase tracking-widest text-rose-300/70 font-semibold flex items-center gap-1">
+              <Flame className="w-3 h-3" /> Mode coquin
+              {!isPremium && <Lock className="w-3 h-3 ml-auto text-amber-400" />}
+              {coquinMode && <span className="ml-auto text-[8px] px-1.5 py-px rounded-full bg-rose-500/20 text-rose-200 border border-rose-400/30">ON</span>}
+            </div>
+
+            {!coquinMode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isPremium) {
+                    openPremiumUpsell();
+                    return;
+                  }
+                  toggleCoquinMode();
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-rose-500/10 transition-colors text-rose-200/80"
+              >
+                <Lock className="w-4 h-4 text-rose-300" />
+                <span className="flex-1">{isPremium ? 'Activer le Mode coquin' : 'Réservé Premium'}</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowTruth(true)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-rose-500/10 transition-colors"
+                >
+                  <Heart className="w-4 h-4 text-rose-400" />
+                  <span className="flex-1">Action ou vérité coquin</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowHotSeat(true)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-fuchsia-500/10 transition-colors"
+                >
+                  <Flame className="w-4 h-4 text-fuchsia-400" />
+                  <span className="flex-1">Défi coquin / Hot seat</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const line = drawCoquinIcebreaker();
+                    onDiceResult(`💋 Icebreaker : ${line}`);
+                    onClose();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-pink-500/10 transition-colors"
+                >
+                  <MessageCircleHeart className="w-4 h-4 text-pink-400" />
+                  <span className="flex-1">Icebreaker flirty</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {showMemory && (
-        <MemoryGame onClose={() => setShowMemory(false)} />
+      {showMemory && <MemoryGame onClose={() => setShowMemory(false)} />}
+      {showMorpion && <TicTacToeGame onClose={() => setShowMorpion(false)} />}
+      {showReflex && <ReflexGame onClose={() => setShowReflex(false)} />}
+      {showTruth && coquinMode && (
+        <CoquinTruthOrDare
+          onClose={() => setShowTruth(false)}
+          onShare={(text) => { onDiceResult(text); }}
+        />
       )}
-      {showMorpion && (
-        <TicTacToeGame onClose={() => setShowMorpion(false)} />
-      )}
-      {showReflex && (
-        <ReflexGame onClose={() => setShowReflex(false)} />
+      {showHotSeat && coquinMode && (
+        <CoquinHotSeat
+          onClose={() => setShowHotSeat(false)}
+          onShare={(text) => { onDiceResult(text); }}
+        />
       )}
     </>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, ChangeEvent, KeyboardEvent } from 'react';
-import { useUser, useSalons, useXP, useModeration, useMessages, useNotifications, useMuteBlock, useTyping } from '@/lib/contexts';
+import { useUser, useSalons, useXP, useModeration, useMessages, useNotifications, useMuteBlock, useTyping, usePreferences } from '@/lib/contexts';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { SALONS } from '@/lib/chatConfig';
 import { Message } from '@/lib/searchUtils';
@@ -69,6 +69,7 @@ interface ChatAreaProps {
 export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProps) {
   const { user, profiles } = useUser();
   const { currentSalon, setCurrentSalon, customSalons, hiddenSalons, displayOrder } = useSalons();
+  const { coquinMode } = usePreferences();
   const { awardXP, sounds } = useXP();
   const { isUserBanned, isUserMuted, isBlocked } = useModeration();
   const { isMuted: isLocallyMuted, isBlocked: isLocallyBlocked } = useMuteBlock();
@@ -109,8 +110,20 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const [showTools, setShowTools]           = useState(false);
   const [reactionRain, setReactionRain]     = useState<ReactionRainDetail | null>(null);
 
-  const allSalons    = mergeAndSortSalons(customSalons || [], hiddenSalons || [], displayOrder || {});
+  const allSalons    = mergeAndSortSalons(customSalons || [], hiddenSalons || [], displayOrder || {}, { coquinMode });
   const salon        = allSalons.find(s => s.id === currentSalon);
+
+  // Quitter un salon coquin si le mode est désactivé
+  useEffect(() => {
+    if (!currentSalon || coquinMode) return;
+    const fromBuiltin = SALONS.find(s => s.id === currentSalon);
+    const fromCustom = (customSalons || []).find(s => s.id === currentSalon);
+    const target = fromCustom || fromBuiltin;
+    if (target && (target.isCoquin || target.category_id === 'coquin')) {
+      setCurrentSalon(null);
+    }
+  }, [coquinMode, currentSalon, customSalons, setCurrentSalon]);
+
   const onlineUsers  = currentSalon
     ? presenceService.getOnlineUsersInSalon(currentSalon).filter(u => !isLocallyMuted(u.name) && !isLocallyBlocked(u.name))
     : [];

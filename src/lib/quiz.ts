@@ -69,13 +69,15 @@ export type QuizPresetId =
   | 'sport'
   | 'histoire'
   | 'cinema'
-  | 'geographie';
+  | 'geographie'
+  | 'coquin';
 
 export const QUIZ_THEMES: {
   id: QuizPresetId;
   label: string;
   emoji: string;
   description: string;
+  premiumOnly?: boolean;
 }[] = [
   { id: 'general', label: 'Général', emoji: '🧠', description: 'Culture G variée' },
   { id: 'tech', label: 'Tech', emoji: '💻', description: 'Web & informatique' },
@@ -85,6 +87,7 @@ export const QUIZ_THEMES: {
   { id: 'histoire', label: 'Histoire', emoji: '📜', description: 'Dates & événements' },
   { id: 'cinema', label: 'Cinéma', emoji: '🎬', description: 'Films & réalisateurs' },
   { id: 'geographie', label: 'Géo', emoji: '🌍', description: 'Pays & capitales' },
+  { id: 'coquin', label: 'Coquin', emoji: '💋', description: 'Quiz flirty 18+', premiumOnly: true },
 ];
 
 function q(
@@ -114,6 +117,10 @@ const PRESET_QUESTIONS: Record<QuizPresetId, QuizQuestion[]> = {
     q('Combien y a-t-il de couleurs dans un arc-en-ciel ?', ['5', '6', '7', '8'], 2),
     q('Quel est le plus grand océan ?', ['Atlantique', 'Indien', 'Arctique', 'Pacifique'], 3),
     q('Combien de côtés a un hexagone ?', ['5', '6', '7', '8'], 1),
+    q('Quel gaz respirons-nous principalement ?', ['Azote', 'Oxygène', 'CO₂', 'Hélium'], 1),
+    q('Combien de lettres compte l’alphabet français ?', ['24', '25', '26', '27'], 2),
+    q('Quel fruit est traditionnellement associé à Newton ?', ['Poire', 'Pomme', 'Banane', 'Orange'], 1),
+    q('Quel est le symbole chimique de l’eau ?', ['O2', 'H2O', 'CO2', 'NaCl'], 1),
   ],
   tech: [
     q('Que signifie HTML ?', ['Hyper Text Markup Language', 'High Tech Modern Language', 'Home Tool Markup Language', 'Hyperlinks Text Mark Language'], 0, 150),
@@ -122,6 +129,8 @@ const PRESET_QUESTIONS: Record<QuizPresetId, QuizQuestion[]> = {
     q('Que signifie CPU ?', ['Central Processing Unit', 'Computer Personal Unit', 'Central Program Utility', 'Core Process Utility'], 0),
     q('Quel protocole sécurise le web (HTTPS) ?', ['FTP', 'SSH', 'SSL/TLS', 'SMTP'], 2, 150),
     q('React est principalement utilisé pour…', ['Bases de données', 'Interfaces utilisateur', 'Systèmes d’exploitation', 'Réseaux'], 1),
+    q('Que signifie API ?', ['Application Programming Interface', 'Advanced Program Integration', 'Automatic Process Input', 'App Protocol Index'], 0),
+    q('Git sert principalement à…', ['Compiler du code', 'Versionner le code', 'Dessiner des UI', 'Héberger des sites'], 1),
   ],
   culture: [
     q('Qui a peint la Joconde ?', ['Van Gogh', 'Picasso', 'Léonard de Vinci', 'Michel-Ange'], 2, 150),
@@ -130,6 +139,8 @@ const PRESET_QUESTIONS: Record<QuizPresetId, QuizQuestion[]> = {
     q('Quel musée abrite la Joconde ?', ['Orsay', 'Louvre', 'Pompidou', 'British Museum'], 1),
     q('Quelle ville a inventé les Jeux olympiques antiques ?', ['Rome', 'Athènes', 'Sparte', 'Troie'], 1),
     q('Combien de cordes a un violon ?', ['3', '4', '5', '6'], 1),
+    q('Qui a sculpté Le Penseur ?', ['Rodin', 'Michel-Ange', 'Bernini', 'Donatello'], 0),
+    q('Molière est surtout connu comme…', ['Peintre', 'Dramaturge', 'Compositeur', 'Architecte'], 1),
   ],
   musique: [
     q('Qui a chanté « Billie Jean » ?', ['Prince', 'Michael Jackson', 'Madonna', 'Bruno Mars'], 1),
@@ -138,6 +149,9 @@ const PRESET_QUESTIONS: Record<QuizPresetId, QuizQuestion[]> = {
     q('Qui est surnommé le Roi du Rock’n’Roll ?', ['Chuck Berry', 'Elvis Presley', 'Buddy Holly', 'Johnny Cash'], 1),
     q('Quel groupe a sorti « Bohemian Rhapsody » ?', ['The Beatles', 'Queen', 'Pink Floyd', 'ABBA'], 1),
     q('La clé de sol se place sur quelle ligne ?', ['1re', '2e', '3e', '4e'], 1, 150),
+    q('Quel hit des années 80 commence par « Take on me » ?', ['A-ha', 'Duran Duran', 'Wham!', 'Europe'], 0),
+    q('Johnny Hallyday est une icône de quelle scène ?', ['Opéra', 'Rock français', 'Jazz', 'Rap'], 1),
+    q('Combien de membres dans les Beatles (classique) ?', ['3', '4', '5', '6'], 1),
   ],
   sport: [
     q('Combien de joueurs sur un terrain de football (par équipe) ?', ['9', '10', '11', '12'], 2),
@@ -146,6 +160,7 @@ const PRESET_QUESTIONS: Record<QuizPresetId, QuizQuestion[]> = {
     q('Quel sport utilise un panier ?', ['Volley', 'Basket', 'Handball', 'Rugby'], 1),
     q('Les JO d’été 2024 se sont déroulés à…', ['Tokyo', 'Los Angeles', 'Paris', 'Londres'], 2),
     q('Combien de trous sur un parcours de golf standard ?', ['9', '12', '18', '21'], 2),
+    q('Un marathon mesure environ…', ['21 km', '32 km', '42 km', '50 km'], 2),
   ],
   histoire: [
     q('En quelle année a eu lieu la Révolution française ?', ['1776', '1789', '1815', '1848'], 1),
@@ -154,6 +169,7 @@ const PRESET_QUESTIONS: Record<QuizPresetId, QuizQuestion[]> = {
     q('Qui a découvert l’Amérique en 1492 ?', ['Magellan', 'Vasco de Gama', 'Christophe Colomb', 'Cook'], 2),
     q('Napoléon a perdu à Waterloo en…', ['1804', '1812', '1815', '1821'], 2),
     q('La Première Guerre mondiale a commencé en…', ['1912', '1914', '1916', '1918'], 1),
+    q('Qui a inventé l’imprimerie en Europe ?', ['Gutenberg', 'Galilée', 'Copernic', 'Newton'], 0),
   ],
   cinema: [
     q('Qui a réalisé « Inception » ?', ['Spielberg', 'Nolan', 'Tarantino', 'Scorsese'], 1),
@@ -162,6 +178,7 @@ const PRESET_QUESTIONS: Record<QuizPresetId, QuizQuestion[]> = {
     q('Quelle saga commence par « Un nouvel espoir » ?', ['Star Trek', 'Star Wars', 'Dune', 'Alien'], 1),
     q('Combien d’Oscars a remporté « Titanic » ?', ['5', '8', '11', '14'], 2, 150),
     q('Qui a co-fondé Pixar (figure célèbre) ?', ['Walt Disney', 'Steve Jobs', 'George Lucas', 'James Cameron'], 1),
+    q('Quel film français a pour héros Amélie Poulain ?', ['Les Choristes', 'Le Fabuleux Destin d’Amélie Poulain', 'Intouchables', 'La Haine'], 1),
   ],
   geographie: [
     q('Quelle est la capitale de l’Italie ?', ['Milan', 'Naples', 'Rome', 'Florence'], 2),
@@ -170,6 +187,18 @@ const PRESET_QUESTIONS: Record<QuizPresetId, QuizQuestion[]> = {
     q('Quelle est la capitale du Japon ?', ['Osaka', 'Kyoto', 'Tokyo', 'Nagoya'], 2),
     q('Quel désert est le plus grand du monde ?', ['Gobi', 'Sahara', 'Antarctique', 'Kalahari'], 2, 150),
     q('Combien de pays bordent la France métropolitaine ?', ['6', '7', '8', '9'], 2),
+    q('Quelle est la capitale de la Belgique ?', ['Anvers', 'Liège', 'Bruxelles', 'Gand'], 2),
+    q('Le mont Blanc se situe principalement en…', ['Espagne', 'Italie/France', 'Allemagne', 'Portugal'], 1),
+  ],
+  coquin: [
+    q('Quelle est la couleur traditionnelle de la Saint-Valentin ?', ['Bleu', 'Vert', 'Rouge', 'Jaune'], 2),
+    q('« Trouver l’âme sœur » évoque surtout…', ['Un plat', 'L’amour', 'Un métier', 'Un sport'], 1),
+    q('Quel emoji est le plus « flirty » parmi ceux-ci ?', ['📎', '💋', '📁', '🧮'], 1),
+    q('Un toast au bar se dit souvent en levant…', ['Un livre', 'Un verre', 'Un chapeau', 'Un stylo'], 1),
+    q('« Coup de foudre » désigne…', ['Un orage', 'Une attraction soudaine', 'Une panne', 'Un dessert'], 1),
+    q('Quelle chanson évoque souvent une romance nocturne ?', ['Happy Birthday', 'La Vie en rose', 'Frère Jacques', 'Marseillaise'], 1),
+    q('En soirée, « icebreaker » sert à…', ['Casser la glace', 'Refroidir des boissons', 'Couper le gâteau', 'Régler la clim'], 0),
+    q('Le consentement en flirt, c’est…', ['Optionnel', 'Obligatoire et révocable', 'Réservé aux Premium', 'Automatique'], 1, 150),
   ],
 };
 

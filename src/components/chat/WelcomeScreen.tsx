@@ -1,18 +1,18 @@
-import React, { useState, useRef, useCallback, FormEvent, useEffect } from 'react';
-import { useUser, useSalons, useNotifications, useXP, useMuteBlock, useUI } from '@/lib/contexts';
+import React, { useState, useRef, useCallback, FormEvent, useEffect, useMemo } from 'react';
+import { useUser, useSalons, useNotifications, useXP, useMuteBlock, useUI, usePreferences } from '@/lib/contexts';
 import { Salon } from '@/lib/chatConfig';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
 import UserProfileView from './UserProfileView';
 import { SupabaseLogin } from '../auth/SupabaseLogin';
-import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users, Scale, ShieldAlert } from 'lucide-react';
+import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users, Scale, ShieldAlert, ChevronDown, ChevronRight } from 'lucide-react';
 import { getSpecialBadgeForUser, getSpecialBadgeIdsForUser, SPECIAL_BADGES } from '@/lib/diamondBadges';
 import { presenceService } from '@/lib/presenceService';
 import MembersPanel from './MembersPanel';
 import DailySparkCard from './DailySparkCard';
 import { Link } from 'react-router-dom';
-import { mergeAndSortSalons } from '@/lib/salonUtils';
+import { groupSalonsByCategory, mergeAndSortSalons } from '@/lib/salonUtils';
 import { MENTIONS_LEGALES_HREF } from '@/lib/welcomeContent';
 import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';
 
@@ -53,7 +53,8 @@ function PulseDot({ color = 'bg-emerald-500' }: { color?: string }) {
 }
 
 export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalonsOpenChange }: WelcomeScreenProps) {
-  const { setCurrentSalon, customSalons, hiddenSalons, displayOrder, isSalonLocked, verifySalonPassword } = useSalons();
+  const { setCurrentSalon, customSalons, hiddenSalons, displayOrder, categories, isSalonLocked, verifySalonPassword } = useSalons();
+  const { coquinMode } = usePreferences();
   const { user, profiles, loginWithSupabase, logout } = useUser();
   const { addNotification } = useNotifications();
   const { xpProgress, xpForLevel, monthlyXP } = useXP();
@@ -70,6 +71,7 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
   const [salonCounts, setSalonCounts] = useState<Record<string, number>>({});
   const [showMembersPanel, setShowMembersPanel] = useState(false);
   const [localSalonsOpen, setLocalSalonsOpen] = useState(false);
+  const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
   const waveTimersRef                 = useRef<Record<string, number>>({});
 
   const salonsDrawerOpen = mobileSalonsOpen ?? localSalonsOpen;
@@ -119,7 +121,12 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
     return unsubscribe;
   }, [profiles, user?.name, isMuted, isBlocked]);
 
-  const allSalons = mergeAndSortSalons(customSalons || [], hiddenSalons || [], displayOrder || {});
+  const allSalons = mergeAndSortSalons(
+    customSalons || [],
+    hiddenSalons || [],
+    displayOrder || {},
+    { coquinMode },
+  );
 
   // Données XP
   const lvl = user?.level || 1;
@@ -145,6 +152,23 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
     (filter === 'chat'  && s.type === 'chat') ||
     (filter === 'video' && s.type === 'video')
   );
+
+  const categoryGroups = useMemo(() => {
+    const catMeta = (categories || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      emoji: c.emoji,
+      description: c.description,
+      sort_order: c.sort_order,
+      subcategories: c.subcategories || [],
+      isCoquin: c.isCoquin,
+    }));
+    return groupSalonsByCategory(filteredSalons, catMeta, salonCounts, { coquinMode });
+  }, [filteredSalons, categories, salonCounts, coquinMode]);
+
+  const toggleCat = useCallback((id: string) => {
+    setCollapsedCats(prev => ({ ...prev, [id]: !prev[id] }));
+  }, []);
 
   const handleWave = useCallback((name: string) => {
     setWaved(prev => ({ ...prev, [name]: true }));
@@ -225,34 +249,70 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
         </div>
 
         <div className="flex-1 overflow-y-auto py-1.5 px-2">
-          {filteredSalons.map((salon, index) => (
-            <button key={salon.id} onClick={() => handleSalonClick(salon)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5 hover:bg-white/[0.05] transition-all duration-200 text-left group hover:scale-[1.02] active:scale-[0.98] animate-slide-in-up"
-              style={{ animationDelay: `${index * 50}ms` }}>
-
-              {/* Emoji avec fond */}
-              <div className="w-9 h-9 rounded-xl bg-secondary border border-border flex items-center justify-center text-lg shrink-0 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
-                {salon.emoji || SALON_EMOJI[salon.id] || '💬'}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[13px] font-medium text-foreground truncate group-hover:text-primary transition-colors">{salon.name}</span>
-                  {salon.isPrivate && <Lock className="w-3 h-3 text-amber-400" />}
-                  {salon.live && <PulseDot color="bg-red-500" />}
-                </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  {salonCounts[salon.id] > 0 && (
-                    <>
-                      <PulseDot color="bg-emerald-500" />
-                      <span className="text-[10px] text-muted-foreground/50">{salonCounts[salon.id]} en ligne</span>
-                    </>
+          {categoryGroups.map(group => {
+            const collapsed = !!collapsedCats[group.category.id];
+            return (
+              <div key={group.category.id} className="mb-2">
+                <button
+                  type="button"
+                  onClick={() => toggleCat(group.category.id)}
+                  className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left hover:bg-white/[0.04] transition-colors group/cat"
+                >
+                  {collapsed
+                    ? <ChevronRight className="w-3 h-3 text-muted-foreground/40 shrink-0" />
+                    : <ChevronDown className="w-3 h-3 text-muted-foreground/40 shrink-0" />}
+                  <span className="text-sm shrink-0" aria-hidden>{group.category.emoji}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex-1 truncate">
+                    {group.category.name}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground/40 tabular-nums">{group.salons.length}</span>
+                  {group.category.isCoquin && (
+                    <span className="text-[8px] px-1.5 py-px rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">18+</span>
                   )}
-                  {salon.live && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/30 rounded px-1.5 py-px font-semibold animate-pulse">LIVE</span>}
-                </div>
+                </button>
+                {!collapsed && (
+                  <div className="mt-0.5 space-y-0.5 border-l border-border/40 ml-3 pl-1">
+                    {group.salons.map((salon, index) => (
+                      <button
+                        key={salon.id}
+                        type="button"
+                        onClick={() => handleSalonClick(salon)}
+                        className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-white/[0.05] transition-all duration-200 text-left group hover:scale-[1.02] active:scale-[0.98]"
+                        style={{ animationDelay: `${index * 30}ms` }}
+                      >
+                        <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition-transform duration-300">
+                          {salon.emoji || SALON_EMOJI[salon.id] || '💬'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[12px] font-medium text-foreground truncate group-hover:text-primary transition-colors">{salon.name}</span>
+                            {salon.isPrivate && <Lock className="w-3 h-3 text-amber-400" />}
+                            {salon.live && <PulseDot color="bg-red-500" />}
+                            {salon.isCoquin && <span className="text-[8px] text-rose-300/80">🔥</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {salon.subcategory && (
+                              <span className="text-[9px] text-muted-foreground/40 truncate">{salon.subcategory}</span>
+                            )}
+                            {salonCounts[salon.id] > 0 && (
+                              <>
+                                <PulseDot color="bg-emerald-500" />
+                                <span className="text-[10px] text-muted-foreground/50">{salonCounts[salon.id]} en ligne</span>
+                              </>
+                            )}
+                            {salon.live && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/30 rounded px-1.5 py-px font-semibold animate-pulse">LIVE</span>}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </button>
-          ))}
+            );
+          })}
+          {categoryGroups.length === 0 && (
+            <p className="text-[11px] text-muted-foreground/50 px-3 py-4 text-center italic">Aucun salon pour ce filtre.</p>
+          )}
         </div>
       </div>
 

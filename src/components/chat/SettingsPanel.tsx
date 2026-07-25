@@ -68,7 +68,7 @@ interface SettingsPanelProps {
 export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewProfile }: SettingsPanelProps) {
   const { user, updateProfile, setStatus, supabaseUser, logout, loginWithSupabase } = useUser();
   const { xpProgress, xpForLevel } = useXP();
-  const { theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium, accentColor, changeAccent, ACCENT_COLORS, compactMode, toggleCompactMode, ambianceMode, setAmbianceMode, AMBIANCE_OPTIONS } = usePreferences();
+  const { theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium, accentColor, changeAccent, ACCENT_COLORS, compactMode, toggleCompactMode, ambianceMode, setAmbianceMode, AMBIANCE_OPTIONS, coquinMode, toggleCoquinMode } = usePreferences();
   const { mutedUsers, blockedUsers, unmuteUser, unblockUser } = useMuteBlock();
   const { friends, pendingRequests, outgoingRequests, acceptRequestFromSender, rejectRequestFromSender, removeFriend, cancelRequestToRecipient, reloadFriends } = useFriends();
   const { addNotification } = useNotifications();
@@ -1015,19 +1015,67 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                   </div>
                 </button>
 
+                {/* Mode coquin Premium */}
+                <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 mt-6 flex items-center gap-2">
+                  Mode coquin 🔥
+                  <span className="text-[8px] px-1.5 py-px rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">18+</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isPremium && !coquinMode) {
+                      setActiveTab('premium');
+                      return;
+                    }
+                    toggleCoquinMode();
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] ${
+                    coquinMode
+                      ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                      : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'
+                  }`}
+                >
+                  <span className="text-xl shrink-0" aria-hidden>💋</span>
+                  <div className="flex-1 text-left">
+                    <div className="text-sm font-medium flex items-center gap-2">
+                      {coquinMode ? 'Mode coquin actif' : 'Activer le Mode coquin'}
+                      {!isPremium && (
+                        <span className="text-[9px] px-2 py-px rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          Réservé Premium
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] opacity-60 mt-0.5">
+                      {isPremium
+                        ? 'Salons, jeux et réactions flirty (consentement obligatoire)'
+                        : 'Débloquez Premium pour accéder à la zone 18+'}
+                    </div>
+                  </div>
+                  <div className={`w-9 h-5 rounded-full transition-all duration-300 ${coquinMode ? 'bg-rose-500' : 'bg-muted-foreground/20'} relative`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-300 ${coquinMode ? 'left-4' : 'left-0.5'}`} />
+                  </div>
+                </button>
+
                 {/* Ambiances */}
                 <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 mt-6">Ambiances</div>
                 <div className="space-y-2">
                   {AMBIANCE_OPTIONS.map((opt) => {
                     const active = ambianceMode === opt.id;
+                    const locked = !!opt.premiumOnly && !isPremium;
                     return (
                       <button
                         key={opt.id}
                         type="button"
-                        onClick={() => setAmbianceMode(opt.id)}
+                        onClick={() => {
+                          if (locked) {
+                            setActiveTab('premium');
+                            return;
+                          }
+                          setAmbianceMode(opt.id);
+                        }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] ${
                           active ? opt.activeClass : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'
-                        }`}
+                        } ${locked ? 'opacity-70' : ''}`}
                       >
                         <span className="text-xl shrink-0" aria-hidden>{opt.emoji}</span>
                         <div className="flex-1 text-left">
@@ -1035,6 +1083,9 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                             {active ? `${opt.label} actif` : opt.label}
                             {active && (
                               <span className="text-[9px] rounded-full px-2 py-px bg-white/10 border border-white/15">Actif</span>
+                            )}
+                            {locked && (
+                              <span className="text-[9px] rounded-full px-2 py-px bg-amber-500/15 text-amber-300 border border-amber-500/30">Premium</span>
                             )}
                           </div>
                           <div className="text-[10px] opacity-60 mt-0.5">{opt.description}</div>
@@ -1300,7 +1351,7 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                 ) : (
                   <div className="space-y-4">
                     <div className="bg-secondary border border-border rounded-xl p-4 space-y-2">
-                      {['🎨 Badge Premium exclusif', '⚡ XP x2 par message', '🎵 Accès aux salons VIP', '🌟 Couleur de pseudo personnalisée', '📌 Messages épinglés'].map((f, index) => (
+                      {['🎨 Badge Premium exclusif', '⚡ XP x2 par message', '🎵 Accès aux salons VIP', '🌟 Couleur de pseudo personnalisée', '📌 Messages épinglés', '🔥 Mode coquin 18+ (salons, jeux, réactions)'].map((f, index) => (
                         <div key={f} className="flex items-center gap-2 text-sm text-muted-foreground/80 transition-all duration-200 hover:scale-[1.01]"
                           style={{ animationDelay: `${index * 50}ms` }}>
                           <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />{f}

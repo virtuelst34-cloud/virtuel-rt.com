@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { ChatProvider, useChat, useUI } from '@/lib/contexts';
 import Sidebar from '@/components/chat/Sidebar';
 import UsernameModal from '@/components/chat/UsernameModal';
@@ -44,6 +44,15 @@ function ChatApp() {
     setSettingsTab(tab);
     setShowSettings(true);
   }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ tab?: string }>).detail;
+      openSettings(detail?.tab || 'premium');
+    };
+    window.addEventListener('virtuel-rt-open-settings', handler);
+    return () => window.removeEventListener('virtuel-rt-open-settings', handler);
+  }, [openSettings]);
 
   return (
     <div className="flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-background safe-area-pad">

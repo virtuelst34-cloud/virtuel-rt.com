@@ -8,7 +8,8 @@ import {
   markDailySparkDone,
   msUntilNextLocalMidnight,
 } from '@/lib/funFeatures';
-import { useNotifications } from '@/lib/contexts';
+import { getCoquinDailySpark } from '@/lib/coquinFeatures';
+import { useNotifications, usePreferences } from '@/lib/contexts';
 
 interface DailySparkCardProps {
   /** Compact for settings / sidebar-adjacent panels */
@@ -19,16 +20,21 @@ interface DailySparkCardProps {
 /** Étincelle du jour — tip qui change à minuit local, dismissable pour la journée. */
 export default function DailySparkCard({ compact = false, className = '' }: DailySparkCardProps) {
   const { addNotification } = useNotifications();
-  const [spark, setSpark] = useState(() => getDailySpark());
+  const { coquinMode } = usePreferences();
+  const [spark, setSpark] = useState(() => (coquinMode ? getCoquinDailySpark() : getDailySpark()));
   const [sparkDone, setSparkDone] = useState(() => isDailySparkDone(spark.key));
   const [dismissed, setDismissed] = useState(() => isDailySparkDismissed(spark.key));
 
   const refreshSpark = () => {
-    const next = getDailySpark();
+    const next = coquinMode ? getCoquinDailySpark() : getDailySpark();
     setSpark(next);
     setSparkDone(isDailySparkDone(next.key));
     setDismissed(isDailySparkDismissed(next.key));
   };
+
+  useEffect(() => {
+    refreshSpark();
+  }, [coquinMode]);
 
   useEffect(() => {
     refreshSpark();
@@ -74,7 +80,11 @@ export default function DailySparkCard({ compact = false, className = '' }: Dail
 
   return (
     <div
-      className={`relative rounded-xl border border-violet-500/25 bg-violet-500/10 text-left ${
+      className={`relative rounded-xl border text-left ${
+        coquinMode
+          ? 'border-rose-500/30 bg-rose-500/10'
+          : 'border-violet-500/25 bg-violet-500/10'
+      } ${
         compact ? 'px-3 py-2.5' : 'px-4 py-3'
       } ${className}`}
     >

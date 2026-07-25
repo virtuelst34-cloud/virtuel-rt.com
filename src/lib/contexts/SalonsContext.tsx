@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { useNotifications } from './NotificationsContext';
 import { useUser } from './UserContext';
-import { supabaseDbService, Salon as SupabaseSalon } from '../supabaseDb';
+import { supabaseDbService, Salon as SupabaseSalon, SalonCategoryRow } from '../supabaseDb';
 import { presenceService } from '../presenceService';
 import { supabase } from '../supabase';
+import { DEFAULT_SALON_CATEGORIES } from '../salonCategories';
 
 interface Salon {
   id: string;
@@ -18,6 +19,19 @@ interface Salon {
   description?: string;
   sort_order?: number;
   created_by?: string;
+  category_id?: string;
+  subcategory?: string;
+  isCoquin?: boolean;
+}
+
+export interface SalonCategoryState {
+  id: string;
+  name: string;
+  emoji: string;
+  description?: string;
+  sort_order: number;
+  subcategories: string[];
+  isCoquin?: boolean;
 }
 
 interface SalonsContextType {
@@ -26,12 +40,16 @@ interface SalonsContextType {
   hiddenSalons: string[];
   setHiddenSalons: React.Dispatch<React.SetStateAction<string[]>>;
   displayOrder: Record<string, number>;
+  categories: SalonCategoryState[];
   currentSalon: string | null;
   setCurrentSalon: (id: string | null) => void;
   addSalon: (salon: Salon) => void;
   updateSalon: (salonId: string, updates: Partial<Salon>) => Promise<void>;
   deleteSalon: (salonId: string) => void;
   reorderSalons: (orderedIds: string[]) => Promise<void>;
+  upsertCategory: (category: SalonCategoryState) => Promise<void>;
+  deleteCategory: (categoryId: string) => Promise<void>;
+  loadCategories: () => Promise<void>;
   isSalonLocked: (salonId: string) => boolean;
   verifySalonPassword: (salonId: string, password: string) => boolean;
   loadCustomSalons: () => Promise<void>;
@@ -56,7 +74,34 @@ function convertSupabaseSalon(supabaseSalon: SupabaseSalon): Salon {
     description: supabaseSalon.description || '',
     sort_order: supabaseSalon.sort_order,
     created_by: supabaseSalon.created_by || undefined,
+    category_id: supabaseSalon.category_id || undefined,
+    subcategory: supabaseSalon.subcategory || undefined,
+    isCoquin: !!supabaseSalon.is_coquin,
   };
+}
+
+function convertCategory(row: SalonCategoryRow): SalonCategoryState {
+  return {
+    id: row.id,
+    name: row.name,
+    emoji: row.emoji || '💬',
+    description: row.description || '',
+    sort_order: row.sort_order ?? 100,
+    subcategories: Array.isArray(row.subcategories) ? row.subcategories : [],
+    isCoquin: !!row.is_coquin,
+  };
+}
+
+function defaultCategoriesState(): SalonCategoryState[] {
+  return DEFAULT_SALON_CATEGORIES.map(c => ({
+    id: c.id,
+    name: c.name,
+    emoji: c.emoji,
+    description: c.description || '',
+    sort_order: c.sort_order,
+    subcategories: [...c.subcategories],
+    isCoquin: !!c.isCoquin,
+  }));
 }
 
 function mergeSalonLists(existing: Salon[], incoming: Salon[]): Salon[] {
@@ -75,6 +120,7 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
   const [hiddenSalons, setHiddenSalons] = useState<string[]>([]);
   const [unlockedSalons, setUnlockedSalons] = useState<Record<string, boolean>>({});
   const [displayOrder, setDisplayOrder] = useState<Record<string, number>>({});
+  const [categories, setCategories] = useState<SalonCategoryState[]>(defaultCategoriesState);
   const [currentSalon, setCurrentSalonRaw] = useState<string | null>(null);
   const { user, supabaseUser } = useUser();
 
@@ -133,9 +179,24 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loadCategories = useCallback(async () => {
+    try {
+      const rows = await supabaseDbService.getSalonCategories();
+      if (rows.length > 0) {
+        setCategories(rows.map(convertCategory));
+      } else {
+        setCategories(defaultCategoriesState());
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des catégories:', error);
+      setCategories(defaultCategoriesState());
+    }
+  }, []);
+
   useEffect(() => {
     loadCustomSalons();
-  }, [loadCustomSalons]);
+    loadCategories();
+  }, [loadCustomSalons, loadCategories]);
 
   useEffect(() => {
     const channel = supabase
@@ -200,6 +261,9 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
         description: salon.description || '',
         sort_order: salon.sort_order ?? 1000,
         created_by: user?.name || salon.created_by,
+        category_id: salon.category_id || 'general',
+        subcategory: salon.subcategory || '',
+        is_coquin: !!salon.isCoquin,
       };
       const saved = await supabaseDbService.addSalon(supabaseSalon, user?.name);
       if (saved) {
@@ -232,6 +296,9 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
       if (updates.password !== undefined) dbUpdates.password = updates.password;
       if (updates.isPrivate === false) dbUpdates.password = undefined;
       if (updates.live !== undefined) dbUpdates.live = updates.live;
+      if (updates.category_id !== undefined) dbUpdates.category_id = updates.category_id;
+      if (updates.subcategory !== undefined) dbUpdates.subcategory = updates.subcategory;
+      if (updates.isCoquin !== undefined) dbUpdates.is_coquin = updates.isCoquin;
 
       const saved = await supabaseDbService.updateSalon(salonId, dbUpdates);
       if (saved) {
@@ -283,6 +350,48 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
     }
   }, [addNotification, loadCustomSalons]);
 
+  const upsertCategory = useCallback(async (category: SalonCategoryState) => {
+    setCategories(prev => {
+      const map = new Map(prev.map(c => [c.id, c]));
+      map.set(category.id, category);
+      return Array.from(map.values()).sort((a, b) => a.sort_order - b.sort_order);
+    });
+    try {
+      await supabaseDbService.upsertSalonCategory({
+        id: category.id,
+        name: category.name,
+        emoji: category.emoji,
+        description: category.description || '',
+        sort_order: category.sort_order,
+        subcategories: category.subcategories || [],
+        is_coquin: !!category.isCoquin,
+      });
+      addNotification({ type: 'system', message: `Catégorie « ${category.name} » enregistrée.` });
+    } catch (error) {
+      console.error('Erreur catégorie:', error);
+      addNotification({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Impossible d’enregistrer la catégorie.',
+      });
+      await loadCategories();
+    }
+  }, [addNotification, loadCategories]);
+
+  const deleteCategory = useCallback(async (categoryId: string) => {
+    if (categoryId === 'general' || categoryId === 'coquin') {
+      addNotification({ type: 'error', message: 'Cette catégorie système ne peut pas être supprimée.' });
+      return;
+    }
+    setCategories(prev => prev.filter(c => c.id !== categoryId));
+    try {
+      await supabaseDbService.deleteSalonCategory(categoryId);
+      addNotification({ type: 'system', message: 'Catégorie supprimée.' });
+    } catch (error) {
+      console.error('Erreur suppression catégorie:', error);
+      await loadCategories();
+    }
+  }, [addNotification, loadCategories]);
+
   const isSalonLocked = useCallback((salonId: string): boolean => {
     const salon = customSalons.find(s => s.id === salonId);
     return Boolean(salon?.isPrivate && !unlockedSalons[salonId]);
@@ -300,9 +409,10 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
 
   const value: SalonsContextType = {
     customSalons, setCustomSalons, hiddenSalons, setHiddenSalons,
-    displayOrder,
+    displayOrder, categories,
     currentSalon, setCurrentSalon,
     addSalon, updateSalon, deleteSalon, reorderSalons,
+    upsertCategory, deleteCategory, loadCategories,
     isSalonLocked, verifySalonPassword,
     loadCustomSalons
   };

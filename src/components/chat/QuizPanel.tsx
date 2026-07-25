@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ArrowLeft, ArrowRight, Brain, Trophy, Users, X } from 'lucide-react';
-import { useUser } from '@/lib/contexts';
+import { useUser, usePreferences } from '@/lib/contexts';
 import {
   quizRealtimeService,
   QuizEvent,
@@ -31,6 +31,7 @@ function mergeAnswers(existing: QuizLiveAnswer[], incoming: QuizLiveAnswer[]): Q
 
 export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPanelProps) {
   const { user } = useUser();
+  const { coquinMode, isPremium } = usePreferences();
   const userId = user?.name || '';
 
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -150,6 +151,11 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
 
   const startPreset = async (preset: QuizPresetId) => {
     if (!user?.name) return;
+    const theme = QUIZ_THEMES.find(t => t.id === preset);
+    if (theme?.premiumOnly && !(coquinMode && isPremium)) {
+      setFeedback('🔒 Quiz Coquin réservé au Mode coquin Premium.');
+      return;
+    }
     setCreating(true);
     setFeedback(null);
 
@@ -274,18 +280,27 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
         <div className="space-y-2">
           <p className="text-[10px] text-muted-foreground">Choisis un thème pour démarrer :</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            {QUIZ_THEMES.map(theme => (
+            {QUIZ_THEMES.filter(t => !t.premiumOnly || (coquinMode && isPremium)).map(theme => (
               <button
                 key={theme.id}
                 type="button"
                 disabled={creating || !user}
                 onClick={() => void startPreset(theme.id)}
-                className="flex flex-col items-start gap-0.5 px-2.5 py-2 rounded-lg bg-primary/10 border border-primary/25 text-left hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                className={`flex flex-col items-start gap-0.5 px-2.5 py-2 rounded-lg border text-left disabled:opacity-50 transition-colors ${
+                  theme.premiumOnly
+                    ? 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20'
+                    : 'bg-primary/10 border-primary/25 hover:bg-primary/20'
+                }`}
               >
-                <span className="text-sm leading-none">{theme.emoji} <span className="text-xs font-medium text-primary">{theme.label}</span></span>
+                <span className="text-sm leading-none">{theme.emoji} <span className={`text-xs font-medium ${theme.premiumOnly ? 'text-rose-300' : 'text-primary'}`}>{theme.label}</span></span>
                 <span className="text-[9px] text-muted-foreground">{theme.description}</span>
               </button>
             ))}
+            {QUIZ_THEMES.some(t => t.premiumOnly) && !(coquinMode && isPremium) && (
+              <div className="col-span-2 sm:col-span-4 text-[10px] text-rose-300/70 px-1 py-1 flex items-center gap-1.5">
+                💋 Quiz Coquin masqué — activez le Mode coquin Premium (Apparence).
+              </div>
+            )}
           </div>
           {!user && (
             <p className="text-[10px] text-amber-400">Connecte-toi pour lancer un quiz.</p>

@@ -85,8 +85,8 @@ const MIGRATION_ORDER = [
   "enable_guest_friends_rls.sql",
   "add_salons_sort_order_and_meta.sql",
   "create_moderation_alerts_system.sql",
+  "add_salon_categories.sql",
 ];
-
 const SKIP_ERROR_CODES = new Set([
   "42P07", // duplicate_table
   "42710", // duplicate_object

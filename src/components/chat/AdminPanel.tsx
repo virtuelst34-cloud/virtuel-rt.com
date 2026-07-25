@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useUI, useUser, useSalons, useMessages, useXP, useModeration, useBadges } from '@/lib/contexts';
 import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';
 import { X, ShieldAlert, LayoutDashboard, Users, Gavel, DoorOpen, Diamond, Award, BarChart2, Lock, EyeOff, LucideIcon, Settings, Bell, MessageSquare, Shield, FileText, Activity, Siren } from 'lucide-react';
@@ -96,9 +97,9 @@ export default function AdminPanel() {
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[2000] animate-in fade-in duration-300 p-4"
+      className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center z-[2000] animate-in fade-in duration-300 p-0 sm:p-4 safe-area-pad"
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-panel-title"
@@ -106,7 +107,7 @@ export default function AdminPanel() {
     >
       <div
         ref={panelRef}
-        className="bg-card border border-red-500/30 rounded-3xl w-full max-w-[800px] max-h-[90vh] flex flex-col overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300"
+        className="bg-card border border-red-500/30 rounded-t-3xl sm:rounded-3xl w-full max-w-[800px] h-[min(100dvh,100%)] sm:h-auto max-h-[100dvh] sm:max-h-[90vh] flex flex-col overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300"
         tabIndex={-1}
       >
         {/* Header */}
@@ -139,10 +140,10 @@ export default function AdminPanel() {
           </div>
         )}
 
-        <div className="flex overflow-hidden flex-1 flex-col sm:flex-row">
+        <div className="flex overflow-hidden flex-1 flex-col sm:flex-row min-h-0">
           {/* Sidebar tabs */}
           <div
-            className="w-full sm:w-[170px] bg-secondary border-r border-border p-1.5 flex flex-row sm:flex-col gap-0.5 shrink-0 overflow-x-auto sm:overflow-x-visible"
+            className="w-full sm:w-[170px] bg-secondary border-b sm:border-b-0 sm:border-r border-border p-1.5 flex flex-row sm:flex-col gap-0.5 shrink-0 overflow-x-auto sm:overflow-x-visible sm:overflow-y-auto"
             role="tablist"
             aria-label="Onglets d'administration"
           >
@@ -158,21 +159,22 @@ export default function AdminPanel() {
                   aria-selected={activeTab === tab.id}
                   aria-controls={`panel-${tab.id}`}
                   id={`tab-${tab.id}`}
+                  title={tab.label}
                   className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition-all border whitespace-nowrap ${
                     activeTab === tab.id
                       ? 'bg-red-500/12 border-red-500/25 text-red-400'
                       : 'border-transparent text-muted-foreground/60 hover:bg-white/[0.04] hover:text-muted-foreground'
                   }`}
                 >
-                  <Icon className="w-4 h-4" aria-hidden="true" />
-                  <span className="hidden sm:inline">{tab.label}</span>
+                  <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span className="text-[11px] sm:text-xs">{tab.label}</span>
                 </button>
               );
             })}
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-5" role="tabpanel" aria-live="polite">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 min-h-0" role="tabpanel" aria-live="polite">
             {activeTab === 'dashboard'      && <DashboardSection profiles={profiles} customSalons={customSalons} salonMessages={salonMessages} monthlyXP={monthlyXP} />}
             {activeTab === 'stats'          && <StatsSection profiles={profiles} customSalons={customSalons} salonMessages={salonMessages} monthlyXP={monthlyXP} />}
             {activeTab === 'salons'         && <SalonsSection readOnly={isReadOnly} customSalons={customSalons} addSalon={addSalon} updateSalon={updateSalon} deleteSalon={deleteSalon} reorderSalons={reorderSalons} displayOrder={displayOrder} hiddenSalons={hiddenSalons} setHiddenSalons={setHiddenSalons} />}
@@ -191,6 +193,7 @@ export default function AdminPanel() {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

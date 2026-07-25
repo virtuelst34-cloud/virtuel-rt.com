@@ -9,8 +9,8 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 
 describe('AdminPanel component', () => {
   it('should render without crashing', () => {
-    const { container } = render(<AdminPanel />, { wrapper })
-    expect(container.firstChild).toBeInTheDocument()
+    render(<AdminPanel />, { wrapper })
+    expect(screen.getByRole('dialog', { name: /Panneau d'administration/i })).toBeInTheDocument()
   })
 
   it('should render admin panel header', () => {
@@ -31,7 +31,7 @@ describe('AdminPanel component', () => {
 
   it('should have close button', () => {
     render(<AdminPanel />, { wrapper })
-    const closeButton = screen.getByRole('button')
+    const closeButton = screen.getByLabelText(/Fermer le panneau d'administration/i)
     expect(closeButton).toBeInTheDocument()
   })
 

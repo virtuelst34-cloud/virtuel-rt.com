@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { ChatProvider, useChat } from '@/lib/contexts';
+import { ChatProvider, useChat, useUI } from '@/lib/contexts';
 import Sidebar from '@/components/chat/Sidebar';
 import UsernameModal from '@/components/chat/UsernameModal';
 import WelcomeScreen from '@/components/chat/WelcomeScreen';
@@ -17,7 +17,8 @@ import UserProfileView from '@/components/chat/UserProfileView';
 import AppUpdateBanner from '@/components/AppUpdateBanner';
 
 function ChatApp() {
-  const { user, currentSalon, showAdmin, setCurrentSalon } = useChat();
+  const { user, currentSalon, setCurrentSalon } = useChat();
+  const { showAdmin } = useUI();
   const [micActive, setMicActive]       = useState<boolean>(false);
   const [micLevel,  setMicLevel]        = useState<number>(0);
   const [showDM,    setShowDM]          = useState<boolean>(false);

@@ -66,7 +66,7 @@ export default function MobileBottomNav({
         {isStaff && (
           <NavBtn
             label="Modo"
-            onClick={() => openAdmin(user, 'modhub')}
+            onClick={() => openAdmin(user)}
             icon={<ShieldAlert className="w-5 h-5" />}
           />
         )}

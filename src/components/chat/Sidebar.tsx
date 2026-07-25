@@ -3,9 +3,10 @@ import { useUser, useSalons, useUI, usePreferences, useNotifications, useDM, use
 import Avatar from './Avatar';
 import { SearchPanel } from './SearchPanel';
 import { StatsPanel } from './StatsPanel';
-import { Home, MessageSquare, Bell, Star, ShieldAlert, Sun, Moon, Search, TrendingUp, LucideIcon, LogOut, MessagesSquare } from 'lucide-react';
+import { Home, MessageSquare, Bell, Star, ShieldAlert, Sun, Moon, Search, TrendingUp, LucideIcon, LogOut, MessagesSquare, Gamepad2 } from 'lucide-react';
 import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';
 import StaffChatPanel from './StaffChatPanel';
+import MiniGamesHub from './MiniGamesHub';
 
 interface SidebarProps {
   onOpenDM: (name?: string | null) => void;
@@ -35,6 +36,7 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
   const [showSearch, setShowSearch] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showStaffChat, setShowStaffChat] = useState(false);
+  const [showMiniGames, setShowMiniGames] = useState(false);
 
   return (
     <>
@@ -60,6 +62,7 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
         {settings.enable_notifications && (
           <IconBtn icon={Bell} title="Notifications" onClick={onOpenNotifications} badge={unreadCount > 0 ? unreadCount : null} />
         )}
+        <IconBtn icon={Gamepad2} title="Mini-jeux" onClick={() => setShowMiniGames(true)} />
         <div className="flex-1 min-h-2" />
 
         {user && (
@@ -128,6 +131,7 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
       {showSearch && <SearchPanel onClose={() => setShowSearch(false)} />}
       {showStats && <StatsPanel onClose={() => setShowStats(false)} />}
       {showStaffChat && <StaffChatPanel onClose={() => setShowStaffChat(false)} />}
+      {showMiniGames && <MiniGamesHub onClose={() => setShowMiniGames(false)} />}
     </>
   );
 });

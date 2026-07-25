@@ -70,6 +70,16 @@ describe('Sidebar', () => {
     expect(notificationsButton).toBeInTheDocument();
   });
 
+  it('devrait avoir un bouton Mini-jeux', () => {
+    render(
+      <TestProviders>
+        <Sidebar {...defaultProps} />
+      </TestProviders>
+    );
+
+    expect(screen.getByTitle('Mini-jeux')).toBeInTheDocument();
+  });
+
   it('devrait avoir un bouton Mon compte si l\'utilisateur existe', () => {
     render(
       <TestProviders>

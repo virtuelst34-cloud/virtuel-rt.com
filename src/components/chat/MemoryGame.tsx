@@ -53,7 +53,7 @@ export default function MemoryGame({ onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="w-full max-w-sm rounded-2xl border border-violet-500/35 bg-gradient-to-br from-[#1a1028] to-[#120c1c] shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
           <div>

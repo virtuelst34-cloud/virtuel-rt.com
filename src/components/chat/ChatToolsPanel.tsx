@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Dice5, CloudRain, Gamepad2, BellOff, Bell, Bookmark, Zap, X } from 'lucide-react';
+import { Dice5, CloudRain, Gamepad2, BellOff, Bell, Bookmark, Zap, X, Grid3X3 } from 'lucide-react';
 import {
   broadcastReactionRain,
   formatDiceResult,
@@ -11,6 +11,8 @@ import {
   type MessageBookmark,
 } from '@/lib/funFeatures';
 import MemoryGame from './MemoryGame';
+import TicTacToeGame from './TicTacToeGame';
+import ReflexGame from './ReflexGame';
 
 interface Props {
   open: boolean;
@@ -34,6 +36,8 @@ export default function ChatToolsPanel({
   addNotification,
 }: Props) {
   const [showMemory, setShowMemory] = useState(false);
+  const [showMorpion, setShowMorpion] = useState(false);
+  const [showReflex, setShowReflex] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [bookmarks, setBookmarks] = useState<MessageBookmark[]>([]);
   const [muted, setMuted] = useState(() => isSalonMuted(userName, salonId));
@@ -182,11 +186,37 @@ export default function ChatToolsPanel({
             <Gamepad2 className="w-4 h-4 text-violet-400" />
             <span className="flex-1">Mémoire cosmique</span>
           </button>
+
+          {/* Morpion */}
+          <button
+            type="button"
+            onClick={() => setShowMorpion(true)}
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-white/[0.05] transition-colors"
+          >
+            <Grid3X3 className="w-4 h-4 text-cyan-400" />
+            <span className="flex-1">Morpion</span>
+          </button>
+
+          {/* Réflexe */}
+          <button
+            type="button"
+            onClick={() => setShowReflex(true)}
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-white/[0.05] transition-colors"
+          >
+            <Zap className="w-4 h-4 text-amber-400" />
+            <span className="flex-1">Réflexe</span>
+          </button>
         </div>
       </div>
 
       {showMemory && (
         <MemoryGame onClose={() => setShowMemory(false)} />
+      )}
+      {showMorpion && (
+        <TicTacToeGame onClose={() => setShowMorpion(false)} />
+      )}
+      {showReflex && (
+        <ReflexGame onClose={() => setShowReflex(false)} />
       )}
     </>
   );

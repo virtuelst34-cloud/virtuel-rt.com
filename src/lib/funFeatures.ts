@@ -74,13 +74,38 @@ const DAILY_SPARKS = [
   { title: 'Micro-poésie', text: 'Écris un message en exactement 7 mots.' },
   { title: 'Compliment flash', text: 'Félicite quelqu’un pour son pseudo ou son avatar.' },
   { title: 'Pause zen', text: 'Active l’ambiance Nébuleuse et reste 2 minutes sans chatter.' },
+  { title: 'Fil rouge', text: 'Relance une discussion calme avec une question ouverte.' },
+  { title: 'Avatar surprise', text: 'Change ton avatar ou ton humeur pour la journée.' },
+  { title: 'Merci express', text: 'Remercie quelqu’un pour un message utile ou drôle.' },
+  { title: 'Histoire minute', text: 'Raconte une anecdote en trois phrases max.' },
+  { title: 'Voyage salon', text: 'Passe 5 minutes dans un salon hors de ta zone habituelle.' },
+  { title: 'Écoute active', text: 'Réponds à quelqu’un en reprenant un détail de son message.' },
+  { title: 'Défi emoji', text: 'Envoie un message composé uniquement d’emojis (max 8).' },
+  { title: 'Pont amical', text: 'Présente deux personnes du salon l’une à l’autre.' },
+  { title: 'Question du soir', text: 'Pose une question légère pour animer le fil.' },
+  { title: 'Mode curiosité', text: 'Demande à quelqu’un son salon préféré et pourquoi.' },
+  { title: 'Éclat créatif', text: 'Propose un petit défi ou un jeu improvisé au salon.' },
+  { title: 'Soft power', text: 'Envoie un message d’encouragement sans raison particulière.' },
+  { title: 'Rituel du jour', text: 'Choisis un mot du jour et glisse-le dans un message.' },
+  { title: 'Connexion douce', text: 'Réponds à un message ancien encore sans réponse.' },
 ];
 
+/** Clé date locale YYYY-MM-DD (fuseau du navigateur). */
+export function localDateKey(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function getDailySpark(date = new Date()) {
-  const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  const key = localDateKey(date);
   let hash = 0;
-  for (let i = 0; i < key.length; i++) hash = (hash + key.charCodeAt(i) * (i + 1)) % DAILY_SPARKS.length;
-  return { ...DAILY_SPARKS[hash], key };
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i) * (i + 1)) >>> 0;
+  }
+  const index = hash % DAILY_SPARKS.length;
+  return { ...DAILY_SPARKS[index], key };
 }
 
 export function isDailySparkDone(key: string): boolean {
@@ -95,6 +120,29 @@ export function markDailySparkDone(key: string) {
   try {
     localStorage.setItem(`virtuel_rt_spark_${key}`, '1');
   } catch { /* ignore */ }
+}
+
+const sparkDismissedKey = (dateKey: string) => `virtuel-rt-spark-dismissed-${dateKey}`;
+
+export function isDailySparkDismissed(dateKey = localDateKey()): boolean {
+  try {
+    return localStorage.getItem(sparkDismissedKey(dateKey)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function dismissDailySpark(dateKey = localDateKey()) {
+  try {
+    localStorage.setItem(sparkDismissedKey(dateKey), '1');
+  } catch { /* ignore */ }
+}
+
+/** ms jusqu’à minuit local suivant (rollover étincelle). */
+export function msUntilNextLocalMidnight(from = new Date()): number {
+  const next = new Date(from);
+  next.setHours(24, 0, 0, 0);
+  return Math.max(1000, next.getTime() - from.getTime());
 }
 
 export const APPLAUSE_EVENT = 'virtuel-rt-applause';

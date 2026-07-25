@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, KeyboardEvent, useMemo
 import { useUser, useNotifications, useXP, useDM, useMuteBlock } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
-import { Send, X, MessageSquare, Search, Mic, Video, PhoneOff, MicOff, VideoOff, Paperclip, FileText } from 'lucide-react';
+import { Send, X, MessageSquare, Search, Mic, Video, PhoneOff, MicOff, VideoOff, Paperclip, FileText, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { dmTypingService } from '@/lib/dmTypingService';
 import { getSpecialBadgeForUser, SPECIAL_BADGES } from '@/lib/diamondBadges';
@@ -451,14 +451,16 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
     );
   }
 
+  const mobileShowChat = !!selectedUser;
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[1500] animate-in fade-in duration-300 p-4" onClick={handleClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center z-[1500] animate-in fade-in duration-300 p-0 sm:p-4 safe-area-pad" onClick={handleClose}>
       <div
-        className="bg-card border-2 border-red-500/50 rounded-3xl w-full max-w-[720px] h-[90vh] max-h-[560px] flex overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5),0_0_0_1px_rgba(239,68,68,0.3)] animate-in zoom-in-95 duration-300"
+        className="bg-card border-0 sm:border-2 border-red-500/50 rounded-t-3xl sm:rounded-3xl w-full max-w-[720px] h-[92dvh] sm:h-[90vh] max-h-[92dvh] sm:max-h-[560px] flex overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5),0_0_0_1px_rgba(239,68,68,0.3)] animate-in zoom-in-95 duration-300"
         onClick={e => e.stopPropagation()}
       >
-        {/* Sidebar contacts */}
-        <div className="w-[210px] bg-secondary border-r border-border flex flex-col shrink-0">
+        {/* Sidebar contacts — full width on mobile when no chat selected */}
+        <div className={`${mobileShowChat ? 'hidden sm:flex' : 'flex'} w-full sm:w-[210px] bg-secondary sm:border-r border-border flex-col shrink-0 min-w-0`}>
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
               <MessageSquare className="w-4 h-4 text-primary animate-pulse" /> Messages
@@ -466,7 +468,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                 <span className="text-[9px] bg-primary text-white rounded-full px-1.5 py-px font-bold animate-bounce">{totalUnread}</span>
               )}
             </span>
-            <button onClick={handleClose} className="p-1 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-all duration-200 hover:scale-110 active:scale-95">
+            <button onClick={handleClose} className="p-1 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-200 hover:scale-110 active:scale-95" aria-label="Fermer">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -490,7 +492,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
               const profile = u.profile || profiles[u.name];
               return (
                 <button key={u.name} onClick={() => setSelectedUser(u.name)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 transition-all duration-200 text-left ${selectedUser === u.name ? 'bg-primary/15 border-r-2 border-primary' : 'hover:bg-white/[0.04] hover:scale-[1.01]'} animate-slide-in-right`}
+                  className={`w-full flex items-center gap-2.5 px-3 py-3 sm:py-2.5 transition-all duration-200 text-left min-h-[52px] sm:min-h-0 ${selectedUser === u.name ? 'bg-primary/15 border-r-2 border-primary' : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:scale-[1.01]'} animate-slide-in-right`}
                   style={{ animationDelay: `${index * 30}ms` }}>
                   <div className="relative shrink-0 transition-transform duration-200 hover:scale-110">
                     <Avatar avatarClass={u.avatar || 'av1'} initials={u.initials || u.name.slice(0, 2).toUpperCase()} size="sm" />
@@ -520,14 +522,22 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
           </div>
         </div>
 
-        {/* Zone conversation */}
-        <div className="flex-1 flex flex-col min-w-0">
+        {/* Zone conversation — full screen on mobile when a chat is open */}
+        <div className={`${mobileShowChat ? 'flex' : 'hidden sm:flex'} flex-1 flex-col min-w-0 w-full`}>
           {selectedUser && contact ? (
             <>
-              <div className="px-4 py-2.5 border-b border-border flex items-center gap-2.5 shrink-0 bg-card">
+              <div className="px-3 sm:px-4 py-2.5 border-b border-border flex items-center gap-2 shrink-0 bg-card">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUser(null)}
+                  className="sm:hidden p-1.5 -ml-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5 touch-target shrink-0"
+                  aria-label="Retour aux conversations"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
                 <Avatar avatarClass={contact.avatar || 'av1'} initials={contact.initials || contact.name.slice(0, 2).toUpperCase()} size="sm" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-semibold text-foreground truncate">{contact.name}</span>
                     <DiamondBadge level={contact.level || 1} size="xs" />
                     <SpecialBadgesOnly profile={contact as Record<string, unknown>} />
@@ -649,7 +659,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                   return (
                     <div key={msg.id} className={`flex gap-2 items-end ${isOwn ? 'flex-row-reverse' : ''} animate-slide-in-up`} style={{ animationDelay: `${index * 30}ms` }}>
                       {!isOwn && <Avatar avatarClass={msg.sender_avatar} initials={msg.sender_initials} size="xs" />}
-                      <div className={`max-w-[65%] px-3 py-2 text-[13px] rounded-xl leading-relaxed break-words transition-all duration-200 hover:scale-[1.02] ${isOwn ? 'bg-purple-700/30 border border-purple-500/30 rounded-br-sm hover:bg-purple-700/40' : 'bg-secondary border border-border rounded-bl-sm hover:bg-secondary/90'}`}>
+                      <div className={`max-w-[85%] sm:max-w-[65%] min-w-0 px-3 py-2 text-[13px] rounded-xl leading-relaxed transition-all duration-200 hover:scale-[1.02] ${isOwn ? 'bg-purple-700/30 border border-purple-500/30 rounded-br-sm hover:bg-purple-700/40' : 'bg-secondary border border-border rounded-bl-sm hover:bg-secondary/90'}`}>
                         {msg.image_url && (
                           isImage ? (
                             <a href={msg.image_url} target="_blank" rel="noopener noreferrer" className="block mb-1.5">
@@ -660,7 +670,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                               href={msg.image_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 mb-1.5 px-2 py-1.5 rounded-lg bg-black/20 border border-white/10 text-[11px] text-primary hover:bg-black/30"
+                              className="flex items-center gap-2 mb-1.5 px-2 py-1.5 rounded-lg bg-black/20 border border-border text-[11px] text-primary hover:bg-black/30"
                             >
                               <FileText className="w-3.5 h-3.5 shrink-0" />
                               <span className="truncate">Télécharger le fichier</span>
@@ -668,7 +678,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                           )
                         )}
                         {!isFileOnly && msg.text && (
-                          <span className="text-foreground">{msg.text}</span>
+                          <span className="text-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{msg.text}</span>
                         )}
                         <div className={`text-[9px] mt-1 flex items-center gap-1 ${isOwn ? 'justify-end text-purple-300/50' : 'text-muted-foreground/40'}`}>
                           {msg.created_date ? format(new Date(msg.created_date), 'HH:mm') : ''}
@@ -706,7 +716,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                     </button>
                   </div>
                 )}
-                <div className="flex items-center gap-2 bg-secondary border border-white/10 rounded-xl px-3 py-1.5 focus-within:border-primary/50 focus-within:shadow-lg focus-within:shadow-primary/10 transition-all duration-200">
+                <div className="flex items-center gap-2 bg-secondary border border-border rounded-xl px-3 py-2 sm:py-1.5 focus-within:border-primary/50 focus-within:shadow-lg focus-within:shadow-primary/10 transition-all duration-200">
                   <input
                     ref={fileInputRef}
                     type="file"

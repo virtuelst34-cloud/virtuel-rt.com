@@ -40,28 +40,29 @@
 
   /* ── Thème clair ── */
   .light {
-    --background: 220 15% 90%;
-    --foreground: 220 20% 12%;
-    --card: 0 0% 95%;
-    --card-foreground: 220 20% 12%;
-    --popover: 0 0% 95%;
-    --popover-foreground: 220 20% 12%;
-    --primary: 263 70% 50%;
+    --background: 210 24% 97%;
+    --foreground: 222 28% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 28% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 28% 10%;
+    --primary: 263 70% 46%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 10% 85%;
-    --secondary-foreground: 220 20% 12%;
-    --muted: 220 10% 85%;
-    --muted-foreground: 220 8% 42%;
-    --accent: 263 50% 88%;
-    --accent-foreground: 263 70% 30%;
-    --destructive: 0 84% 55%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 220 12% 80%;
-    --input: 220 12% 80%;
-    --ring: 263 70% 50%;
-    --sidebar-background: 0 0% 94%;
-    --sidebar-foreground: 220 20% 28%;
-    --sidebar-border: 220 12% 80%;
+    --secondary: 214 18% 92%;
+    --secondary-foreground: 222 24% 14%;
+    --muted: 214 16% 91%;
+    --muted-foreground: 215 14% 28%;
+    --accent: 263 42% 90%;
+    --accent-foreground: 263 70% 28%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 16% 80%;
+    --input: 214 16% 80%;
+    --ring: 263 70% 46%;
+    --sidebar-background: 210 20% 96%;
+    --sidebar-foreground: 222 22% 22%;
+    --sidebar-border: 214 16% 82%;
+    color-scheme: light;
   }
 
   /* ── Mode soirée ── */
@@ -539,5 +540,59 @@ html, body, #root {
     height: 100dvh;
     max-height: 100dvh;
   }
+}
+
+/* ── Light theme: contraste lisible (overlays / texte atténué) ── */
+.light .text-muted-foreground\/40,
+.light .text-muted-foreground\/45,
+.light .text-muted-foreground\/50 {
+  color: hsl(var(--muted-foreground) / 0.85);
+}
+.light .text-muted-foreground\/60,
+.light .text-muted-foreground\/70 {
+  color: hsl(var(--muted-foreground));
+}
+.light .border-white\/10,
+.light .border-white\/5,
+.light .border-white\/15 {
+  border-color: hsl(var(--border));
+}
+.light .hover\:bg-white\/5:hover,
+.light .hover\:bg-white\/\[0\.04\]:hover,
+.light .hover\:bg-white\/\[0\.05\]:hover,
+.light .hover\:bg-white\/\[0\.08\]:hover,
+.light .hover\:bg-white\/10:hover,
+.light .active\:bg-white\/5:active {
+  background-color: hsl(222 28% 10% / 0.06);
+}
+.light .bg-white\/5,
+.light .bg-white\/\[0\.03\],
+.light .bg-white\/\[0\.04\],
+.light .bg-white\/\[0\.05\] {
+  background-color: hsl(222 28% 10% / 0.05);
+}
+.light .text-purple-300 {
+  color: hsl(263 55% 38%);
+}
+.light .text-purple-300\/50,
+.light .text-purple-300\/40 {
+  color: hsl(263 40% 42% / 0.8);
+}
+.light .text-emerald-400 {
+  color: hsl(160 70% 28%);
+}
+.light .text-amber-200\/85,
+.light .text-amber-200 {
+  color: hsl(32 80% 28%);
+}
+.light .bg-card {
+  color: hsl(var(--card-foreground));
+}
+.light .bg-secondary {
+  color: hsl(var(--secondary-foreground));
+}
+.light input::placeholder,
+.light textarea::placeholder {
+  color: hsl(var(--muted-foreground) / 0.7);
 }
 

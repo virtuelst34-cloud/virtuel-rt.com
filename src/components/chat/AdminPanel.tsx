@@ -43,14 +43,16 @@ const TABS: Tab[] = [
 ];
 
 export default function AdminPanel() {
-  const { setShowAdmin } = useUI();
+  const { setShowAdmin, adminInitialTab, setAdminInitialTab } = useUI();
   const { user, supabaseUser, profiles, setProfiles, setUserStatusAdmin } = useUser();
   const { customSalons, addSalon, updateSalon, deleteSalon, reorderSalons, displayOrder, hiddenSalons, setHiddenSalons } = useSalons();
   const { salonMessages } = useMessages();
   const { monthlyXP } = useXP();
   const { banUser, unbanUser, muteUser, unmuteUser } = useModeration();
   const { customBadges, setCustomBadges } = useBadges();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() =>
+    adminInitialTab && TABS.some((t) => t.id === adminInitialTab) ? adminInitialTab : 'dashboard',
+  );
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const firstTabRef = useRef<HTMLButtonElement>(null);
@@ -58,6 +60,13 @@ export default function AdminPanel() {
 
   // Un invité (pas de session Supabase) ne peut qu'observer
   const isReadOnly = !supabaseUser;
+
+  useEffect(() => {
+    if (adminInitialTab && TABS.some((t) => t.id === adminInitialTab)) {
+      setActiveTab(adminInitialTab);
+      setAdminInitialTab(null);
+    }
+  }, [adminInitialTab, setAdminInitialTab]);
 
   // Sécurité : fermer si l'utilisateur n'a pas les droits staff/admin
   useEffect(() => {

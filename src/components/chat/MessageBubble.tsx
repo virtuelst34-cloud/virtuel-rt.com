@@ -149,7 +149,7 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
         {/* Auteur + heure */}
         <div className={`flex items-center gap-1.5 ${isOwn ? 'flex-row-reverse' : ''}`}>
           <button 
-            className={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline transition-colors ${isOwn ? 'text-emerald-400' : 'text-purple-300'} cursor-pointer`}
+            className={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline transition-colors ${isOwn ? 'text-emerald-700 dark:text-emerald-400' : 'text-purple-700 dark:text-purple-300'} cursor-pointer`}
             onClick={(e) => {
               e.stopPropagation();
               onViewProfile?.(message.author_name);
@@ -194,8 +194,8 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
           <div 
             className={`${compactMode ? 'px-2 py-1.5 text-[12px]' : 'px-3 py-2 text-[13px]'} text-foreground leading-relaxed break-words transition-all duration-200
             ${isOwn
-              ? 'bg-purple-700/25 border border-purple-500/30 rounded-xl rounded-br-sm hover:bg-purple-700/35'
-              : 'bg-secondary/80 border border-border rounded-xl rounded-bl-sm hover:bg-secondary/90'
+              ? 'bg-purple-600/15 dark:bg-purple-700/25 border border-purple-500/40 dark:border-purple-500/30 rounded-xl rounded-br-sm hover:bg-purple-600/25 dark:hover:bg-purple-700/35'
+              : 'bg-secondary border border-border rounded-xl rounded-bl-sm hover:bg-secondary/90'
             }`}
             id={`message-content-${message.id}`}>
             {isEditing && onEdit ? (

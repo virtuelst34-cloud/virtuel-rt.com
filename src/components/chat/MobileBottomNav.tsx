@@ -1,7 +1,7 @@
 import React from 'react';
 import { Home, MessageSquare, Bell, Settings, Menu, ShieldAlert } from 'lucide-react';
 import { useUser, useSalons, useNotifications, useDM, useUI, useGlobalSettings } from '@/lib/contexts';
-import { hasAdminAccess } from '@/lib/utils/founderCheck';
+import { hasStaffAccess } from '@/lib/utils/founderCheck';
 import Avatar from './Avatar';
 
 interface MobileBottomNavProps {
@@ -26,6 +26,7 @@ export default function MobileBottomNav({
   const { openAdmin } = useUI();
   const { settings } = useGlobalSettings();
   const dmUnread = user?.name ? getUnreadCount(user.name) : 0;
+  const isStaff = hasStaffAccess(user);
 
   return (
     <nav
@@ -62,10 +63,10 @@ export default function MobileBottomNav({
             icon={<Bell className="w-5 h-5" />}
           />
         )}
-        {hasAdminAccess(user) && (
+        {isStaff && (
           <NavBtn
-            label="Admin"
-            onClick={() => openAdmin(user)}
+            label="Modo"
+            onClick={() => openAdmin(user, 'modhub')}
             icon={<ShieldAlert className="w-5 h-5" />}
           />
         )}

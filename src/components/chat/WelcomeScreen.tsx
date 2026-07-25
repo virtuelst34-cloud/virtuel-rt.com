@@ -1,12 +1,12 @@
 import React, { useState, useRef, useCallback, FormEvent, useEffect } from 'react';
-import { useUser, useSalons, useNotifications, useXP, useMuteBlock } from '@/lib/contexts';
+import { useUser, useSalons, useNotifications, useXP, useMuteBlock, useUI } from '@/lib/contexts';
 import { Salon } from '@/lib/chatConfig';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
 import UserProfileView from './UserProfileView';
 import { SupabaseLogin } from '../auth/SupabaseLogin';
-import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users, Scale } from 'lucide-react';
+import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users, Scale, ShieldAlert } from 'lucide-react';
 import { getSpecialBadgeForUser, getSpecialBadgeIdsForUser, SPECIAL_BADGES } from '@/lib/diamondBadges';
 import { presenceService } from '@/lib/presenceService';
 import MembersPanel from './MembersPanel';
@@ -14,6 +14,7 @@ import DailySparkCard from './DailySparkCard';
 import { Link } from 'react-router-dom';
 import { mergeAndSortSalons } from '@/lib/salonUtils';
 import { MENTIONS_LEGALES_HREF } from '@/lib/welcomeContent';
+import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';
 
 interface DisplayOnlineUser {
   name: string;
@@ -57,6 +58,8 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
   const { addNotification } = useNotifications();
   const { xpProgress, xpForLevel, monthlyXP } = useXP();
   const { isMuted, isBlocked } = useMuteBlock();
+  const { openAdmin } = useUI();
+  const canModerate = hasAdminAccess(user) || hasStaffAccess(user);
   const [waved, setWaved]             = useState<Record<string, boolean>>({});
   const [filter, setFilter]           = useState('all');
   const [viewProfile, setViewProfile] = useState<string | null>(null);
@@ -273,20 +276,30 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
           </div>
         </div>
         <h2 className="text-lg sm:text-xl font-bold text-foreground">Bienvenue sur Virtuel-RT</h2>
-        <p className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] text-amber-200/85 bg-amber-500/10 border border-amber-500/25 rounded-full px-2.5 py-1">
+        <p className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] text-amber-800 dark:text-amber-200/85 bg-amber-500/10 border border-amber-500/25 rounded-full px-2.5 py-1">
           <Scale className="w-3 h-3 shrink-0" /> Interdit aux mineurs · réservé aux 18 ans
         </p>
         <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg px-4 py-2 mb-1">
-          <p className="text-sm font-semibold text-purple-300">🎉 Pour l'ouverture, Premium offert en essai !</p>
+          <p className="text-sm font-semibold text-purple-700 dark:text-purple-300">🎉 Pour l&apos;ouverture, Premium offert en essai !</p>
         </div>
         <DailySparkCard className="w-full max-w-sm" />
-        <p className="text-sm text-muted-foreground/50 max-w-xs leading-relaxed">
+        {canModerate && (
+          <button
+            type="button"
+            onClick={() => openAdmin(user, 'modhub')}
+            className="w-full max-w-sm flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/35 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/20 transition-colors touch-target"
+          >
+            <ShieldAlert className="w-4 h-4 shrink-0" />
+            Centre de modération
+          </button>
+        )}
+        <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
           Choisissez un salon pour rejoindre une discussion,
           ou envoyez un message privé à quelqu'un.
         </p>
         <Link
           to={MENTIONS_LEGALES_HREF}
-          className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/45 hover:text-purple-300 transition-colors"
+          className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
         >
           <Scale className="w-3 h-3" /> Mentions légales · 18+
         </Link>

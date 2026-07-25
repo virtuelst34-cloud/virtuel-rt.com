@@ -5,24 +5,31 @@ import type { UserProfile } from './UserContext';
 interface UIContextType {
   showAdmin: boolean;
   setShowAdmin: React.Dispatch<React.SetStateAction<boolean>>;
+  adminInitialTab: string | null;
+  setAdminInitialTab: React.Dispatch<React.SetStateAction<string | null>>;
   showProfile: boolean;
   setShowProfile: React.Dispatch<React.SetStateAction<boolean>>;
-  openAdmin: (user: UserProfile | null) => void;
+  openAdmin: (user: UserProfile | null, initialTab?: string) => void;
 }
 
 const UIContext = createContext<UIContextType | null>(null);
 
 export function UIProvider({ children }: { children: ReactNode }) {
   const [showAdmin, setShowAdmin] = useState<boolean>(false);
+  const [adminInitialTab, setAdminInitialTab] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState<boolean>(false);
 
   // Ouverture sécurisée : staff (mod+) ou admin
-  const openAdmin = useCallback((user: UserProfile | null) => {
-    if (hasStaffAccess(user) || hasAdminAccess(user)) setShowAdmin(true);
+  const openAdmin = useCallback((user: UserProfile | null, initialTab?: string) => {
+    if (hasStaffAccess(user) || hasAdminAccess(user)) {
+      setAdminInitialTab(initialTab || null);
+      setShowAdmin(true);
+    }
   }, []);
 
   const value: UIContextType = {
     showAdmin, setShowAdmin,
+    adminInitialTab, setAdminInitialTab,
     showProfile, setShowProfile,
     openAdmin,
   };

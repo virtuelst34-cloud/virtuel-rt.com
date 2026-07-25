@@ -102,7 +102,7 @@ export default function StaffChatPanel({ onClose }: Props) {
   };
 
   const openFullModeration = () => {
-    openAdmin(user);
+    openAdmin(user, 'modhub');
     onClose();
   };
 

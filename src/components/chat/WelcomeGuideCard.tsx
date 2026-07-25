@@ -27,7 +27,7 @@ export default function WelcomeGuideCard() {
       </button>
 
       {open && (
-        <div className="px-4 pb-4 space-y-4 text-[12px] text-muted-foreground/80 leading-relaxed border-t border-purple-500/15 pt-3">
+        <div className="px-4 pb-4 space-y-4 text-[12px] text-muted-foreground/80 leading-relaxed border-t border-purple-500/15 pt-3 max-h-[min(60vh,520px)] overflow-y-auto overscroll-contain">
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100/90 leading-snug">
             <strong className="font-semibold">18+ · Interdit aux mineurs.</strong>{' '}
             Virtuel-RT est réservé aux adultes. Signalez tout contenu inapproprié via le bouton signaler.

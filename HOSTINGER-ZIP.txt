@@ -16,9 +16,13 @@
 # 2. Zipper le CONTENU de dist/ à la racine (index.html + assets/)
 # 3. Extraire dans public_html (pas dans un sous-dossier)
 #
-# Option C — GitHub Actions (branche master uniquement)
-# Push sur master → CI build + FTPS vers FTP_SERVER_DIR
-# Vérifier le secret FTP_SERVER_DIR = vrai document root www
+# Option C — GitHub Actions (push main ou master)
+# Push → CI build + FTPS (protocol ftps, port 21) vers FTP_SERVER_DIR
+# Secrets : FTP_SERVER (IP Hostinger recommandée), FTP_USERNAME, FTP_PASSWORD,
+#           FTP_SERVER_DIR (= vrai document root www)
+# Les deploys FTPS sont sérialisés (concurrency) + 1 retry si timeout.
+# Si FTPS échoue encore : télécharger l'artifact hostinger-dist-<sha> du run,
+# ou utiliser Option A (zip SOURCE hPanel).
 #
 # Permissions zip Windows (EACCES Hostinger) :
 #   powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\zip-for-hostinger.ps1"

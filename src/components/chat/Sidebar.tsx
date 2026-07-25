@@ -3,8 +3,9 @@ import { useUser, useSalons, useUI, usePreferences, useNotifications, useDM, use
 import Avatar from './Avatar';
 import { SearchPanel } from './SearchPanel';
 import { StatsPanel } from './StatsPanel';
-import { Home, MessageSquare, Bell, Star, ShieldAlert, Sun, Moon, Search, TrendingUp, LucideIcon, LogOut } from 'lucide-react';
-import { hasAdminAccess } from '@/lib/utils/founderCheck';
+import { Home, MessageSquare, Bell, Star, ShieldAlert, Sun, Moon, Search, TrendingUp, LucideIcon, LogOut, MessagesSquare } from 'lucide-react';
+import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';
+import StaffChatPanel from './StaffChatPanel';
 
 interface SidebarProps {
   onOpenDM: (name?: string | null) => void;
@@ -32,6 +33,7 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
   const pendingFriends = pendingRequests.length;
   const [showSearch, setShowSearch] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showStaffChat, setShowStaffChat] = useState(false);
 
   return (
     <div className="hidden sm:flex w-[72px] bg-card flex-col items-center border-r border-border shrink-0 h-full py-3 gap-1.5">
@@ -66,11 +68,22 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
         <Star className="w-[18px] h-[18px]" />
       </button>
 
-      {/* Admin — visible uniquement pour les utilisateurs autorisés */}
-      {hasAdminAccess(user) && (
+      {/* Admin — staff (mods+) et admins */}
+      {(hasAdminAccess(user) || hasStaffAccess(user)) && (
         <button onClick={() => openAdmin(user)} title="Administration"
           className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-500/10 border border-red-500/25 text-red-400 hover:bg-red-500/20 transition-colors">
           <ShieldAlert className="w-[18px] h-[18px]" />
+        </button>
+      )}
+
+      {/* Espace staff — mods / direction / fondateur */}
+      {hasStaffAccess(user) && (
+        <button
+          onClick={() => setShowStaffChat(true)}
+          title="Espace staff"
+          className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-500/10 border border-red-500/25 text-red-400 hover:bg-red-500/20 transition-colors"
+        >
+          <MessagesSquare className="w-[18px] h-[18px]" />
         </button>
       )}
 
@@ -104,6 +117,8 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
 
       {/* Stats Panel */}
       {showStats && <StatsPanel onClose={() => setShowStats(false)} />}
+
+      {showStaffChat && <StaffChatPanel onClose={() => setShowStaffChat(false)} />}
     </div>
   );
 });

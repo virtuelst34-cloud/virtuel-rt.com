@@ -4,13 +4,14 @@ import { supabaseAuthService } from '@/lib/supabaseAuth';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import { getBadgeForLevel, getUnlockedBadges } from '@/lib/diamondBadges';
-import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare, Scale, Zap, Bookmark } from 'lucide-react';
+import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare, Scale, Zap, Bookmark, Smartphone } from 'lucide-react';
 import AchievementsSection from './AchievementsSection';
 import TwoFactorSection from './TwoFactorSection';
 import DailySparkCard from './DailySparkCard';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { AVATAR_IDS } from '@/lib/chatConfig';
+import { supabase } from '@/lib/supabase';
 import {
   MOOD_OPTIONS,
   getMood,
@@ -106,6 +107,15 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordMsg, setPasswordMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [alertPrefs, setAlertPrefs] = useState({
+    phone_number: '',
+    phone_consent: false,
+    notify_mod_app: true,
+    notify_mod_email: true,
+    notify_mod_sms: false,
+  });
+  const [alertPrefsSaving, setAlertPrefsSaving] = useState(false);
+  const [alertPrefsMsg, setAlertPrefsMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -114,6 +124,27 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
   useEffect(() => {
     if (activeTab === 'friends') void reloadFriends();
   }, [activeTab, reloadFriends]);
+
+  useEffect(() => {
+    if (!supabaseUser?.id) return;
+    let active = true;
+    void (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('phone_number, phone_consent, notify_mod_app, notify_mod_email, notify_mod_sms')
+        .eq('id', supabaseUser.id)
+        .maybeSingle();
+      if (!active || !data) return;
+      setAlertPrefs({
+        phone_number: data.phone_number || '',
+        phone_consent: !!data.phone_consent,
+        notify_mod_app: data.notify_mod_app !== false,
+        notify_mod_email: data.notify_mod_email !== false,
+        notify_mod_sms: !!data.notify_mod_sms,
+      });
+    })();
+    return () => { active = false; };
+  }, [supabaseUser?.id]);
 
   useEffect(() => {
     setDraft({ 
@@ -128,6 +159,28 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
       signature: user?.name ? getSignature(user.name) : '',
     });
   }, [user]);
+
+  const saveAlertPrefs = async () => {
+    if (!supabaseUser?.id) return;
+    if (alertPrefs.notify_mod_sms && (!alertPrefs.phone_consent || !alertPrefs.phone_number.trim())) {
+      setAlertPrefsMsg('Consentement et numéro requis pour les SMS.');
+      return;
+    }
+    setAlertPrefsSaving(true);
+    setAlertPrefsMsg(null);
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        phone_number: alertPrefs.phone_number.trim() || null,
+        phone_consent: alertPrefs.phone_consent,
+        notify_mod_app: alertPrefs.notify_mod_app,
+        notify_mod_email: alertPrefs.notify_mod_email,
+        notify_mod_sms: alertPrefs.notify_mod_sms && alertPrefs.phone_consent,
+      })
+      .eq('id', supabaseUser.id);
+    setAlertPrefsSaving(false);
+    setAlertPrefsMsg(error ? 'Erreur lors de la sauvegarde.' : 'Préférences d\'alerte enregistrées.');
+  };
 
   if (!user) return null;
 
@@ -673,6 +726,77 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                 {supabaseUser && user.email && (
                   <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
                     <TwoFactorSection userId={supabaseUser.id} email={user.email} />
+                  </div>
+                )}
+
+                {supabaseUser && (
+                  <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Smartphone className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-semibold text-foreground">Alertes modération / sécurité</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mb-3">
+                      Choisissez comment être prévenu en cas d&apos;événement de modération sur votre compte (staff : aussi pour les alertes équipe).
+                    </p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5 block">
+                          Téléphone (optionnel, format international)
+                        </label>
+                        <input
+                          type="tel"
+                          value={alertPrefs.phone_number}
+                          onChange={(e) => setAlertPrefs((p) => ({ ...p, phone_number: e.target.value }))}
+                          placeholder="+33 6 12 34 56 78"
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50"
+                        />
+                      </div>
+                      <label className="flex items-start gap-2 text-[11px] text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={alertPrefs.phone_consent}
+                          onChange={(e) => setAlertPrefs((p) => ({ ...p, phone_consent: e.target.checked }))}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          J&apos;accepte de recevoir des SMS d&apos;alerte de modération / sécurité sur ce numéro.
+                          Consentement révocable à tout moment.
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {(
+                          [
+                            ['notify_mod_app', 'In-app'],
+                            ['notify_mod_email', 'Email'],
+                            ['notify_mod_sms', 'SMS'],
+                          ] as const
+                        ).map(([key, label]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setAlertPrefs((p) => ({ ...p, [key]: !p[key] }))}
+                            className={`px-2.5 py-1.5 rounded-lg border text-[11px] ${
+                              alertPrefs[key]
+                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                : 'border-border text-muted-foreground'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={alertPrefsSaving}
+                        onClick={() => void saveAlertPrefs()}
+                        className="w-full py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs hover:bg-primary/25 disabled:opacity-50"
+                      >
+                        {alertPrefsSaving ? 'Enregistrement…' : 'Enregistrer les préférences'}
+                      </button>
+                      {alertPrefsMsg && (
+                        <p className="text-[11px] text-muted-foreground">{alertPrefsMsg}</p>
+                      )}
+                    </div>
                   </div>
                 )}
 

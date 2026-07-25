@@ -34,9 +34,9 @@ interface NotificationsContextType {
 
 const NotificationsContext = createContext<NotificationsContextType | null>(null);
 
-const DB_NOTIFICATION_TYPES = new Set(['dm', 'friend_request', 'friend_accepted', 'system', 'mention']);
+const DB_NOTIFICATION_TYPES = new Set(['dm', 'friend_request', 'friend_accepted', 'system', 'mention', 'moderation_alert']);
 const GUEST_NOTIFS_KEY = 'virtuel_rt_guest_notifications';
-const PERSISTENT_TYPES = new Set(['dm', 'mention', 'friend_request', 'friend_accepted', 'mod', 'report']);
+const PERSISTENT_TYPES = new Set(['dm', 'mention', 'friend_request', 'friend_accepted', 'mod', 'report', 'moderation_alert']);
 
 type StoredNotification = Omit<Notification, 'actions'>;
 

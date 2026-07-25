@@ -84,6 +84,7 @@ const MIGRATION_ORDER = [
   "fix_friends_rls_and_realtime.sql",
   "enable_guest_friends_rls.sql",
   "add_salons_sort_order_and_meta.sql",
+  "create_moderation_alerts_system.sql",
 ];
 
 const SKIP_ERROR_CODES = new Set([

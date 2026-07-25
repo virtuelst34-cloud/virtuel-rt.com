@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, KeyboardEvent } from 'react';
 import { useUI, useUser, useSalons, useMessages, useXP, useModeration, useBadges } from '@/lib/contexts';
-import { hasAdminAccess } from '@/lib/utils/founderCheck';
-import { X, ShieldAlert, LayoutDashboard, Users, Gavel, DoorOpen, Diamond, Award, BarChart2, Lock, EyeOff, LucideIcon, Settings, Bell, MessageSquare, Shield, FileText, Activity } from 'lucide-react';
+import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';
+import { X, ShieldAlert, LayoutDashboard, Users, Gavel, DoorOpen, Diamond, Award, BarChart2, Lock, EyeOff, LucideIcon, Settings, Bell, MessageSquare, Shield, FileText, Activity, Siren } from 'lucide-react';
 import DashboardSection from './admin/DashboardSection';
 import StatsSection from './admin/StatsSection';
 import SalonsSection from './admin/SalonsSection';
 import UsersSection from './admin/UsersSection';
 import ModerationSection from './admin/ModerationSection';
+import ModerationHubSection from './admin/ModerationHubSection';
 import BadgesSection from './admin/BadgesSection';
 import SpecialBadgesSection from './admin/SpecialBadgesSection';
 import PermissionsSection from './admin/PermissionsSection';
@@ -28,6 +29,7 @@ const TABS: Tab[] = [
   { id: 'stats',       label: 'Statistiques',     icon: BarChart2 },
   { id: 'salons',      label: 'Salons',           icon: DoorOpen },
   { id: 'users',       label: 'Utilisateurs',     icon: Users },
+  { id: 'modhub',      label: 'Centre modo',      icon: Siren },
   { id: 'moderation',  label: 'Modération',       icon: Gavel },
   { id: 'badges',      label: 'Badges',           icon: Diamond },
   { id: 'special',     label: 'Badges spéciaux',  icon: Award },
@@ -57,9 +59,9 @@ export default function AdminPanel() {
   // Un invité (pas de session Supabase) ne peut qu'observer
   const isReadOnly = !supabaseUser;
 
-  // Sécurité : fermer si l'utilisateur n'a pas les droits admin
+  // Sécurité : fermer si l'utilisateur n'a pas les droits staff/admin
   useEffect(() => {
-    if (user && !hasAdminAccess(user)) {
+    if (user && !hasStaffAccess(user) && !hasAdminAccess(user)) {
       setShowAdmin(false);
     }
   }, [user, setShowAdmin]);
@@ -166,6 +168,7 @@ export default function AdminPanel() {
             {activeTab === 'stats'          && <StatsSection profiles={profiles} customSalons={customSalons} salonMessages={salonMessages} monthlyXP={monthlyXP} />}
             {activeTab === 'salons'         && <SalonsSection readOnly={isReadOnly} customSalons={customSalons} addSalon={addSalon} updateSalon={updateSalon} deleteSalon={deleteSalon} reorderSalons={reorderSalons} displayOrder={displayOrder} hiddenSalons={hiddenSalons} setHiddenSalons={setHiddenSalons} />}
             {activeTab === 'users'          && <UsersSection readOnly={isReadOnly} profiles={profiles} setProfiles={setProfiles} setUserStatusAdmin={setUserStatusAdmin} banUser={banUser} unbanUser={unbanUser} muteUser={muteUser} unmuteUser={unmuteUser} />}
+            {activeTab === 'modhub'         && <ModerationHubSection readOnly={isReadOnly} user={user} />}
             {activeTab === 'moderation'     && <ModerationSection readOnly={isReadOnly} profiles={profiles} unbanUser={unbanUser} unmuteUser={unmuteUser} />}
             {activeTab === 'badges'         && <BadgesSection readOnly={isReadOnly} customBadges={customBadges} setCustomBadges={setCustomBadges} />}
             {activeTab === 'special'        && <SpecialBadgesSection readOnly={isReadOnly} profiles={profiles} setProfiles={setProfiles} />}

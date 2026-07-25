@@ -233,6 +233,11 @@ export const supabaseAuthService = {
       if (updates.age !== undefined) dbUpdates.age = updates.age;
       if (updates.city !== undefined) dbUpdates.city = updates.city;
       if (updates.gender !== undefined) dbUpdates.gender = updates.gender;
+      if ((updates as any).phone_number !== undefined) dbUpdates.phone_number = (updates as any).phone_number;
+      if ((updates as any).phone_consent !== undefined) dbUpdates.phone_consent = (updates as any).phone_consent;
+      if ((updates as any).notify_mod_app !== undefined) dbUpdates.notify_mod_app = (updates as any).notify_mod_app;
+      if ((updates as any).notify_mod_email !== undefined) dbUpdates.notify_mod_email = (updates as any).notify_mod_email;
+      if ((updates as any).notify_mod_sms !== undefined) dbUpdates.notify_mod_sms = (updates as any).notify_mod_sms;
       
       const { error } = await supabase
         .from('profiles')

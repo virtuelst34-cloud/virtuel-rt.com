@@ -42,6 +42,7 @@ export type PermissionSection = 'chat' | 'moderation' | 'admin' | 'settings' | '
 export type PermissionAction =
   | 'read' | 'write' | 'delete_own' | 'delete_any'
   | 'view_reports' | 'ban_users' | 'mute_users' | 'unblock_users'
+  | 'manage_alerts' | 'receive_alerts' | 'staff_chat' | 'handle_reports'
   | 'access_panel' | 'manage_permissions' | 'view_analytics'
   | 'view_own' | 'edit_own' | 'edit_any'
   | 'view_all' | 'create_custom' | 'delete_custom' | 'edit_custom' | 'reorder' | 'manage_messages' | 'pin_messages'

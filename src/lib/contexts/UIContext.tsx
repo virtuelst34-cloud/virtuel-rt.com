@@ -1,12 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { hasAdminAccess } from '../utils/founderCheck';
-
-interface UserProfile {
-  isAdmin?: boolean;
-  isFounder?: boolean;
-  isDirection?: boolean;
-  isMasterOp?: boolean;
-}
+import { hasAdminAccess, hasStaffAccess } from '../utils/founderCheck';
+import type { UserProfile } from './UserContext';
 
 interface UIContextType {
   showAdmin: boolean;
@@ -22,9 +16,9 @@ export function UIProvider({ children }: { children: ReactNode }) {
   const [showAdmin, setShowAdmin] = useState<boolean>(false);
   const [showProfile, setShowProfile] = useState<boolean>(false);
 
-  // Ouverture sécurisée : nécessite les droits admin
+  // Ouverture sécurisée : staff (mod+) ou admin
   const openAdmin = useCallback((user: UserProfile | null) => {
-    if (hasAdminAccess(user)) setShowAdmin(true);
+    if (hasStaffAccess(user) || hasAdminAccess(user)) setShowAdmin(true);
   }, []);
 
   const value: UIContextType = {

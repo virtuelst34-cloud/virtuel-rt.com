@@ -81,6 +81,10 @@ export interface Report {
   reporter: string;
   timestamp: string;
   created_at: string;
+  status?: 'pending' | 'in_progress' | 'resolved' | 'dismissed';
+  handled_by?: string | null;
+  handled_at?: string | null;
+  staff_notes?: string | null;
 }
 
 // Service de base de données Supabase

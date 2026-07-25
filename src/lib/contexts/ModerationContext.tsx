@@ -7,6 +7,7 @@ import {
   upsertUserModeration,
   type UserModerationRecord,
 } from '../moderationService';
+import { moderationAlertService } from '../moderationAlertService';
 
 interface ModerationContextType {
   blockedUsers: string[];
@@ -176,6 +177,12 @@ export function ModerationProvider({ children }: { children: ReactNode }) {
     });
     syncRecord(record, name);
     addNotification({ type: 'mod', message: `🔨 ${name} a été banni.` });
+    void moderationAlertService.dispatch(
+      'ban',
+      `🔨 ${name} a été banni${reason ? ` (${reason})` : ''} par ${user?.name || 'staff'}.`,
+      { target: name, reason, moderated_by: user?.name },
+      user?.name,
+    );
   }, [addNotification, syncRecord, user?.name]);
 
   const unbanUser = useCallback(async (name: string) => {
@@ -185,6 +192,12 @@ export function ModerationProvider({ children }: { children: ReactNode }) {
       moderated_by: user?.name || null,
     });
     syncRecord(record, name);
+    void moderationAlertService.dispatch(
+      'unban',
+      `✅ ${name} a été débanni par ${user?.name || 'staff'}.`,
+      { target: name, moderated_by: user?.name },
+      user?.name,
+    );
   }, [syncRecord, user?.name]);
 
   const muteUser = useCallback(async (name: string) => {
@@ -193,6 +206,12 @@ export function ModerationProvider({ children }: { children: ReactNode }) {
       moderated_by: user?.name || null,
     });
     syncRecord(record, name);
+    void moderationAlertService.dispatch(
+      'mute',
+      `🔇 ${name} a été rendu muet par ${user?.name || 'staff'}.`,
+      { target: name, moderated_by: user?.name },
+      user?.name,
+    );
   }, [syncRecord, user?.name]);
 
   const unmuteUser = useCallback(async (name: string) => {
@@ -201,6 +220,12 @@ export function ModerationProvider({ children }: { children: ReactNode }) {
       moderated_by: user?.name || null,
     });
     syncRecord(record, name);
+    void moderationAlertService.dispatch(
+      'unmute',
+      `🔊 ${name} a été démuté par ${user?.name || 'staff'}.`,
+      { target: name, moderated_by: user?.name },
+      user?.name,
+    );
   }, [syncRecord, user?.name]);
 
   const isUserBanned = useCallback(

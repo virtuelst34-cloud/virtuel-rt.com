@@ -156,7 +156,7 @@ export function XPProvider({ children }: { children: ReactNode }) {
 
     const intervalId = window.setInterval(() => {
       loadMonthlyXP();
-    }, 60_000);
+    }, 5 * 60_000);
 
     const onFocus = () => { loadMonthlyXP(); };
     window.addEventListener('focus', onFocus);

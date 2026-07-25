@@ -104,15 +104,18 @@ export const supabaseDbService = {
   // Messages
   async getMessages(salonId: string, limit: number = 200, offset: number = 0): Promise<Message[]> {
     try {
+      // Newest-first page, then reverse for chronological UI. Avoid select('*') bloat.
       const { data, error } = await supabase
         .from('messages')
-        .select('*')
+        .select(
+          'id, salon_id, author_name, author_avatar, author_initials, text, created_date, reactions, pinned, is_system, is_announcement, reply_to, image_url, edited, edited_at, created_at',
+        )
         .eq('salon_id', salonId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (error) throw error;
-      return data || [];
+      return (data || []).slice().reverse();
     } catch (error) {
       console.error('Erreur lors de la récupération des messages:', error);
       return [];

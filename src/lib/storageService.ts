@@ -17,7 +17,7 @@ async function uploadFileToBucket(file: File, ownerFolder: string): Promise<stri
 
   const { data, error } = await supabase.storage
     .from(CHAT_UPLOADS_BUCKET)
-    .upload(path, file, { cacheControl: "3600", upsert: false });
+    .upload(path, file, { cacheControl: "31536000", upsert: false });
 
   if (error) throw error;
 
@@ -48,7 +48,7 @@ export async function uploadChatFile(file: File, ownerFolder: string): Promise<s
  * Upload une image/fichier vers Supabase Storage.
  * - data: URLs → converties puis uploadées
  * - http(s) URLs → retournées telles quelles
- * - Échec → retourne l'URL d'origine (fallback base64 pour invités)
+ * - Échec → null (éviter d'écrire des data URLs géantes en base = egress)
  */
 export async function uploadChatMedia(
   source: string | null | undefined,
@@ -62,7 +62,7 @@ export async function uploadChatMedia(
     const file = await dataUrlToFile(source, `upload-${Date.now()}`);
     return await uploadFileToBucket(file, ownerFolder);
   } catch (error) {
-    console.error("Upload Storage échoué, fallback data URL:", error);
-    return source;
+    console.error("Upload Storage échoué:", error);
+    return null;
   }
 }

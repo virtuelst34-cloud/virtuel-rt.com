@@ -226,6 +226,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [loadGuestSession, trackLogin]);
 
   useEffect(() => {
+    const currentName = user?.name;
     const channel = supabase
       .channel('profiles_changes')
       .on(
@@ -236,7 +237,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
             const updatedProfile = payload.new as SupabaseUserProfile;
             const mappedProfile = mapSupabaseProfile(updatedProfile);
             setProfiles(prev => ({ ...prev, [mappedProfile.name]: mappedProfile }));
-            if (user && user.name === mappedProfile.name) {
+            if (currentName && currentName === mappedProfile.name) {
               setUser(mappedProfile);
             }
           }
@@ -247,7 +248,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.name]);
 
   const login = useCallback(async (name: string, avatar: string, initials: string) => {
     const trimmed = name.trim();
@@ -304,9 +305,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
       void presenceService.setOffline(userId);
     };
 
+    // Presence touch fans out via postgres_changes to every client — keep sparse.
     const heartbeat = window.setInterval(() => {
       void presenceService.touch(userId, user?.status || 'online');
-    }, 30000);
+    }, 90_000);
 
     window.addEventListener('pagehide', markOffline);
     window.addEventListener('beforeunload', markOffline);

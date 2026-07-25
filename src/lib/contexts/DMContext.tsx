@@ -114,14 +114,15 @@ function DMProviderInner({ children }: { children: ReactNode }) {
         const key = conversationKey(name1, name2);
         const { data, error } = await supabase
           .from('direct_messages')
-          .select('*')
+          .select('id, sender_id, receiver_id, text, image_url, read_at, created_at')
           .or(
             `and(sender_id.eq.${name1},receiver_id.eq.${name2}),and(sender_id.eq.${name2},receiver_id.eq.${name1})`,
           )
-          .order('created_at', { ascending: true });
+          .order('created_at', { ascending: false })
+          .limit(100);
 
         if (error) throw error;
-        setConversations(prev => ({ ...prev, [key]: data || [] }));
+        setConversations(prev => ({ ...prev, [key]: (data || []).slice().reverse() }));
       } catch (error) {
         console.error('Erreur lors du chargement de la conversation:', error);
       }
@@ -136,15 +137,16 @@ function DMProviderInner({ children }: { children: ReactNode }) {
       await withGuestContext();
       const { data, error } = await supabase
         .from('direct_messages')
-        .select('*')
+        .select('id, sender_id, receiver_id, text, image_url, read_at, created_at')
         .or(`sender_id.eq.${currentUserName},receiver_id.eq.${currentUserName}`)
-        .order('created_at', { ascending: true })
-        .limit(500);
+        .order('created_at', { ascending: false })
+        .limit(150);
 
       if (error) throw error;
 
       const grouped: Record<string, DMMessage[]> = {};
-      for (const message of data || []) {
+      // Newest-first fetch → reverse per conversation for chronological UI
+      for (const message of [...(data || [])].reverse()) {
         const key = conversationKey(message.sender_id, message.receiver_id);
         if (!grouped[key]) grouped[key] = [];
         grouped[key].push(message as DMMessage);

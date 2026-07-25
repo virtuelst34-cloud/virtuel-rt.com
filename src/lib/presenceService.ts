@@ -93,7 +93,7 @@ class PresenceService {
       console.log('[PresenceService] Chargement de la présence initiale...');
       const { data, error } = await supabase
         .from('user_presence')
-        .select('*');
+        .select('user_id, name, avatar, initials, status, current_salon_id, last_seen');
 
       if (error) {
         console.error('[PresenceService] Erreur lors du chargement de la présence:', error);

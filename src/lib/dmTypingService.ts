@@ -33,6 +33,16 @@ class DmTypingService {
     return channel;
   }
 
+  private maybeRemoveChannel(key: string): void {
+    if ((this.listeners.get(key)?.size ?? 0) > 0) return;
+    const channel = this.channels.get(key);
+    if (channel) {
+      supabase.removeChannel(channel);
+      this.channels.delete(key);
+    }
+    this.listeners.delete(key);
+  }
+
   subscribe(userId1: string, userId2: string, listener: DmTypingListener): () => void {
     const key = channelName(userId1, userId2);
     this.ensureChannel(key);
@@ -40,6 +50,7 @@ class DmTypingService {
     this.listeners.get(key)!.add(listener);
     return () => {
       this.listeners.get(key)?.delete(listener);
+      this.maybeRemoveChannel(key);
     };
   }
 

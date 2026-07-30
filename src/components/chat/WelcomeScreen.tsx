@@ -38,9 +38,15 @@ interface WelcomeScreenProps {
 
 // Emoji par salon
 const SALON_EMOJI: Record<string, string> = {
-  musique60: '🎵', musique80: '🎸', karaoke: '🎤', debat: '⚡',
-  quiz: '🧠', jeunes: '👋', lgbt: '🌈', divorce: '💙',
-  libre: '🚪', insulte: '😤', cameras: '📹', bar: '🍷',
+  bienvenue: '👋', annonces: '📢', general: '💬',
+  musique60: '🎵', musique80: '🎸', musique90: '💿', musique2000: '🎧', karaoke: '🎤',
+  cameras: '📹', bar: '🍷', humour: '😂', cuisine: '🍳', voyage: '✈️',
+  amical: '🤝', jeunes: '👋', quarante: '☕',
+  quiz: '🧠', blindtest: '🎼', gaming: '🎮', sport: '⚽',
+  divorce: '💙', aide: '🤲',
+  france: '🇫🇷', belgique: '🇧🇪', quebec: '🇨🇦', suisse: '🇨🇭',
+  lgbt: '🌈', libre: '🚪', debat: '⚡', insulte: '😤',
+  cinema: '🎬', series: '📺', livres: '📚', tech: '💻', ia: '🤖',
 };
 
 function PulseDot({ color = 'bg-emerald-500' }: { color?: string }) {

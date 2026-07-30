@@ -261,7 +261,7 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
         description: salon.description || '',
         sort_order: salon.sort_order ?? 1000,
         created_by: user?.name || salon.created_by,
-        category_id: salon.category_id || 'general',
+        category_id: salon.category_id || 'libre',
         subcategory: salon.subcategory || '',
         is_coquin: !!salon.isCoquin,
       };

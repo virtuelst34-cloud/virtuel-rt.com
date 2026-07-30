@@ -17,6 +17,8 @@ interface SalonItem {
   password?: string;
   created_by?: string;
   sort_order?: number;
+  category_id?: string;
+  subcategory?: string;
 }
 
 interface Props {
@@ -92,6 +94,8 @@ export default function SalonsSection({
       password: form.isPrivate ? form.password.trim() : undefined,
       created_by: user?.name,
       sort_order: 1000 + (customSalons?.length || 0) * 10,
+      category_id: 'libre',
+      subcategory: 'Libre',
     });
     setForm(emptyForm);
     setError('');

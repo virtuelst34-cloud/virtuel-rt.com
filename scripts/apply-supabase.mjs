@@ -86,6 +86,7 @@ const MIGRATION_ORDER = [
   "add_salons_sort_order_and_meta.sql",
   "create_moderation_alerts_system.sql",
   "add_salon_categories.sql",
+  "reorganize_salon_categories.sql",
 ];
 const SKIP_ERROR_CODES = new Set([
   "42P07", // duplicate_table

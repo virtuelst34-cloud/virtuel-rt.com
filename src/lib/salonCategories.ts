@@ -17,7 +17,7 @@ export const DEFAULT_SALON_CATEGORIES: SalonCategory[] = [
     id: 'general',
     name: 'Général',
     emoji: '🏠',
-    description: 'Accueil et salons principaux',
+    description: 'Accueil et essentiels uniquement',
     sort_order: 0,
     subcategories: ['Accueil', 'Annonces', 'Communauté'],
   },
@@ -55,7 +55,7 @@ export const DEFAULT_SALON_CATEGORIES: SalonCategory[] = [
   },
   {
     id: 'aide',
-    name: 'Aide / Support',
+    name: 'Aide',
     emoji: '💙',
     description: 'Écoute et entraide',
     sort_order: 50,
@@ -79,7 +79,7 @@ export const DEFAULT_SALON_CATEGORIES: SalonCategory[] = [
   },
   {
     id: 'libre',
-    name: 'Discussion libre',
+    name: 'Libre',
     emoji: '🗣️',
     description: 'Tous sujets, sans filtre excessif',
     sort_order: 80,
@@ -87,23 +87,23 @@ export const DEFAULT_SALON_CATEGORIES: SalonCategory[] = [
   },
   {
     id: 'culture',
-    name: 'Culture & Arts',
+    name: 'Culture',
     emoji: '🎨',
-    description: 'Livres, ciné, art',
+    description: 'Livres, ciné, séries, art',
     sort_order: 90,
-    subcategories: ['Cinéma', 'Livres', 'Art'],
+    subcategories: ['Cinéma', 'Séries', 'Livres', 'Art'],
   },
   {
     id: 'tech',
-    name: 'Tech & Geek',
+    name: 'Tech',
     emoji: '💻',
-    description: 'High-tech, jeux vidéo, web',
+    description: 'High-tech, IA et web',
     sort_order: 100,
-    subcategories: ['Jeux vidéo', 'Web', 'Sciences'],
+    subcategories: ['Web', 'IA', 'Sciences'],
   },
   {
     id: 'coquin',
-    name: 'Coquins',
+    name: 'Coquins Premium',
     emoji: '🔥',
     description: 'Zone adulte Premium (18+)',
     sort_order: 200,
@@ -116,9 +116,12 @@ export const CATEGORY_BY_ID: Record<string, SalonCategory> = Object.fromEntries(
   DEFAULT_SALON_CATEGORIES.map(c => [c.id, c]),
 );
 
+/** Catégorie de repli pour salons sans category_id (hors Général, réservé aux essentiels). */
+export const FALLBACK_CATEGORY_ID = 'libre';
+
 export function getCategoryMeta(categoryId?: string | null): SalonCategory {
   if (categoryId && CATEGORY_BY_ID[categoryId]) return CATEGORY_BY_ID[categoryId];
-  return CATEGORY_BY_ID.general;
+  return CATEGORY_BY_ID[FALLBACK_CATEGORY_ID] || CATEGORY_BY_ID.general;
 }
 
 export function isCoquinCategory(categoryId?: string | null): boolean {

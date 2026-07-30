@@ -36,7 +36,25 @@ export function mergeAndSortSalons(
 ): SortableSalon[] {
   const defaults = defaultBuiltinOrder();
   const coquinOn = options.coquinMode === true;
-  const all = [...SALONS, ...(customSalons || [])].filter(s => {
+  // Built-in d’abord, custom en overlay (sans doublon) — conserve category_id built-in si custom l’omit
+  const byId = new Map<string, SortableSalon>();
+  for (const s of SALONS) byId.set(s.id, s);
+  for (const s of customSalons || []) {
+    const existing = byId.get(s.id);
+    if (existing) {
+      byId.set(s.id, {
+        ...existing,
+        ...s,
+        category_id: s.category_id || existing.category_id,
+        subcategory: s.subcategory || existing.subcategory,
+        isCoquin: s.isCoquin ?? existing.isCoquin,
+        sort_order: s.sort_order ?? existing.sort_order,
+      });
+    } else {
+      byId.set(s.id, s);
+    }
+  }
+  const all = Array.from(byId.values()).filter(s => {
     if ((hiddenSalons || []).includes(s.id)) return false;
     if (isSalonCoquin(s) && !coquinOn) return false;
     return true;

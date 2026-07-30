@@ -2,14 +2,16 @@ import React, { useState, useRef, useEffect, useCallback, KeyboardEvent, useMemo
 import { useUser, useNotifications, useXP, useDM, useMuteBlock } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
-import { Send, X, MessageSquare, Search, Mic, Video, PhoneOff, MicOff, VideoOff, Paperclip, FileText, ChevronLeft } from 'lucide-react';
+import { Send, X, MessageSquare, Search, Mic, Video, PhoneOff, MicOff, VideoOff, Paperclip, FileText, ChevronLeft, Gamepad2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { dmTypingService } from '@/lib/dmTypingService';
+import { dmGameService, DM_GAME_LABELS, type DmGamePayload, type DmGameType } from '@/lib/dmGameService';
 import { getSpecialBadgeForUser, SPECIAL_BADGES } from '@/lib/diamondBadges';
 import { webrtcService, RemoteStreamInfo } from '@/lib/webrtcService';
 import { uploadChatFile } from '@/lib/storageService';
 import { toast } from 'sonner';
 import { DEFAULT_BANNED_WORDS, findBannedWord, mergeBannedWords } from '@/lib/bannedWords';
+import DMChallengeGames from './DMChallengeGames';
 
 interface DirectMessagePanelProps {
   onClose: () => void;
@@ -96,6 +98,8 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [showGames, setShowGames] = useState(false);
+  const [pendingGameInvite, setPendingGameInvite] = useState<DmGamePayload | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingBroadcastRef = useRef<number | null>(null);
@@ -221,6 +225,33 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
   useEffect(() => {
     if (selectedUser) setTimeout(() => inputRef.current?.focus(), 50);
   }, [selectedUser]);
+
+  // Écoute des défis de jeux (invite entrante)
+  useEffect(() => {
+    if (!myUserId || !contactUserId || !selectedUser) {
+      setPendingGameInvite(null);
+      return;
+    }
+    return dmGameService.subscribe(myUserId, contactUserId, (payload) => {
+      if (payload.fromId === myUserId) return;
+      if (payload.event === 'invite') {
+        setPendingGameInvite(payload);
+        setShowGames(true);
+        toast(`🎮 ${payload.from} vous défie au ${DM_GAME_LABELS[payload.gameType]}`);
+      } else if (payload.event === 'decline' || payload.event === 'cancel') {
+        setPendingGameInvite(null);
+      }
+    });
+  }, [myUserId, contactUserId, selectedUser]);
+
+  const handleGameInviteSent = useCallback((gameType: DmGameType) => {
+    if (!user?.name || !selectedUser) return;
+    void sendDM(
+      user.name,
+      selectedUser,
+      `🎮 Je vous défie au ${DM_GAME_LABELS[gameType]} — ouvrez Jeux pour répondre`,
+    );
+  }, [user?.name, selectedUser, sendDM]);
 
   const contacts = useMemo(() => {
     if (!user?.name) return [];
@@ -556,6 +587,17 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                     <>
                       <button
                         type="button"
+                        onClick={() => setShowGames(true)}
+                        title="Défier / Jeux"
+                        className="p-2 rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 transition-colors relative"
+                      >
+                        <Gamepad2 className="w-3.5 h-3.5" />
+                        {pendingGameInvite && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
                         disabled={callBusy}
                         onClick={() => void startCall(false)}
                         title="Appel vocal"
@@ -755,6 +797,20 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
           )}
         </div>
       </div>
+
+      {showGames && selectedUser && contactUserId && user?.name && myUserId && (
+        <DMChallengeGames
+          myName={user.name}
+          myId={myUserId}
+          contactName={selectedUser}
+          contactId={contactUserId}
+          open={showGames}
+          onClose={() => setShowGames(false)}
+          onInviteSent={handleGameInviteSent}
+          pendingInvite={pendingGameInvite}
+          onClearPendingInvite={() => setPendingGameInvite(null)}
+        />
+      )}
     </div>
   );
 }

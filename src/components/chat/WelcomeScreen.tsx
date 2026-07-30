@@ -104,10 +104,16 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
 
       setOnlineUsers(displayUsers);
 
-      // Extraire les counts par salon
+      // Compteurs par salon : présence dans le salon (currentSalonId), hors soi / mute / block
       const counts: Record<string, number> = {};
+      presenceUsers.forEach((p) => {
+        if (!p.currentSalonId) return;
+        counts[p.currentSalonId] = (counts[p.currentSalonId] || 0) + 1;
+      });
+      // Compléter avec la map salonPresence si des entrées manquent
       salonPresence.forEach((presence, salonId) => {
-        counts[salonId] = presence.users.filter(p => p.name !== user?.name && !isMuted(p.name) && !isBlocked(p.name)).length;
+        const n = presence.users.filter(p => p.name !== user?.name && !isMuted(p.name) && !isBlocked(p.name)).length;
+        if (n > (counts[salonId] || 0)) counts[salonId] = n;
       });
       setSalonCounts(counts);
     };
@@ -272,7 +278,9 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
                 </button>
                 {!collapsed && (
                   <div className="mt-0.5 space-y-0.5 border-l border-border/40 ml-3 pl-1">
-                    {group.salons.map((salon, index) => (
+                    {group.salons.map((salon, index) => {
+                      const count = salonCounts[salon.id] || 0;
+                      return (
                       <button
                         key={salon.id}
                         type="button"
@@ -286,25 +294,30 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[12px] font-medium text-foreground truncate group-hover:text-primary transition-colors">{salon.name}</span>
-                            {salon.isPrivate && <Lock className="w-3 h-3 text-amber-400" />}
+                            {salon.isPrivate && <Lock className="w-3 h-3 text-amber-400 shrink-0" />}
                             {salon.live && <PulseDot color="bg-red-500" />}
-                            {salon.isCoquin && <span className="text-[8px] text-rose-300/80">🔥</span>}
+                            {salon.isCoquin && <span className="text-[8px] text-rose-300/80 shrink-0">🔥</span>}
                           </div>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             {salon.subcategory && (
                               <span className="text-[9px] text-muted-foreground/40 truncate">{salon.subcategory}</span>
                             )}
-                            {salonCounts[salon.id] > 0 && (
-                              <>
-                                <PulseDot color="bg-emerald-500" />
-                                <span className="text-[10px] text-muted-foreground/50">{salonCounts[salon.id]} en ligne</span>
-                              </>
-                            )}
                             {salon.live && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/30 rounded px-1.5 py-px font-semibold animate-pulse">LIVE</span>}
                           </div>
                         </div>
+                        {count > 0 && (
+                          <span
+                            className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-semibold tabular-nums px-1.5 py-0.5"
+                            title={`${count} en ligne dans ce salon`}
+                            aria-label={`${count} utilisateurs en ligne`}
+                          >
+                            <PulseDot color="bg-emerald-500" />
+                            {count}
+                          </span>
+                        )}
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -343,6 +356,83 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
           <p className="text-sm font-semibold text-purple-700 dark:text-purple-300">🎉 Pour l&apos;ouverture, Premium offert en essai !</p>
         </div>
         <DailySparkCard className="w-full max-w-sm" />
+
+        {/* En ligne — visible sur mobile / tablette (colonne droite masquée sous lg) */}
+        <div className="lg:hidden w-full max-w-sm text-left">
+          <div className="flex items-center justify-between mb-2 px-0.5">
+            <h3 className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5">
+              <PulseDot /> En ligne
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-full px-2 py-px tabular-nums">
+                {onlineUsers.length + (user ? 1 : 0)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowMembersPanel(true)}
+                className="text-[10px] text-primary/80 hover:text-primary touch-target px-1"
+                title="Voir tous les membres"
+              >
+                Voir tout
+              </button>
+            </div>
+          </div>
+          {onlineUsers.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground/45 italic px-0.5 py-2">
+              {user ? 'Aucun autre utilisateur en ligne.' : 'Connectez-vous pour voir qui est en ligne.'}
+            </p>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory scrollbar-thin">
+              {onlineUsers
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((u) => {
+                  const salonName = u.salon ? allSalons.find(s => s.id === u.salon)?.name : null;
+                  return (
+                    <div
+                      key={u.name}
+                      className="snap-start shrink-0 w-[132px] rounded-xl border border-border/60 bg-secondary/40 p-2.5 flex flex-col items-center gap-1.5"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setViewProfile(u.name)}
+                        className="flex flex-col items-center gap-1.5 w-full touch-target"
+                        title={`Profil de ${u.name}`}
+                      >
+                        <div className="relative">
+                          <Avatar avatarClass={u.avatar || 'av1'} initials={u.initials || u.name.slice(0, 2).toUpperCase()} size="sm" />
+                          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-card rounded-full" />
+                        </div>
+                        <span className="text-[11px] font-medium text-foreground truncate w-full text-center">{u.name}</span>
+                        <span className="text-[9px] text-emerald-400/75 truncate w-full text-center">
+                          {salonName ? `Dans ${salonName}` : 'En ligne'}
+                        </span>
+                      </button>
+                      <div className="flex items-center gap-1 w-full mt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setViewProfile(u.name)}
+                          className="flex-1 py-1 rounded-lg text-[9px] font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-white/5 touch-target"
+                        >
+                          Profil
+                        </button>
+                        {onOpenDM && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenDM(u.name)}
+                            className="flex-1 py-1 rounded-lg text-[9px] font-medium border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 touch-target"
+                          >
+                            MP
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
         {canModerate && (
           <button
             type="button"

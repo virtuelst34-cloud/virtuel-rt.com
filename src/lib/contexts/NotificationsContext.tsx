@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { supabase } from '@/lib/supabase';
 import { isValidUuid } from '@/lib/utils/uuid';
 import { getStoredGuestToken } from '@/lib/guestAuthService';
+import { isStaffNotificationType } from '@/lib/utils/staffNotifications';
 
 interface NotificationAction {
   label: string;
@@ -29,14 +30,24 @@ interface NotificationsContextType {
   markNotificationRead: (id: number | string) => void;
   clearNotifications: () => void;
   unreadCount: number;
+  /** Non lues dédiées Espace staff (hors badge cloche générale). */
+  staffUnreadCount: number;
+  staffNotifications: Notification[];
+  markStaffNotificationsRead: () => void;
   removeNotification: (id: number | string) => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | null>(null);
 
-const DB_NOTIFICATION_TYPES = new Set(['dm', 'friend_request', 'friend_accepted', 'system', 'mention', 'moderation_alert']);
+const DB_NOTIFICATION_TYPES = new Set([
+  'dm', 'friend_request', 'friend_accepted', 'system', 'mention', 'moderation_alert',
+  'staff_message', 'staff_ban', 'staff_report', 'staff_alert',
+]);
 const GUEST_NOTIFS_KEY = 'virtuel_rt_guest_notifications';
-const PERSISTENT_TYPES = new Set(['dm', 'mention', 'friend_request', 'friend_accepted', 'mod', 'report', 'moderation_alert']);
+const PERSISTENT_TYPES = new Set([
+  'dm', 'mention', 'friend_request', 'friend_accepted', 'mod', 'report', 'moderation_alert',
+  'staff_message', 'staff_ban', 'staff_report', 'staff_alert',
+]);
 
 type StoredNotification = Omit<Notification, 'actions'>;
 
@@ -323,7 +334,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           message: notification.message,
           group_key: notification.groupKey,
           group_count: notification.groupCount || 1,
-          metadata: notification.actions ? { actions: notification.actions } : {}
+          metadata: {
+            ...(notification.metadata || {}),
+            ...(notification.actions ? { actions: notification.actions } : {}),
+          },
         });
 
         if (error) {
@@ -367,36 +381,59 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }
   }, [supabaseUserId]);
 
+  // Cloche (Système B) : ne touche pas aux notifications staff (Système A)
   const markAllRead = useCallback(async () => {
-    setLocalNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    setNotifications(prev => prev.map(n => ({ ...n, read: true, readAt: new Date().toISOString() })));
+    const readAt = new Date().toISOString();
+    const isGeneral = (n: Notification) => !isStaffNotificationType(n.type);
+    const generalIds = allNotifications
+      .filter((n) => isGeneral(n) && !n.read)
+      .map((n) => n.id)
+      .filter((id) => isValidUuid(id));
 
-    if (supabaseUserId && isValidUuid(supabaseUserId)) {
+    setLocalNotifications((prev) =>
+      prev.map((n) => (isGeneral(n) ? { ...n, read: true, readAt } : n)),
+    );
+    setNotifications((prev) =>
+      prev.map((n) => (isGeneral(n) ? { ...n, read: true, readAt } : n)),
+    );
+
+    if (supabaseUserId && isValidUuid(supabaseUserId) && generalIds.length > 0) {
       try {
-        const { error } = await supabase.rpc('mark_all_notifications_read', { p_user_id: supabaseUserId });
-        if (error) {
-          if (error.code === '42883') {
-            console.log('Fonction mark_all_notifications_read non créée encore');
-          } else {
-            console.error('Erreur lors du marquage des notifications comme lues:', error);
-          }
+        const { error } = await supabase
+          .from('notifications')
+          .update({ read_at: readAt })
+          .in('id', generalIds as string[]);
+        if (error && error.code !== '42P01') {
+          console.error('Erreur lors du marquage des notifications comme lues:', error);
         }
       } catch (error) {
         console.error('Erreur lors du marquage des notifications comme lues:', error);
       }
     }
-  }, [supabaseUserId]);
+  }, [supabaseUserId, allNotifications]);
 
   const clearNotifications = useCallback(async () => {
-    setLocalNotifications([]);
-    setNotifications([]);
+    // Efface uniquement le flux général (cloche) — conserve les alertes staff
+    const generalIds = allNotifications
+      .filter((n) => !isStaffNotificationType(n.type))
+      .map((n) => n.id)
+      .filter((id) => isValidUuid(id));
+    const keepStaff = (n: Notification) => isStaffNotificationType(n.type);
+    setLocalNotifications((prev) => prev.filter(keepStaff));
+    setNotifications((prev) => prev.filter(keepStaff));
     Object.values(timersRef.current).forEach(clearTimeout);
     timersRef.current = {};
-    if (!supabaseUserId) clearGuestNotifications();
+    if (!supabaseUserId) {
+      const staffOnly = loadGuestNotifications().filter((n) => isStaffNotificationType(n.type));
+      saveGuestNotifications(staffOnly as Notification[]);
+    }
 
-    if (supabaseUserId && isValidUuid(supabaseUserId)) {
+    if (supabaseUserId && isValidUuid(supabaseUserId) && generalIds.length > 0) {
       try {
-        const { error } = await supabase.from('notifications').delete().eq('user_id', supabaseUserId);
+        const { error } = await supabase
+          .from('notifications')
+          .delete()
+          .in('id', generalIds as string[]);
         if (error && error.code !== '42P01') {
           console.error('Erreur lors de la suppression des notifications:', error);
         }
@@ -404,7 +441,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         console.error('Erreur lors de la suppression des notifications:', error);
       }
     }
-  }, [supabaseUserId]);
+  }, [supabaseUserId, allNotifications]);
 
   const markNotificationRead = useCallback(async (id: number | string) => {
     const readAt = new Date().toISOString();
@@ -420,7 +457,38 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }
   }, [supabaseUserId]);
 
-  const unreadCount = allNotifications.filter(n => !n.read).length;
+  const staffNotifications = allNotifications.filter((n) => isStaffNotificationType(n.type));
+  const staffUnreadCount = staffNotifications.filter((n) => !n.read).length;
+  // Badge cloche : hors notifications staff (celles-ci vont sur Espace staff)
+  const unreadCount = allNotifications.filter((n) => !n.read && !isStaffNotificationType(n.type)).length;
+
+  const markStaffNotificationsRead = useCallback(async () => {
+    const unreadStaff = allNotifications.filter(
+      (n) => isStaffNotificationType(n.type) && !n.read,
+    );
+    if (unreadStaff.length === 0) return;
+    const readAt = new Date().toISOString();
+    const ids = new Set(unreadStaff.map((n) => String(n.id)));
+    setLocalNotifications((prev) =>
+      prev.map((n) => (ids.has(String(n.id)) ? { ...n, read: true, readAt } : n)),
+    );
+    setNotifications((prev) =>
+      prev.map((n) => (ids.has(String(n.id)) ? { ...n, read: true, readAt } : n)),
+    );
+    if (supabaseUserId && isValidUuid(supabaseUserId)) {
+      const uuidIds = unreadStaff.map((n) => n.id).filter((id) => isValidUuid(id));
+      if (uuidIds.length > 0) {
+        try {
+          await supabase
+            .from('notifications')
+            .update({ read_at: readAt })
+            .in('id', uuidIds as string[]);
+        } catch (error) {
+          console.error('Erreur marquage notifications staff lues:', error);
+        }
+      }
+    }
+  }, [allNotifications, supabaseUserId]);
 
   const value: NotificationsContextType = {
     notifications: allNotifications,
@@ -429,6 +497,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     markNotificationRead,
     clearNotifications,
     unreadCount,
+    staffUnreadCount,
+    staffNotifications,
+    markStaffNotificationsRead,
     removeNotification
   };
 

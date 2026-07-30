@@ -291,7 +291,12 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
         addNotification({
           type: 'mention',
           message: `@ ${last.author_name} vous a mentionné dans #${salon?.name}`,
-          groupKey: `mention:${last.author_name}`,
+          groupKey: `mention:${currentSalon}:${last.author_name}`,
+          metadata: {
+            salon_id: currentSalon,
+            message_id: last.id,
+            author_name: last.author_name,
+          },
         });
         recordMention(user.name);
       }
@@ -385,11 +390,26 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     sounds?.message();
     setReplyTo(null);
     recordMessageSent(user.name, (achievement) => {
-      addNotification({ type: 'achievement', message: `${achievement.icon} Succ?s d?bloqu? : ${achievement.name}` });
+      addNotification({ type: 'achievement', message: `${achievement.icon} Succès débloqué : ${achievement.name}` });
     });
+    // Notifier les utilisateurs mentionnés (@pseudo) — Système B
+    if (text) {
+      const mentionMatches = text.match(/@([A-Za-z0-9_\-.]+)/g) || [];
+      const mentioned = [...new Set(mentionMatches.map((m) => m.slice(1)))].filter(
+        (name) => name.toLowerCase() !== user.name.toLowerCase(),
+      );
+      for (const name of mentioned) {
+        void supabaseDbService.notifyUserByName(
+          name,
+          'mention',
+          `@ ${user.name} vous a mentionné dans #${salon?.name || currentSalon}`,
+          `mention:${currentSalon}:${user.name}`,
+        );
+      }
+    }
     const newLevel = await awardXP();
     if (newLevel) setLevelUp(newLevel);
-  }, [user, currentSalon, isUserBanned, isUserMuted, addMessage, sounds, recordMessageSent, awardXP, addNotification]);
+  }, [user, currentSalon, isUserBanned, isUserMuted, addMessage, sounds, recordMessageSent, awardXP, addNotification, salon?.name]);
 
   const handleQuizAnswerPosted = useCallback((text: string) => {
     if (!currentSalon || currentSalon !== 'quiz') return;
@@ -437,16 +457,12 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
           addNotification({ type: 'achievement', message: `${achievement.icon} Succ?s d?bloqu? : ${achievement.name}` });
         });
         if (msg.author_name !== user.name) {
-          addNotification({
-            type: 'dm',
-            message: `${user.name} a r?agi ${emoji} ? votre message`,
-            groupKey: `reaction:${msg.id}`,
-          });
+          // Notifie uniquement l'auteur (Système B) — pas le réacteur
           void supabaseDbService.notifyUserByName(
             msg.author_name,
-            'dm',
-            `${user.name} a r?agi ${emoji} ? votre message`,
-            `reaction:${msg.id}`,
+            'system',
+            `${user.name} a réagi ${emoji} à votre message`,
+            currentSalon ? `reaction:${currentSalon}:${msg.id}` : `reaction:${msg.id}`,
           );
         }
       }

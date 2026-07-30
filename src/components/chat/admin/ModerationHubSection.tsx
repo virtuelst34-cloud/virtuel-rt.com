@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ShieldAlert, Bell, Settings, Lock, MessageSquare, RefreshCw, Save,
   Check, X, Mail, Smartphone, Flag, Send, Trash2, Loader2, AlertTriangle,
+  Paperclip, FileText, Smile,
 } from 'lucide-react';
 import { SectionTitle, StatCard } from './AdminComponents';
 import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';
@@ -14,9 +15,14 @@ import {
   type StaffReport,
 } from '@/lib/moderationAlertService';
 import { staffChatService, type StaffMessage } from '@/lib/staffChatService';
+import { uploadChatFile } from '@/lib/storageService';
 import { useUser } from '@/lib/contexts';
 import { supabase } from '@/lib/supabase';
 import UserDisplayName from '../UserDisplayName';
+import ReactionPicker from '../ReactionPicker';
+import { toast } from 'sonner';
+
+const STAFF_IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i;
 
 interface Props {
   readOnly?: boolean;
@@ -88,7 +94,14 @@ export default function ModerationHubSection({ readOnly = false, user, initialSu
   const [staffMessages, setStaffMessages] = useState<StaffMessage[]>([]);
   const [staffInput, setStaffInput] = useState('');
   const [sendingStaff, setSendingStaff] = useState(false);
+  const [staffFile, setStaffFile] = useState<File | null>(null);
+  const [staffReactionPicker, setStaffReactionPicker] = useState<{
+    msgId: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const staffEndRef = useRef<HTMLDivElement>(null);
+  const staffFileRef = useRef<HTMLInputElement>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -121,6 +134,7 @@ export default function ModerationHubSection({ readOnly = false, user, initialSu
     const channel = staffChatService.subscribe(
       (msg) => setStaffMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])),
       (id) => setStaffMessages((prev) => prev.filter((m) => m.id !== id)),
+      (msg) => setStaffMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m))),
     );
     return () => {
       active = false;
@@ -187,17 +201,59 @@ export default function ModerationHubSection({ readOnly = false, user, initialSu
   };
 
   const sendStaffMessage = async () => {
-    if (!canStaff || !staffInput.trim() || sendingStaff) return;
+    if (!canStaff || (!staffInput.trim() && !staffFile) || sendingStaff) return;
     setSendingStaff(true);
-    const msg = await staffChatService.sendMessage(
-      supabaseUser?.id || null,
-      user?.name || 'Staff',
-      staffInput,
+    try {
+      let attachment: { fileUrl: string; fileName?: string } | null = null;
+      if (staffFile) {
+        if (staffFile.size > 5 * 1024 * 1024) {
+          toast.error('Fichier trop volumineux (max 5 Mo)');
+          return;
+        }
+        const ownerFolder = supabaseUser?.id || user?.id || user?.name || 'staff';
+        const fileUrl = await uploadChatFile(staffFile, ownerFolder);
+        attachment = { fileUrl, fileName: staffFile.name };
+      }
+      const msg = await staffChatService.sendMessage(
+        supabaseUser?.id || null,
+        user?.name || 'Staff',
+        staffInput,
+        attachment,
+      );
+      if (msg) {
+        setStaffInput('');
+        setStaffFile(null);
+        if (staffFileRef.current) staffFileRef.current.value = '';
+        setStaffMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Échec de l\'envoi');
+    } finally {
+      setSendingStaff(false);
+    }
+  };
+
+  const toggleStaffReaction = async (msgId: string, emoji: string) => {
+    const actor = user?.name;
+    if (!actor) return;
+    setStaffMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== msgId) return m;
+        const reactions = { ...(m.reactions || {}) };
+        const users = [...(reactions[emoji] || [])];
+        const idx = users.indexOf(actor);
+        if (idx >= 0) users.splice(idx, 1);
+        else users.push(actor);
+        if (users.length === 0) delete reactions[emoji];
+        else reactions[emoji] = users;
+        return { ...m, reactions };
+      }),
     );
-    setSendingStaff(false);
-    if (msg) {
-      setStaffInput('');
-      setStaffMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+    const result = await staffChatService.toggleReaction(msgId, emoji, actor);
+    if (result) {
+      setStaffMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, reactions: result } : m)),
+      );
     }
   };
 
@@ -539,7 +595,11 @@ export default function ModerationHubSection({ readOnly = false, user, initialSu
                 {staffMessages.length === 0 && (
                   <p className="text-xs text-muted-foreground/60 text-center py-8">Aucun message. Démarrez la conversation.</p>
                 )}
-                {staffMessages.map((msg) => (
+                {staffMessages.map((msg) => {
+                  const reactions = msg.reactions || {};
+                  const hasReactions = Object.keys(reactions).some((e) => (reactions[e]?.length || 0) > 0);
+                  const fileOnly = !!msg.file_url && (!msg.body || msg.body === '📎 Fichier');
+                  return (
                   <div key={msg.id} className="group">
                     <div className="flex items-baseline gap-2">
                       <UserDisplayName
@@ -551,6 +611,23 @@ export default function ModerationHubSection({ readOnly = false, user, initialSu
                       <span className="text-[9px] text-muted-foreground/50">
                         {new Date(msg.created_at).toLocaleString('fr-FR')}
                       </span>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-amber-400"
+                          onClick={(e) => {
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setStaffReactionPicker({
+                              msgId: msg.id,
+                              x: rect.left + rect.width / 2,
+                              y: rect.top,
+                            });
+                          }}
+                          aria-label="Réagir"
+                        >
+                          <Smile className="w-3 h-3" />
+                        </button>
+                      )}
                       {(msg.author_id === supabaseUser?.id || canModify) && !readOnly && (
                         <button
                           type="button"
@@ -562,37 +639,139 @@ export default function ModerationHubSection({ readOnly = false, user, initialSu
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{msg.body}</p>
+                    {msg.file_url && (
+                      STAFF_IMAGE_RE.test(msg.file_url) ? (
+                        <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block mt-1 mb-1">
+                          <img
+                            src={msg.file_url}
+                            alt={msg.file_name || 'Pièce jointe'}
+                            className="max-w-full max-h-36 rounded-lg object-cover border border-border"
+                          />
+                        </a>
+                      ) : (
+                        <a
+                          href={msg.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 mt-1 mb-1 px-2 py-1.5 rounded-lg bg-background border border-border text-[11px] text-red-400 hover:bg-red-500/10"
+                        >
+                          <FileText className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{msg.file_name || 'Télécharger le fichier'}</span>
+                        </a>
+                      )
+                    )}
+                    {!fileOnly && msg.body && (
+                      <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{msg.body}</p>
+                    )}
+                    {hasReactions && (
+                      <div className="flex gap-1 flex-wrap mt-1">
+                        {Object.entries(reactions).map(([emoji, users]) => {
+                          if (!users?.length) return null;
+                          const isMine = user?.name ? users.includes(user.name) : false;
+                          return (
+                            <button
+                              key={emoji}
+                              type="button"
+                              disabled={readOnly}
+                              onClick={() => void toggleStaffReaction(msg.id, emoji)}
+                              className={`flex items-center gap-1 text-[10px] rounded-full px-1.5 py-0.5 border ${
+                                isMine
+                                  ? 'bg-red-500/20 border-red-500/40 text-red-300'
+                                  : 'bg-white/5 border-white/10 text-foreground/70'
+                              }`}
+                            >
+                              <span>{emoji}</span>
+                              <span className="font-medium">{users.length}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
                 <div ref={staffEndRef} />
               </div>
               {!readOnly && canStaff && (
-                <div className="p-2 border-t border-border flex gap-2">
-                  <input
-                    value={staffInput}
-                    onChange={(e) => setStaffInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        void sendStaffMessage();
-                      }
-                    }}
-                    placeholder="Message au staff…"
-                    maxLength={2000}
-                    className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground outline-none focus:border-red-500/40"
-                  />
-                  <button
-                    type="button"
-                    disabled={sendingStaff || !staffInput.trim()}
-                    onClick={() => void sendStaffMessage()}
-                    className="px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 disabled:opacity-40"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                  </button>
+                <div className="p-2 border-t border-border space-y-2">
+                  {staffFile && (
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-background border border-border text-[11px]">
+                      <FileText className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                      <span className="truncate flex-1">{staffFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStaffFile(null);
+                          if (staffFileRef.current) staffFileRef.current.value = '';
+                        }}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Retirer le fichier"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      ref={staffFileRef}
+                      type="file"
+                      className="hidden"
+                      accept="image/*,.pdf,.doc,.docx,.txt,.zip"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) setStaffFile(file);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => staffFileRef.current?.click()}
+                      disabled={sendingStaff}
+                      className={`px-2 py-2 rounded-lg border shrink-0 ${
+                        staffFile
+                          ? 'bg-red-500/15 border-red-500/30 text-red-400'
+                          : 'bg-background border-border text-muted-foreground hover:text-red-400'
+                      }`}
+                      aria-label="Joindre un fichier"
+                      title="Joindre un fichier (max 5 Mo)"
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                    </button>
+                    <input
+                      value={staffInput}
+                      onChange={(e) => setStaffInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          void sendStaffMessage();
+                        }
+                      }}
+                      placeholder="Message au staff…"
+                      maxLength={2000}
+                      className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground outline-none focus:border-red-500/40"
+                    />
+                    <button
+                      type="button"
+                      disabled={sendingStaff || (!staffInput.trim() && !staffFile)}
+                      onClick={() => void sendStaffMessage()}
+                      className="px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 disabled:opacity-40"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
+          )}
+
+          {staffReactionPicker && (
+            <ReactionPicker
+              position={{ x: staffReactionPicker.x, y: staffReactionPicker.y }}
+              onSelect={(emoji) => {
+                void toggleStaffReaction(staffReactionPicker.msgId, emoji);
+                setStaffReactionPicker(null);
+              }}
+              onClose={() => setStaffReactionPicker(null)}
+            />
           )}
 
           {/* ── Outils liés ── */}

@@ -21,9 +21,9 @@ export default function MobileBottomNav({
 }: MobileBottomNavProps) {
   const { user } = useUser();
   const { setCurrentSalon, currentSalon } = useSalons();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, staffUnreadCount } = useNotifications();
   const { getUnreadCount } = useDM();
-  const { openAdmin } = useUI();
+  const { openAdmin, openStaffChat } = useUI();
   const { settings } = useGlobalSettings();
   const dmUnread = user?.name ? getUnreadCount(user.name) : 0;
   const isStaff = hasStaffAccess(user);
@@ -65,9 +65,16 @@ export default function MobileBottomNav({
         )}
         {isStaff && (
           <NavBtn
-            label="Modo"
-            onClick={() => openAdmin(user)}
+            label="Staff"
+            onClick={() =>
+              openStaffChat(
+                user,
+                staffUnreadCount > 0 ? { tab: 'notifications' } : { tab: 'chat' },
+              )
+            }
+            badge={staffUnreadCount > 0 ? staffUnreadCount : null}
             icon={<ShieldAlert className="w-5 h-5" />}
+            onLongPress={() => openAdmin(user)}
           />
         )}
         <NavBtn
@@ -92,17 +99,24 @@ function NavBtn({
   onClick,
   badge,
   active,
+  onLongPress,
 }: {
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
   badge?: number | null;
   active?: boolean;
+  onLongPress?: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      onContextMenu={(e) => {
+        if (!onLongPress) return;
+        e.preventDefault();
+        onLongPress();
+      }}
       className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] rounded-xl transition-colors ${
         active ? 'text-primary bg-primary/10' : 'text-muted-foreground/70 active:bg-white/5'
       }`}

@@ -25,9 +25,9 @@ interface IconBtnProps {
 const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSettings }: SidebarProps) {
   const { user, logout, supabaseUser } = useUser();
   const { setCurrentSalon } = useSalons();
-  const { openAdmin } = useUI();
+  const { openAdmin, showStaffChat, setShowStaffChat, openStaffChat } = useUI();
   const { theme, toggleTheme, isPremium, activatePremium } = usePreferences();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, staffUnreadCount } = useNotifications();
   const { getUnreadCount } = useDM();
   const { pendingRequests } = useFriends();
   const { settings } = useGlobalSettings();
@@ -35,7 +35,6 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
   const pendingFriends = pendingRequests.length;
   const [showSearch, setShowSearch] = useState(false);
   const [showStats, setShowStats] = useState(false);
-  const [showStaffChat, setShowStaffChat] = useState(false);
   const [showMiniGames, setShowMiniGames] = useState(false);
 
   return (
@@ -112,7 +111,8 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
           <IconBtn
             icon={MessagesSquare}
             title="Espace staff"
-            onClick={() => setShowStaffChat(true)}
+            onClick={() => openStaffChat(user, staffUnreadCount > 0 ? { tab: 'notifications' } : { tab: 'chat' })}
+            badge={staffUnreadCount > 0 ? staffUnreadCount : null}
             accent="admin"
           />
         )}

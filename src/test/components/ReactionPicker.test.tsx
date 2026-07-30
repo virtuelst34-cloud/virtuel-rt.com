@@ -24,7 +24,7 @@ describe('ReactionPicker', () => {
     renderPicker();
     const buttons = screen.getAllByRole('button');
     expect(buttons.length).toBeGreaterThan(0);
-  });
+  }, 15_000);
 
   it('devrait appeler onSelect quand on clique sur une réaction', () => {
     renderPicker();

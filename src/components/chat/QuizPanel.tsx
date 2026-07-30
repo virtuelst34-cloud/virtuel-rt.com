@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ArrowLeft, ArrowRight, Brain, Trophy, Users, X } from 'lucide-react';
 import { useUser, usePreferences } from '@/lib/contexts';
+import UserDisplayName from './UserDisplayName';
 import {
   quizRealtimeService,
   QuizEvent,
@@ -387,7 +388,7 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
           </div>
           {liveAnswers.map(a => (
             <div key={`${a.userId}-${a.createdAt}`} className="flex justify-between text-xs py-0.5">
-              <span className="text-foreground truncate">{a.userName}</span>
+              <span className="text-foreground truncate inline-flex items-center gap-1 min-w-0"><UserDisplayName name={a.userId} size="xs" showLevelDiamond={false} showSpecialLabels={false} nameClassName="text-foreground" /></span>
               <span className={a.isCorrect ? 'text-emerald-400' : 'text-muted-foreground'}>
                 {a.answerLabel} {a.isCorrect ? '✓' : '✗'}
               </span>
@@ -405,7 +406,7 @@ export default function QuizPanel({ salonId, onClose, onAnswerPosted }: QuizPane
           </div>
           {leaderboard.slice(0, 5).map((p, i) => (
             <div key={p.userId} className="flex justify-between text-xs py-0.5">
-              <span className="text-foreground">{i + 1}. {p.userName}</span>
+              <span className="text-foreground inline-flex items-center gap-1 min-w-0"><span className="shrink-0">{i + 1}.</span><UserDisplayName name={p.userId} size="xs" showLevelDiamond={false} showSpecialLabels={false} nameClassName="text-foreground" /></span>
               <span className="text-primary font-medium">{p.totalPoints} pts</span>
             </div>
           ))}

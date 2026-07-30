@@ -3,6 +3,7 @@ import { useUser, usePreferences, useXP, useBadges, useMuteBlock, useFriends, us
 import { supabaseAuthService } from '@/lib/supabaseAuth';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
+import UserDisplayName from './UserDisplayName';
 import { getBadgeForLevel, getUnlockedBadges } from '@/lib/diamondBadges';
 import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare, Scale, Zap, Bookmark, Smartphone } from 'lucide-react';
 import AchievementsSection from './AchievementsSection';
@@ -475,10 +476,15 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                       className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200" 
                     />
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[15px] font-bold text-foreground">{user.name}</span>
-                      {user.isFounder && <DiamondBadge level={lvl} size="xs" specialBadge="founder" />}
-                      {user.isIridescent && <DiamondBadge level={lvl} size="xs" specialBadge="iridescent" />}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <UserDisplayName
+                        name={user.name}
+                        profile={user}
+                        level={lvl}
+                        size="xs"
+                        showSpecialLabels
+                        nameClassName="text-[15px] font-bold text-foreground"
+                      />
                       {isPremium && <span className="text-[10px] bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 rounded-full px-2 py-px animate-pulse">PREMIUM</span>}
                     </div>
                   )}
@@ -1191,7 +1197,10 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                     )}
                     {getBookmarks(user?.name).slice(0, 20).map(b => (
                       <div key={b.id + b.savedAt} className="bg-secondary/70 border border-border rounded-xl px-3 py-2">
-                        <div className="text-[10px] text-purple-300">{b.author_name} · {b.salonName || b.salonId}</div>
+                        <div className="text-[10px] text-purple-300 inline-flex items-center gap-1 flex-wrap">
+                          <UserDisplayName name={b.author_name} size="xs" showLevelDiamond={false} showSpecialLabels={false} nameClassName="text-purple-300" />
+                          <span>· {b.salonName || b.salonId}</span>
+                        </div>
                         <p className="text-[11px] text-muted-foreground/70 truncate">{b.text}</p>
                       </div>
                     ))}
@@ -1243,7 +1252,13 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                         {pendingRequests.map(req => (
                           <div key={req.id} className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-3 py-2.5">
                             <UserPlus className="w-4 h-4 text-blue-400 shrink-0" />
-                            <span className="text-sm text-foreground flex-1">{req.user_id}</span>
+                            <UserDisplayName
+                              name={req.user_id}
+                              size="xs"
+                              showSpecialLabels={false}
+                              nameClassName="text-sm text-foreground"
+                              className="flex-1 min-w-0"
+                            />
                             <button onClick={() => void runFriendAction(() => acceptRequestFromSender(req.user_id), `${req.user_id} ajouté à vos amis`)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] hover:bg-emerald-500/25 transition-all active:scale-95 cursor-pointer">Accepter</button>
                             <button onClick={() => void runFriendAction(() => rejectRequestFromSender(req.user_id), `Demande de ${req.user_id} refusée`)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-300 text-[11px] hover:bg-red-500/20 transition-all active:scale-95 cursor-pointer">Refuser</button>
                           </div>
@@ -1261,7 +1276,13 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                         {outgoingRequests.map(req => (
                           <div key={req.id} className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-3 py-2.5">
                             <UserPlus className="w-4 h-4 text-muted-foreground/50 shrink-0" />
-                            <span className="text-sm text-foreground flex-1">{req.friend_id}</span>
+                            <UserDisplayName
+                              name={req.friend_id}
+                              size="xs"
+                              showSpecialLabels={false}
+                              nameClassName="text-sm text-foreground"
+                              className="flex-1 min-w-0"
+                            />
                             <span className="text-[10px] text-muted-foreground/55">En attente</span>
                             <button onClick={() => void runFriendAction(() => cancelRequestToRecipient(req.friend_id), `Demande à ${req.friend_id} annulée`)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-300 text-[11px] hover:bg-red-500/20 transition-all active:scale-95 cursor-pointer">Annuler</button>
                           </div>
@@ -1282,10 +1303,15 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                             <button
                               type="button"
                               onClick={() => onViewProfile?.(name)}
-                              className="text-sm text-foreground flex-1 text-left hover:text-primary transition-colors truncate"
+                              className="flex-1 min-w-0 text-left hover:opacity-90 transition-opacity"
                               title={`Voir le profil de ${name}`}
                             >
-                              {name}
+                              <UserDisplayName
+                                name={name}
+                                size="xs"
+                                showSpecialLabels={false}
+                                nameClassName="text-sm text-foreground hover:text-primary"
+                              />
                             </button>
                             {onOpenDM && (
                               <button
@@ -1327,7 +1353,13 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                       <div key={name} className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-3 py-2.5 transition-all duration-200 hover:scale-[1.01] animate-slide-in-up"
                         style={{ animationDelay: `${index * 50}ms` }}>
                         <UserX className="w-4 h-4 text-muted-foreground/40 shrink-0" />
-                        <span className="text-sm text-foreground flex-1">{name}</span>
+                        <UserDisplayName
+                          name={name}
+                          size="xs"
+                          showSpecialLabels={false}
+                          nameClassName="text-sm text-foreground"
+                          className="flex-1 min-w-0"
+                        />
                         <span className="text-[10px] text-muted-foreground/60">{blocked ? 'Bloqué' : 'Muet'}</span>
                         {muted && <button onClick={() => unmuteUser(name)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] hover:bg-emerald-500/25 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer">Réactiver</button>}
                         {blocked && <button onClick={() => unblockUser(name)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] hover:bg-emerald-500/25 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer">Débloquer</button>}

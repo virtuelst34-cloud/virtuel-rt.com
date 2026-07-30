@@ -8,6 +8,7 @@ import { detectSpam } from '@/lib/antiSpam';
 import { DEFAULT_BANNED_WORDS, findBannedWord, mergeBannedWords } from '@/lib/bannedWords';
 import { supabase } from '@/lib/supabase';
 import { getQuickReplies } from '@/lib/funFeatures';
+import SpecialBadgeInline from './SpecialBadgeInline';
 
 interface Member {
   name: string;
@@ -272,7 +273,14 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
         <div className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-secondary border border-border rounded-xl" role="region" aria-live="polite" aria-label="Réponse en cours">
           <Reply className="w-3.5 h-3.5 text-primary shrink-0" aria-hidden="true" />
           <div className="flex-1 min-w-0">
-            <span className="text-[10px] text-primary font-semibold">Réponse à {replyTo.author_name}</span>
+            <span className="text-[10px] text-primary font-semibold inline-flex items-center gap-1">
+              Réponse à {replyTo.author_name}
+              <SpecialBadgeInline
+                profile={profiles[replyTo.author_name] || (replyTo.author_name === user?.name ? user : null)}
+                size="xs"
+                showLabels={false}
+              />
+            </span>
             <p className="text-[11px] text-muted-foreground/60 truncate">{replyTo.text}</p>
           </div>
           <button 

@@ -16,6 +16,7 @@ import {
 import { staffChatService, type StaffMessage } from '@/lib/staffChatService';
 import { useUser } from '@/lib/contexts';
 import { supabase } from '@/lib/supabase';
+import UserDisplayName from '../UserDisplayName';
 
 interface Props {
   readOnly?: boolean;
@@ -541,7 +542,12 @@ export default function ModerationHubSection({ readOnly = false, user, initialSu
                 {staffMessages.map((msg) => (
                   <div key={msg.id} className="group">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-[11px] font-semibold text-red-400">{msg.author_name}</span>
+                      <UserDisplayName
+                        name={msg.author_name}
+                        size="xs"
+                        showSpecialLabels={false}
+                        nameClassName="text-[11px] font-semibold text-red-400"
+                      />
                       <span className="text-[9px] text-muted-foreground/50">
                         {new Date(msg.created_at).toLocaleString('fr-FR')}
                       </span>

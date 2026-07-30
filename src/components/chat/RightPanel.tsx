@@ -3,9 +3,10 @@ import { Diamond, Flame, Trophy, MapPin, MessageSquare, User } from 'lucide-reac
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
+import UserDisplayName from './UserDisplayName';
+import SpecialBadgeInline from './SpecialBadgeInline';
 import UserProfileView from './UserProfileView';
 import { useChat } from '@/lib/contexts';
-import { getSpecialBadgeForUser } from '@/lib/diamondBadges';
 import { presenceService, OnlineUser } from '@/lib/presenceService';
 
 const MEDAL  = ['🥇', '🥈', '🥉'];
@@ -37,7 +38,6 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
   const xp   = user?.xp    || 0;
   const next = xpForLevel ? xpForLevel(lvl) : 500;
   const prog = user && xpProgress ? xpProgress(user) : 0;
-  const specialBadge = user ? getSpecialBadgeForUser(user) : null;
 
   // Charger les utilisateurs en ligne
   useEffect(() => {
@@ -70,7 +70,14 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
       <div className="p-3 border-b border-border">
         <div className="text-[9.5px] text-muted-foreground/50 uppercase tracking-widest mb-2">Ton diamant</div>
         <div className="text-center py-1">
-          {user ? <DiamondBadge level={lvl} size="md" showLabel specialBadge={specialBadge || undefined} /> : <Diamond className="w-7 h-7 text-indigo-400 mx-auto mb-1" />}
+          {user ? (
+            <div className="flex flex-col items-center gap-1.5">
+              <DiamondBadge level={lvl} size="md" showLabel />
+              <SpecialBadgeInline profile={user} size="sm" showLabels />
+            </div>
+          ) : (
+            <Diamond className="w-7 h-7 text-indigo-400 mx-auto mb-1" />
+          )}
           <div className="text-xs text-purple-300 font-semibold mt-1">Niveau {lvl}</div>
           <div className="text-[10px] text-muted-foreground/50 mt-0.5">{xp.toLocaleString()} / {next.toLocaleString()} XP</div>
           <div className="bg-secondary rounded h-[3px] mt-2">
@@ -94,7 +101,14 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
               <span className="text-[11px] w-4 text-center shrink-0">{MEDAL[i] || `${i+1}`}</span>
               <Avatar avatarClass={r.avatar || 'av1'} initials={r.initials || r.name?.slice(0,2).toUpperCase()} size="xs" />
               <div className="flex-1 min-w-0">
-                <span className={`text-[11px] truncate font-medium block ${isMe ? 'text-yellow-300' : 'text-muted-foreground'}`}>{r.name}</span>
+                <UserDisplayName
+                  name={r.name}
+                  profile={profiles[r.name] || r}
+                  level={(profiles[r.name] || r).level}
+                  size="xs"
+                  showSpecialLabels={false}
+                  nameClassName={`text-[11px] font-medium ${isMe ? 'text-yellow-300' : 'text-muted-foreground'}`}
+                />
                 <span className="text-[9px] text-muted-foreground/40">{r.mxp.toLocaleString()} XP</span>
               </div>
             </div>
@@ -112,18 +126,22 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
           ? <p className="text-[10px] text-muted-foreground/40 italic">Aucun profil.</p>
           : ranked.map((r, i) => {
             const isMe = r.name === user?.name;
-            const specialBadge = getSpecialBadgeForUser(r);
             return (
               <div key={r.name} className={`flex items-center gap-1.5 py-1.5 px-1 rounded-lg mb-0.5 ${isMe ? 'bg-purple-500/8 border border-purple-500/18' : ''}`}>
                 <span className="text-[10px] text-muted-foreground/40 w-4 text-center shrink-0">{i+1}</span>
                 <Avatar avatarClass={r.avatar || 'av1'} initials={r.initials || r.name?.slice(0,2).toUpperCase()} size="xs" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1 justify-between">
-                    <span className={`text-[11px] truncate font-medium ${isMe ? 'text-purple-300' : 'text-muted-foreground'}`}>{r.name}</span>
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <DiamondBadge level={r.level || 1} size="xs" specialBadge={specialBadge || undefined} />
-                      <span className="text-[10px] text-purple-400 font-bold">Nv.{r.level||1}</span>
-                    </div>
+                  <div className="flex items-center gap-1 justify-between min-w-0">
+                    <UserDisplayName
+                      name={r.name}
+                      profile={r}
+                      level={r.level}
+                      size="xs"
+                      showSpecialLabels={false}
+                      nameClassName={`text-[11px] font-medium ${isMe ? 'text-purple-300' : 'text-muted-foreground'}`}
+                      className="min-w-0 flex-1"
+                    />
+                    <span className="text-[10px] text-purple-400 font-bold shrink-0">Nv.{r.level||1}</span>
                   </div>
                   <div className="bg-secondary rounded-full h-[2px] mt-0.5">
                     <div className="h-[2px] rounded-full xp-gradient" style={{ width: `${r.xp != null && xpProgress ? xpProgress(r) : 0}%` }} />
@@ -161,14 +179,16 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                     <GenderIcon gender={userProfile?.gender} size={12} className="shrink-0" />
-                    <span
-                      className="text-[13px] leading-snug font-semibold text-foreground break-words"
-                      title={onlineUser.name}
-                    >
-                      {onlineUser.name}
-                    </span>
+                    <UserDisplayName
+                      name={onlineUser.name}
+                      profile={userProfile}
+                      level={userProfile?.level}
+                      size="xs"
+                      showSpecialLabels={false}
+                      nameClassName="text-[13px] leading-snug font-semibold text-foreground"
+                    />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[10px] text-muted-foreground/65">
                     {userProfile?.gender && userProfile.gender !== 'prefer_not_to_say' && (

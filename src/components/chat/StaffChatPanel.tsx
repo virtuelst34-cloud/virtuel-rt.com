@@ -7,6 +7,7 @@ import {
 import { useUser, useUI, useModeration } from '@/lib/contexts';
 import { hasStaffAccess, hasAdminAccess } from '@/lib/utils/founderCheck';
 import { staffChatService, type StaffMessage } from '@/lib/staffChatService';
+import UserDisplayName from './UserDisplayName';
 import {
   moderationAlertService,
   type StaffReport,
@@ -230,7 +231,12 @@ export default function StaffChatPanel({ onClose }: Props) {
               {messages.map((msg) => (
                 <div key={msg.id} className="group">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[11px] font-semibold text-red-400">{msg.author_name}</span>
+                    <UserDisplayName
+                      name={msg.author_name}
+                      size="xs"
+                      showSpecialLabels={false}
+                      nameClassName="text-[11px] font-semibold text-red-400"
+                    />
                     <span className="text-[9px] text-muted-foreground/50">
                       {new Date(msg.created_at).toLocaleString('fr-FR')}
                     </span>

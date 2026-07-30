@@ -53,6 +53,8 @@ interface UserContextType {
   setUserStatusAdmin: (name: string, status: UserProfile['status']) => void;
   profiles: Record<string, UserProfile>;
   setProfiles: React.Dispatch<React.SetStateAction<Record<string, UserProfile>>>;
+  /** Charge les profils manquants (badges spéciaux inclus) par pseudo. */
+  ensureProfiles: (names: string[]) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | null>(null);
@@ -101,6 +103,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUserProfile | null>(null);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const isMountedRef = useRef(true);
+  const profilesRef = useRef(profiles);
+  profilesRef.current = profiles;
+  const pendingProfileFetches = useRef<Set<string>>(new Set());
   const { addNotification } = useNotifications();
 
   const trackLogin = useCallback((userId: string) => {
@@ -414,6 +419,42 @@ export function UserProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const ensureProfiles = useCallback(async (names: string[]) => {
+    const unique = [...new Set(names.map((n) => n?.trim()).filter(Boolean))];
+    const toFetch = unique.filter((n) => {
+      if (profilesRef.current[n]) return false;
+      if (pendingProfileFetches.current.has(n)) return false;
+      pendingProfileFetches.current.add(n);
+      return true;
+    });
+    if (toFetch.length === 0) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('name', toFetch);
+
+      if (error) throw error;
+      if (!isMountedRef.current) return;
+
+      if (data?.length) {
+        setProfiles((prev) => {
+          const next = { ...prev };
+          for (const row of data) {
+            const mapped = mapSupabaseProfile(row as SupabaseUserProfile);
+            next[mapped.name] = { ...next[mapped.name], ...mapped };
+          }
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('ensureProfiles:', err);
+    } finally {
+      toFetch.forEach((n) => pendingProfileFetches.current.delete(n));
+    }
+  }, []);
+
   const value: UserContextType = {
     user,
     supabaseUser,
@@ -425,6 +466,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setUserStatusAdmin,
     profiles,
     setProfiles,
+    ensureProfiles,
   };
 
   return (
@@ -446,6 +488,7 @@ export function useUser(): UserContextType {
     supabaseUser: null,
     profiles: {},
     setProfiles: () => {},
+    ensureProfiles: async () => {},
     login: async () => ({ success: false, error: 'UserProvider manquant' }),
     loginWithSupabase: () => {},
     logout: () => {},

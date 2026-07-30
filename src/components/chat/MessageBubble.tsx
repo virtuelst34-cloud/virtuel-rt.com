@@ -1,6 +1,7 @@
 import React, { useState, useRef, memo, RefObject, useCallback, useMemo, useEffect } from 'react';
 import Avatar from './Avatar';
-import DiamondBadge from './DiamondBadge';
+import UserDisplayName from './UserDisplayName';
+import SpecialBadgeInline from './SpecialBadgeInline';
 import SafeMessageContent from './SafeMessageContent';
 import { useUser, usePreferences, useMuteBlock, useNotifications } from '@/lib/contexts';
 import { useModeration } from '@/lib/contexts';
@@ -40,7 +41,7 @@ interface MessageBubbleContentProps {
 }
 
 const MessageBubbleContent = function MessageBubbleContent({ message, onReact, onDelete, onPin, onEdit, onViewProfile, onReply, onReport, salonId, salonName }: MessageBubbleContentProps) {
-  const { user } = useUser();
+  const { user, profiles } = useUser();
   const { compactMode } = usePreferences();
   const { reportMessage } = useModeration();
   const { blockUser } = useMuteBlock();
@@ -58,6 +59,7 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
   }, [can]);
 
   const isOwn = message.author_name === user?.name;
+  const authorProfile = isOwn ? user : profiles[message.author_name];
   const authorMood = getMood(message.author_name);
   const [authorSignature, setAuthorSignature] = useState(() => getSignature(message.author_name));
 
@@ -73,11 +75,6 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
     return () => window.removeEventListener(SIGNATURE_EVENT, onSig);
   }, [message.author_name]);
 
-  const showCreatorBadges =
-    isOwn &&
-    !!user &&
-    (user.isFounder || user.specialBadges?.includes('founder')) &&
-    (user.isIridescent || user.specialBadges?.includes('iridescent'));
   const canDeleteMessage = isOwn || isAdmin || canDeleteAny;
   const [hovered, setHovered]       = useState(false);
   const [reported, setReported]     = useState(false);
@@ -147,23 +144,21 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
 
       <div className={`max-w-[70%] flex flex-col ${compactMode ? 'gap-0.5' : 'gap-1'} ${isOwn ? 'items-end' : ''}`}>
         {/* Auteur + heure */}
-        <div className={`flex items-center gap-1.5 ${isOwn ? 'flex-row-reverse' : ''}`}>
-          <button 
-            className={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline transition-colors ${isOwn ? 'text-emerald-700 dark:text-emerald-400' : 'text-purple-700 dark:text-purple-300'} cursor-pointer`}
+        <div className={`flex items-center gap-1.5 flex-wrap ${isOwn ? 'flex-row-reverse' : ''}`}>
+          <UserDisplayName
+            name={message.author_name}
+            profile={authorProfile}
+            level={authorProfile?.level}
+            size="xs"
+            showSpecialLabels={!compactMode}
+            nameClassName={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline transition-colors ${isOwn ? 'text-emerald-700 dark:text-emerald-400' : 'text-purple-700 dark:text-purple-300'}`}
             onClick={(e) => {
               e.stopPropagation();
               onViewProfile?.(message.author_name);
             }}
             id={`message-author-${message.id}`}
-            aria-label={`Message de ${message.author_name}`}>
-            {message.author_name}
-          </button>
-          {showCreatorBadges && (
-            <span className={`inline-flex items-center gap-1 ${isOwn ? 'mr-1' : 'ml-1'}`} aria-label="Badges créateur">
-              <DiamondBadge level={1} size="xs" specialBadge="founder" />
-              <DiamondBadge level={1} size="xs" specialBadge="iridescent" />
-            </span>
-          )}
+            aria-label={`Message de ${message.author_name}`}
+          />
           <span className={`${compactMode ? 'text-[9px]' : 'text-[10px]'} text-muted-foreground/40`} aria-label={`Envoyé à ${time}`}>{time}</span>
           {message.pinned && <Pin className="w-3 h-3 text-amber-400 animate-bounce" aria-label="Message épinglé" />}
         </div>
@@ -186,7 +181,14 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
               style={{ borderLeftColor: isOwn ? '#34d399' : '#a78bfa' }}
               role="complementary"
               aria-label={`Réponse à ${message.replyTo.author_name}`}>
-              <span className="font-semibold" style={{ color: isOwn ? '#34d399' : '#a78bfa' }}>@{message.replyTo.author_name}</span>
+              <span className="inline-flex items-center gap-1 font-semibold" style={{ color: isOwn ? '#34d399' : '#a78bfa' }}>
+                @{message.replyTo.author_name}
+                <SpecialBadgeInline
+                  profile={profiles[message.replyTo.author_name] || (message.replyTo.author_name === user?.name ? user : null)}
+                  size="xs"
+                  showLabels={false}
+                />
+              </span>
               {' '}{message.replyTo.text}
             </div>
           )}

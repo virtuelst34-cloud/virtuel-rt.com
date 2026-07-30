@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Users, Search, Ban, CheckCircle, VolumeX, Volume2, Trash2 } from 'lucide-react';
 import Avatar from '../Avatar';
+import UserDisplayName from '../UserDisplayName';
 import { SectionTitle, StatCard } from './AdminComponents';
 
 const STATUS_OPTIONS = [
@@ -57,7 +58,14 @@ export default function UsersSection({ readOnly = false, profiles, setProfiles, 
               <Avatar avatarClass={profile.avatar} initials={profile.initials} size="sm" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs font-medium text-foreground truncate">{profile.name}</span>
+                  <UserDisplayName
+                    name={profile.name}
+                    profile={profile}
+                    level={profile.level}
+                    size="xs"
+                    showSpecialLabels={false}
+                    nameClassName="text-xs font-medium text-foreground"
+                  />
                   {profile.isBanned && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/30 rounded px-1.5 py-px">BANNI</span>}
                   {profile.isMuted  && <span className="text-[9px] bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded px-1.5 py-px">MUTÉ</span>}
                 </div>

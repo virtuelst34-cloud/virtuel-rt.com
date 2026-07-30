@@ -1,6 +1,8 @@
 import React from 'react';
 import { Mic, MicOff, MessageSquare, User } from 'lucide-react';
 import Avatar from './Avatar';
+import SpecialBadgeInline from './SpecialBadgeInline';
+import { useUser } from '@/lib/contexts';
 
 interface SceneMember {
   name: string;
@@ -45,6 +47,7 @@ export default function ScenePanel({
   onViewProfile,
   onOpenDM,
 }: ScenePanelProps) {
+  const { profiles } = useUser();
   const allMembers = micActive
     ? [...members, { name: 'Vous', avatar: 'av1', initials: 'V', speaking: userMicLevel > 8, micLevel: userMicLevel, isMe: true }]
     : members;
@@ -91,14 +94,17 @@ export default function ScenePanel({
                 type="button"
                 disabled={!interactive || !onViewProfile}
                 onClick={() => { if (!m.isMe) onViewProfile?.(m.name); }}
-                className={`text-[10px] font-medium truncate max-w-[60px] ${
+                className={`text-[10px] font-medium truncate max-w-[72px] inline-flex items-center gap-0.5 ${
                   m.isMe ? 'text-primary cursor-default' : interactive && onViewProfile
                     ? 'text-foreground hover:text-primary cursor-pointer'
                     : 'text-foreground cursor-default'
                 }`}
                 aria-label={m.isMe ? m.name : `Ouvrir le profil de ${m.name}`}
               >
-                {m.name}
+                <span className="truncate">{m.name}</span>
+                {!m.isMe && (
+                  <SpecialBadgeInline profile={profiles[m.name]} size="xs" showLabels={false} />
+                )}
               </button>
 
               <VUBar speaking={m.speaking} level={m.micLevel ?? (m.speaking ? userMicLevel : 0)} />

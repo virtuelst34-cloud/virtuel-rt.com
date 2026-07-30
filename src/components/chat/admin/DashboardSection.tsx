@@ -2,7 +2,7 @@ import React from 'react';
 import { LayoutDashboard } from 'lucide-react';
 import { SALONS } from '@/lib/chatConfig';
 import Avatar from '../Avatar';
-import DiamondBadge from '../DiamondBadge';
+import UserDisplayName from '../UserDisplayName';
 import { SectionTitle, StatCard } from './AdminComponents';
 
 interface Props {
@@ -36,8 +36,15 @@ export default function DashboardSection({ profiles, customSalons, salonMessages
           <div key={p.name} className="flex items-center gap-2.5 bg-secondary border border-border rounded-xl px-3 py-2">
             <span className="text-[11px] text-muted-foreground/40 w-4">#{i+1}</span>
             <Avatar avatarClass={p.avatar} initials={p.initials} size="xs" />
-            <span className="text-xs text-foreground flex-1 truncate">{p.name}</span>
-            <DiamondBadge level={p.level || 1} size="xs" />
+            <UserDisplayName
+              name={p.name}
+              profile={p}
+              level={p.level || 1}
+              size="xs"
+              showSpecialLabels={false}
+              nameClassName="text-xs text-foreground"
+              className="flex-1 min-w-0"
+            />
             <span className="text-[10px] text-purple-400 font-bold">Nv.{p.level||1}</span>
             <span className="text-[10px] text-muted-foreground/50">{(p.xp||0).toLocaleString()} XP</span>
           </div>

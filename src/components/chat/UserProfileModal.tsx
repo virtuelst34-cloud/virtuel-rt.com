@@ -2,7 +2,8 @@ import React, { useState, useRef, ChangeEvent } from 'react';
 import { useUser, useXP } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
-import { getBadgeForLevel, getUnlockedBadges, getBadgeStats, SPECIAL_BADGES, getSpecialBadgeForUser } from '@/lib/diamondBadges';
+import UserDisplayName from './UserDisplayName';
+import { getBadgeForLevel, getUnlockedBadges, getBadgeStats } from '@/lib/diamondBadges';
 import { X, Edit3, Check, Flame, Calendar, Venus, Mars, CircleHelp } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -36,7 +37,6 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
   const badge    = getBadgeForLevel(lvl);
   const unlocked = getUnlockedBadges(lvl);
   const stats    = getBadgeStats();
-  const userSpecialBadges = (user as any)?.specialBadges || [];
 
   const handleSave = () => {
     updateProfile({ 
@@ -93,7 +93,7 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
                 <>
                   <Avatar avatarClass={user.avatar} initials={user.initials} size="lg" />
                   <div className="absolute -bottom-2 -right-2">
-                    <DiamondBadge level={lvl} size="sm" specialBadge={getSpecialBadgeForUser(user) || undefined} />
+                    <DiamondBadge level={lvl} size="sm" />
                   </div>
                 </>
               )}
@@ -101,7 +101,7 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
                 <div className="relative">
                   <Avatar avatarClass={draft.avatar} initials={user.initials} size="lg" />
                   <div className="absolute -bottom-2 -right-2">
-                    <DiamondBadge level={lvl} size="sm" specialBadge={getSpecialBadgeForUser(user) || undefined} />
+                    <DiamondBadge level={lvl} size="sm" />
                   </div>
                 </div>
               )}
@@ -130,15 +130,15 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
 
           {/* Nom + date */}
           <div className="mb-4">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[17px] font-bold text-foreground">{user.name}</span>
-              <DiamondBadge level={lvl} size="sm" showLabel specialBadge={getSpecialBadgeForUser(user) || undefined} />
-              {userSpecialBadges.map((specialId: string) => {
-                const special = SPECIAL_BADGES.find(b => b.id === specialId);
-                return special ? (
-                  <span key={specialId} className="text-lg" title={special.label}>{special.icon}</span>
-                ) : null;
-              })}
+            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+              <UserDisplayName
+                name={user.name}
+                profile={user}
+                level={lvl}
+                size="sm"
+                showSpecialLabels
+                nameClassName="text-[17px] font-bold text-foreground"
+              />
             </div>
             {user.joinedAt && (
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50">

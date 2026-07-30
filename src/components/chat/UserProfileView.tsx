@@ -3,7 +3,8 @@ import { useChat, useFriends, useMuteBlock, useNotifications } from '@/lib/conte
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
-import { getBadgeForLevel, getUnlockedBadges, getBadgeStats, SPECIAL_BADGES, getSpecialBadgeForUser } from '@/lib/diamondBadges';
+import UserDisplayName from './UserDisplayName';
+import { getBadgeForLevel, getUnlockedBadges, getBadgeStats } from '@/lib/diamondBadges';
 import { X, MessageSquare, UserX, Flame, Calendar, VolumeX, UserCheck, UserPlus, UserMinus } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -27,7 +28,6 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
   const badge    = getBadgeForLevel(lvl);
   const unlocked = getUnlockedBadges(lvl);
   const stats    = getBadgeStats();
-  const targetSpecialBadges = (target as any)?.specialBadges || [];
   const blocked  = isBlocked(targetName);
   const muted   = isMuted(targetName);
   const friend   = isFriend(targetName);
@@ -107,8 +107,8 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
           <div className="-mt-7 mb-4 flex items-end justify-between">
             <div className="relative">
               <Avatar avatarClass={target.avatar} initials={target.initials} size="lg" mood={getMood(targetName)} />
-              <div className="absolute -bottom-2 -right-2">
-                <DiamondBadge level={lvl} size="sm" specialBadge={getSpecialBadgeForUser(target) || undefined} />
+              <div className="absolute -bottom-2 -right-2 flex items-center gap-0.5">
+                <DiamondBadge level={lvl} size="sm" />
               </div>
               <GenderIcon gender={(target as any).gender} size={14} className="absolute -top-1 -right-1" />
             </div>
@@ -163,15 +163,16 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
 
           {/* Nom + badge */}
           <div className="mb-3">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[17px] font-bold text-foreground" id={`profile-title-${targetName}`}>{target.name}</span>
-              <DiamondBadge level={lvl} size="sm" showLabel specialBadge={getSpecialBadgeForUser(target) || undefined} />
-              {targetSpecialBadges.map((specialId: string) => {
-                const special = SPECIAL_BADGES.find(b => b.id === specialId);
-                return special ? (
-                  <span key={specialId} className="text-lg" title={special.label} aria-label={special.label}>{special.icon}</span>
-                ) : null;
-              })}
+            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+              <UserDisplayName
+                name={target.name}
+                profile={target}
+                level={lvl}
+                size="sm"
+                showSpecialLabels
+                nameClassName="text-[17px] font-bold text-foreground"
+                id={`profile-title-${targetName}`}
+              />
             </div>
             {(target as any).joinedAt && (
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50">

@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback, KeyboardEvent, useMemo } from 'react';
 import { useUser, useNotifications, useXP, useDM, useMuteBlock } from '@/lib/contexts';
 import Avatar from './Avatar';
-import DiamondBadge from './DiamondBadge';
+import UserDisplayName from './UserDisplayName';
 import { Send, X, MessageSquare, Search, Mic, Video, PhoneOff, MicOff, VideoOff, Paperclip, FileText, ChevronLeft, Gamepad2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { dmTypingService } from '@/lib/dmTypingService';
 import { dmGameService, DM_GAME_LABELS, type DmGamePayload, type DmGameType } from '@/lib/dmGameService';
-import { getSpecialBadgeForUser, SPECIAL_BADGES } from '@/lib/diamondBadges';
 import { webrtcService, RemoteStreamInfo } from '@/lib/webrtcService';
 import { uploadChatFile } from '@/lib/storageService';
 import { toast } from 'sonner';
@@ -32,49 +31,6 @@ function TypingDots() {
       </span>
       est en train d'écrire...
     </div>
-  );
-}
-
-/** Badges spéciaux uniquement si l'utilisateur en possède réellement. */
-function SpecialBadgesOnly({ profile, size = 'xs' }: { profile?: Record<string, unknown> | null; size?: 'xs' | 'sm' }) {
-  if (!profile) return null;
-
-  const roleId = getSpecialBadgeForUser({
-    isFounder: !!profile.isFounder,
-    isDirection: !!profile.isDirection,
-    isMasterOp: !!profile.isMasterOp,
-    isIridescent: !!profile.isIridescent,
-  });
-
-  const extraIds = Array.isArray(profile.specialBadges)
-    ? (profile.specialBadges as string[]).filter((id) => id && id !== roleId)
-    : [];
-
-  const ids = [...(roleId ? [roleId] : []), ...extraIds];
-  if (ids.length === 0) return null;
-
-  const iconClass = size === 'sm' ? 'text-sm' : 'text-[11px]';
-
-  return (
-    <>
-      {ids.map((id) => {
-        if (id === 'iridescent') {
-          return <DiamondBadge key={id} level={1} size={size} specialBadge="iridescent" />;
-        }
-        const special = SPECIAL_BADGES.find((b) => b.id === id);
-        if (!special) return null;
-        return (
-          <span
-            key={id}
-            className={`${iconClass} leading-none shrink-0`}
-            title={special.label}
-            style={{ color: special.color }}
-          >
-            {special.icon}
-          </span>
-        );
-      })}
-    </>
   );
 }
 
@@ -532,12 +488,16 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className={`text-xs font-medium truncate ${unread > 0 ? 'text-foreground' : 'text-muted-foreground/80'}`}>{u.name}</span>
-                      <span className="flex items-center gap-0.5 shrink-0">
-                        <DiamondBadge level={u.level || 1} size="xs" />
-                        <SpecialBadgesOnly profile={profile as Record<string, unknown>} />
-                      </span>
+                    <div className="flex items-center justify-between gap-1 min-w-0">
+                      <UserDisplayName
+                        name={u.name}
+                        profile={profile}
+                        level={u.level || 1}
+                        size="xs"
+                        showSpecialLabels={false}
+                        nameClassName={`text-xs font-medium ${unread > 0 ? 'text-foreground' : 'text-muted-foreground/80'}`}
+                        className="min-w-0 flex-1"
+                      />
                     </div>
                     <div className={`text-[10px] truncate mt-0.5 ${unread > 0 ? 'text-foreground/60 font-medium' : 'text-muted-foreground/40'}`}>
                       {lastMsg
@@ -569,9 +529,14 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                 <Avatar avatarClass={contact.avatar || 'av1'} initials={contact.initials || contact.name.slice(0, 2).toUpperCase()} size="sm" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-semibold text-foreground truncate">{contact.name}</span>
-                    <DiamondBadge level={contact.level || 1} size="xs" />
-                    <SpecialBadgesOnly profile={contact as Record<string, unknown>} />
+                    <UserDisplayName
+                      name={contact.name}
+                      profile={contact}
+                      level={contact.level || 1}
+                      size="xs"
+                      showSpecialLabels={false}
+                      nameClassName="text-sm font-semibold text-foreground"
+                    />
                   </div>
                   <div className="text-[10px] text-muted-foreground/50">
                     {inCall

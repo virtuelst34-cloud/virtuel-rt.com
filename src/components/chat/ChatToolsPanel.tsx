@@ -11,7 +11,8 @@ import {
   type MessageBookmark,
 } from '@/lib/funFeatures';
 import { drawCoquinIcebreaker } from '@/lib/coquinFeatures';
-import { usePreferences } from '@/lib/contexts';
+import { usePreferences, useUser } from '@/lib/contexts';
+import SpecialBadgeInline from './SpecialBadgeInline';
 import MemoryGame from './MemoryGame';
 import TicTacToeGame from './TicTacToeGame';
 import ReflexGame from './ReflexGame';
@@ -40,6 +41,7 @@ export default function ChatToolsPanel({
   addNotification,
 }: Props) {
   const { coquinMode, isPremium, toggleCoquinMode } = usePreferences();
+  const { profiles } = useUser();
   const [showMemory, setShowMemory] = useState(false);
   const [showMorpion, setShowMorpion] = useState(false);
   const [showReflex, setShowReflex] = useState(false);
@@ -120,7 +122,10 @@ export default function ChatToolsPanel({
               )}
               {bookmarks.slice(0, 12).map(b => (
                 <div key={b.id + b.savedAt} className="text-[10px] leading-snug">
-                  <span className="text-purple-300 font-medium">{b.author_name}</span>
+                  <span className="text-purple-300 font-medium inline-flex items-center gap-1">
+                    {b.author_name}
+                    <SpecialBadgeInline profile={profiles[b.author_name]} size="xs" showLabels={false} />
+                  </span>
                   <span className="text-muted-foreground/40"> · {b.salonName || b.salonId}</span>
                   <p className="text-muted-foreground/70 truncate">{b.text}</p>
                 </div>

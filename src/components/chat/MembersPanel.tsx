@@ -3,8 +3,9 @@ import { useUser, useSalons, useMuteBlock } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
+import UserDisplayName from './UserDisplayName';
 import UserProfileView from './UserProfileView';
-import { Users, Search, X, Crown, Shield, Star, MessageSquare, UserX, Eye } from 'lucide-react';
+import { Users, Search, X, MessageSquare, UserX, Eye } from 'lucide-react';
 import { presenceService } from '@/lib/presenceService';
 
 interface MembersPanelProps {
@@ -168,12 +169,17 @@ function MemberItem({
       </button>
 
       <button type="button" onClick={onViewProfile} className="flex-1 min-w-0 text-left" aria-label={`Ouvrir le profil de ${member.name}`}>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
           <GenderIcon gender={member.gender} size={10} />
-          <span className={`text-xs font-medium truncate ${blocked ? 'text-red-300' : 'text-foreground'}`}>{member.name}</span>
-          {member.isFounder && <Crown className="w-3 h-3 text-yellow-400" />}
-          {member.isAdmin && <Shield className="w-3 h-3 text-red-400" />}
-          {member.isPremium && <Star className="w-3 h-3 text-yellow-400" />}
+          <UserDisplayName
+            name={member.name}
+            profile={member}
+            level={member.level || 1}
+            size="xs"
+            showLevelDiamond={false}
+            showSpecialLabels={false}
+            nameClassName={`text-xs font-medium ${blocked ? 'text-red-300' : 'text-foreground'}`}
+          />
         </div>
         <div className="flex items-center gap-1 mt-0.5">
           <DiamondBadge level={member.level || 1} size="xs" />

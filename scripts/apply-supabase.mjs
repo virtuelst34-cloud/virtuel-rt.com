@@ -1,7 +1,7 @@
-/**
+﻿/**
  * Applique schema.sql + migrations sur la base Supabase distante.
- * Charge automatiquement DATABASE_URL depuis .env.local si présent.
- * Ignore les migrations déjà enregistrées dans schema_migrations.
+ * Charge automatiquement DATABASE_URL depuis .env.local si prÃ©sent.
+ * Ignore les migrations dÃ©jÃ  enregistrÃ©es dans schema_migrations.
  *
  * Usage :
  *   npm run supabase:migrate
@@ -87,6 +87,8 @@ const MIGRATION_ORDER = [
   "create_moderation_alerts_system.sql",
   "add_salon_categories.sql",
   "reorganize_salon_categories.sql",
+  "add_staff_messages_files_reactions.sql",
+  "add_staff_notifications.sql",
 ];
 const SKIP_ERROR_CODES = new Set([
   "42P07", // duplicate_table
@@ -132,7 +134,7 @@ async function markApplied(client, filename) {
 async function main() {
   if (!DATABASE_URL) {
     console.error(`
-❌ DATABASE_URL (ou SUPABASE_DB_URL) non défini.
+âŒ DATABASE_URL (ou SUPABASE_DB_URL) non dÃ©fini.
 
 Ajoutez dans .env.local :
   DATABASE_URL=postgresql://postgres:...@db.mqghveoldsidfxgvefts.supabase.co:5432/postgres
@@ -146,7 +148,7 @@ Puis : npm run supabase:migrate
   try {
     pg = await import("pg");
   } catch {
-    console.error("❌ Installez pg : npm install --save-dev pg");
+    console.error("âŒ Installez pg : npm install --save-dev pg");
     process.exit(1);
   }
 
@@ -156,7 +158,7 @@ Puis : npm run supabase:migrate
   });
 
   await client.connect();
-  console.log("✅ Connecté à Supabase PostgreSQL\n");
+  console.log("âœ… ConnectÃ© Ã  Supabase PostgreSQL\n");
   await ensureMigrationTable(client);
 
   const startFrom = process.env.APPLY_FROM;
@@ -171,7 +173,7 @@ Puis : npm run supabase:migrate
     }
 
     if (await isApplied(client, file)) {
-      console.log(`⏭  ${file} (déjà appliquée)`);
+      console.log(`â­  ${file} (dÃ©jÃ  appliquÃ©e)`);
       skipped++;
       continue;
     }
@@ -182,12 +184,12 @@ Puis : npm run supabase:migrate
       : join(root, "supabase", "migrations", file);
 
     if (!existsSync(path)) {
-      console.warn(`⚠️  Ignoré (absent) : ${file}`);
+      console.warn(`âš ï¸  IgnorÃ© (absent) : ${file}`);
       continue;
     }
 
     const sql = readFileSync(path, "utf8");
-    process.stdout.write(`▶ ${file} ... `);
+    process.stdout.write(`â–¶ ${file} ... `);
     try {
       await client.query(sql);
       await markApplied(client, file);
@@ -208,7 +210,7 @@ Puis : npm run supabase:migrate
   }
 
   await client.end();
-  console.log(`\n✅ Terminé : ${applied} appliquée(s), ${skipped} ignorée(s).`);
+  console.log(`\nâœ… TerminÃ© : ${applied} appliquÃ©e(s), ${skipped} ignorÃ©e(s).`);
 }
 
 main().catch((err) => {

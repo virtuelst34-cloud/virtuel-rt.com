@@ -8,11 +8,13 @@ import { mergeAndSortSalons } from '@/lib/salonUtils';
 
 interface OnboardingWizardProps {
   onComplete: () => void;
+  /** Clé d’identité (compte / invité) — obligatoire pour marquer « done » sans bloquer les autres. */
+  userKey?: string;
 }
 
 type StepId = 'age' | 'salon' | 'notifs';
 
-export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
+export default function OnboardingWizard({ onComplete, userKey }: OnboardingWizardProps) {
   const { customSalons, hiddenSalons, displayOrder, setCurrentSalon } = useSalons();
   const needsAge = !hasAgeAcknowledged();
 
@@ -42,7 +44,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
   const isLast = index >= steps.length - 1;
 
   const finish = () => {
-    markOnboardingDone();
+    markOnboardingDone(userKey);
     onComplete();
   };
 

@@ -92,6 +92,7 @@ const MIGRATION_ORDER = [
   "gate_premium_coquin.sql",
   "tighten_user_presence_rls.sql",
   "premium_codes.sql",
+  "premium_codes_abuse_staff_merci.sql",
 ];
 const SKIP_ERROR_CODES = new Set([
   "42P07", // duplicate_table

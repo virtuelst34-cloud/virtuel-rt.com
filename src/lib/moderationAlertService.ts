@@ -11,7 +11,8 @@ export type ModerationAlertEventType =
   | 'unmute'
   | 'content_flag'
   | 'appeal'
-  | 'test';
+  | 'test'
+  | 'merci_modo';
 
 export type AlertChannel = 'app' | 'email' | 'sms';
 export type AlertQueueStatus =

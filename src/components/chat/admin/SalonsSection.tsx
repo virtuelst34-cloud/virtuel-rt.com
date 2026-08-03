@@ -5,7 +5,7 @@ import { SectionTitle } from './AdminComponents';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useUser, useGlobalSettings } from '@/lib/contexts';
 import { isSalonCreator, mergeAndSortSalons } from '@/lib/salonUtils';
-import { supabase } from '@/lib/supabase';
+import { supabaseDbService } from '@/lib/supabaseDb';
 
 interface SalonItem {
   id: string;
@@ -64,11 +64,7 @@ export default function SalonsSection({
     if (readOnly) return;
     const next = featuredId === salonId ? null : salonId;
     try {
-      if (settings.id) {
-        await supabase.from('global_settings').update({ featured_salon_id: next }).eq('id', settings.id);
-      } else {
-        await supabase.from('global_settings').update({ featured_salon_id: next });
-      }
+      await supabaseDbService.staffSetFeaturedSalon(next);
       await refreshSettings();
     } catch (e) {
       console.error(e);

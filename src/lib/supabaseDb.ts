@@ -693,9 +693,47 @@ export const supabaseDbService = {
     return !!data;
   },
 
+  async adminListPremiumRedemptions(codeId?: string | null): Promise<Array<{
+    id: string;
+    code_id: string;
+    code: string;
+    user_id: string;
+    user_name: string | null;
+    redeemed_at: string;
+  }>> {
+    const { data, error } = await supabase.rpc('admin_list_premium_redemptions', {
+      p_code_id: codeId ?? null,
+    });
+    if (error) throw error;
+    return (data || []) as Array<{
+      id: string;
+      code_id: string;
+      code: string;
+      user_id: string;
+      user_name: string | null;
+      redeemed_at: string;
+    }>;
+  },
+
   async redeemPremiumCode(code: string): Promise<{ ok: boolean; premium_until: string | null; permanent: boolean }> {
     const { data, error } = await supabase.rpc('redeem_premium_code', { p_code: code });
     if (error) throw error;
     return data as { ok: boolean; premium_until: string | null; permanent: boolean };
+  },
+
+  async staffSetFeaturedSalon(salonId: string | null): Promise<boolean> {
+    const { data, error } = await supabase.rpc('staff_set_featured_salon', {
+      p_salon_id: salonId,
+    });
+    if (error) throw error;
+    return !!data;
+  },
+
+  async sendMerciModo(targetName: string): Promise<{ ok: boolean; staff_notified?: number }> {
+    const { data, error } = await supabase.rpc('send_merci_modo', {
+      p_target_name: targetName,
+    });
+    if (error) throw error;
+    return data as { ok: boolean; staff_notified?: number };
   },
 };

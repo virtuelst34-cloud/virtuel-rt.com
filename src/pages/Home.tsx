@@ -16,7 +16,7 @@ import DirectMessagePanel from '@/components/chat/DirectMessagePanel';
 import UserProfileView from '@/components/chat/UserProfileView';
 import AppUpdateBanner from '@/components/AppUpdateBanner';
 import OnboardingWizard from '@/components/chat/OnboardingWizard';
-import { isOnboardingDone } from '@/lib/onboarding';
+import { isOnboardingDone, onboardingUserKey } from '@/lib/onboarding';
 
 function ChatApp() {
   const { user } = useUser();
@@ -58,22 +58,29 @@ function ChatApp() {
     return () => window.removeEventListener('virtuel-rt-open-settings', handler);
   }, [openSettings]);
 
+  // Après UsernameModal uniquement (user défini) — flag par identité, jamais avant entrée
   useEffect(() => {
     if (!user) {
       setShowOnboarding(false);
       return;
     }
-    if (!isOnboardingDone()) {
+    const key = onboardingUserKey(user);
+    if (key && !isOnboardingDone(key)) {
       setShowOnboarding(true);
+    } else {
+      setShowOnboarding(false);
     }
-  }, [user?.name]);
+  }, [user?.id, user?.name]);
 
   return (
     <div className="flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-background safe-area-pad">
       <AppUpdateBanner autoApply={!currentSalon} />
       {!user && <UsernameModal />}
       {user && showOnboarding && (
-        <OnboardingWizard onComplete={() => setShowOnboarding(false)} />
+        <OnboardingWizard
+          userKey={onboardingUserKey(user) || undefined}
+          onComplete={() => setShowOnboarding(false)}
+        />
       )}
 
       <div className="flex flex-1 min-h-0 overflow-hidden">

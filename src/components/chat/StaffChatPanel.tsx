@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom';
 import {
   X, MessageSquare, Send, Trash2, Wrench, ShieldAlert, Flag, Bell,
   VolumeX, Ban, Search, RefreshCw, Check, Loader2, ExternalLink,
-  Paperclip, FileText, Smile, CheckCheck, MessagesSquare,
+  Paperclip, FileText, Smile, CheckCheck, MessagesSquare, Flame, Pin,
 } from 'lucide-react';
-import { useUser, useUI, useModeration, useNotifications } from '@/lib/contexts';
+import { useUser, useUI, useModeration, useNotifications, useSalons, useGlobalSettings } from '@/lib/contexts';
 import { hasStaffAccess, hasAdminAccess } from '@/lib/utils/founderCheck';
 import { staffChatService, type StaffMessage } from '@/lib/staffChatService';
 import { uploadChatFile } from '@/lib/storageService';
@@ -22,6 +22,8 @@ import {
   staffNotifLabel,
 } from '@/lib/utils/staffNotifications';
 import { supabase } from '@/lib/supabase';
+import { supabaseDbService } from '@/lib/supabaseDb';
+import { mergeAndSortSalons } from '@/lib/salonUtils';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -49,6 +51,8 @@ export default function StaffChatPanel({ onClose }: Props) {
     markNotificationRead,
   } = useNotifications();
   const { banUser, muteUser, unbanUser, unmuteUser, isUserBanned, isUserMuted } = useModeration();
+  const { currentSalon, customSalons, hiddenSalons, displayOrder } = useSalons();
+  const { settings, refresh: refreshSettings } = useGlobalSettings();
   const canStaff = hasStaffAccess(user);
   const canAdmin = hasAdminAccess(user);
   const [tab, setTab] = useState<StaffTab>('chat');
@@ -74,6 +78,28 @@ export default function StaffChatPanel({ onClose }: Props) {
   const [userQuery, setUserQuery] = useState('');
   const [banReason, setBanReason] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
+  const [featuredBusy, setFeaturedBusy] = useState(false);
+  const [pickSalonId, setPickSalonId] = useState('');
+
+  const featuredId = settings.featured_salon_id || null;
+  const salonOptions = mergeAndSortSalons(customSalons || [], hiddenSalons || [], displayOrder || {});
+
+  const pinFeaturedSalon = async (salonId: string | null) => {
+    setFeaturedBusy(true);
+    try {
+      await supabaseDbService.staffSetFeaturedSalon(salonId);
+      await refreshSettings();
+      toast.success(
+        salonId
+          ? `Salon du moment : ${salonOptions.find((s) => s.id === salonId)?.name || salonId}`
+          : 'Épinglage du salon du moment retiré',
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Impossible d’épingler');
+    } finally {
+      setFeaturedBusy(false);
+    }
+  };
 
   const clearSelectedFile = useCallback(() => {
     if (filePreview?.startsWith('blob:')) URL.revokeObjectURL(filePreview);
@@ -685,6 +711,68 @@ export default function StaffChatPanel({ onClose }: Props) {
               <ExternalLink className="w-3.5 h-3.5" />
               Ouvrir le Centre de modération
             </button>
+
+            {/* Salon du moment */}
+            <section className="space-y-2">
+              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 flex items-center gap-1.5">
+                <Flame className="w-3 h-3 text-primary" /> Salon du moment
+              </h3>
+              <p className="text-[10px] text-muted-foreground/50">
+                Visible sur l’Accueil pour tout le monde.
+                {featuredId
+                  ? ` Actuel : ${salonOptions.find((s) => s.id === featuredId)?.name || featuredId}`
+                  : ' (auto = salon le plus actif)'}
+              </p>
+              {currentSalon && (
+                <button
+                  type="button"
+                  disabled={featuredBusy}
+                  onClick={() =>
+                    void pinFeaturedSalon(
+                      featuredId === currentSalon ? null : currentSalon,
+                    )
+                  }
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-primary/10 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/20 disabled:opacity-50"
+                >
+                  <Pin className="w-3.5 h-3.5" />
+                  {featuredId === currentSalon
+                    ? 'Retirer l’épingle du salon actuel'
+                    : 'Définir salon du moment (salon actuel)'}
+                </button>
+              )}
+              <div className="flex gap-1.5">
+                <select
+                  value={pickSalonId}
+                  onChange={(e) => setPickSalonId(e.target.value)}
+                  className="flex-1 min-w-0 bg-background border border-border rounded-lg px-2 py-2 text-xs outline-none focus:border-red-500/40"
+                >
+                  <option value="">Choisir un salon…</option>
+                  {salonOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.emoji || '💬'} {s.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!pickSalonId || featuredBusy}
+                  onClick={() => void pinFeaturedSalon(pickSalonId || null)}
+                  className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium disabled:opacity-40 shrink-0"
+                >
+                  Épingler
+                </button>
+              </div>
+              {featuredId && (
+                <button
+                  type="button"
+                  disabled={featuredBusy}
+                  onClick={() => void pinFeaturedSalon(null)}
+                  className="text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                >
+                  Retirer l’épingle (revenir en auto)
+                </button>
+              )}
+            </section>
 
             {/* Quick user actions */}
             <section className="space-y-2">

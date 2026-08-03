@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { KeyRound, Plus, Ban, Copy, RefreshCw } from 'lucide-react';
+import { KeyRound, Plus, Ban, Copy, RefreshCw, History, ChevronDown, ChevronUp } from 'lucide-react';
 import { SectionTitle } from './AdminComponents';
 import { supabaseDbService } from '@/lib/supabaseDb';
 
@@ -15,6 +15,15 @@ interface PremiumCodeRow {
   created_at: string;
 }
 
+interface RedemptionRow {
+  id: string;
+  code_id: string;
+  code: string;
+  user_id: string;
+  user_name: string | null;
+  redeemed_at: string;
+}
+
 interface Props {
   readOnly?: boolean;
 }
@@ -28,26 +37,34 @@ function randomCode(): string {
 
 export default function PremiumCodesSection({ readOnly = false }: Props) {
   const [codes, setCodes] = useState<PremiumCodeRow[]>([]);
+  const [redemptions, setRedemptions] = useState<RedemptionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
   const [code, setCode] = useState(() => randomCode());
-  const [duration, setDuration] = useState<string>('30'); // '' = permanent
+  const [duration, setDuration] = useState<string>('30');
   const [maxUses, setMaxUses] = useState('1');
+  const [expiresInDays, setExpiresInDays] = useState('');
   const [note, setNote] = useState('');
+  const [showLog, setShowLog] = useState(true);
+  const [filterCodeId, setFilterCodeId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const rows = await supabaseDbService.adminListPremiumCodes();
+      const [rows, logs] = await Promise.all([
+        supabaseDbService.adminListPremiumCodes(),
+        supabaseDbService.adminListPremiumRedemptions(filterCodeId),
+      ]);
       setCodes(rows);
+      setRedemptions(logs);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Impossible de charger les codes');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filterCodeId]);
 
   useEffect(() => {
     void load();
@@ -59,15 +76,21 @@ export default function PremiumCodesSection({ readOnly = false }: Props) {
     setOk('');
     try {
       const days = duration.trim() === '' ? null : Math.max(1, parseInt(duration, 10) || 30);
+      const expDays = expiresInDays.trim() === '' ? null : Math.max(1, parseInt(expiresInDays, 10) || 0);
+      const expiresAt = expDays
+        ? new Date(Date.now() + expDays * 24 * 60 * 60 * 1000).toISOString()
+        : null;
       await supabaseDbService.adminCreatePremiumCode({
         code: code.trim(),
         durationDays: days,
         maxUses: Math.max(1, parseInt(maxUses, 10) || 1),
+        expiresAt,
         note: note.trim() || null,
       });
       setOk(`Code ${code.trim().toUpperCase()} créé`);
       setCode(randomCode());
       setNote('');
+      setExpiresInDays('');
       await load();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Création impossible');
@@ -88,8 +111,8 @@ export default function PremiumCodesSection({ readOnly = false }: Props) {
     <div className="space-y-5">
       <SectionTitle icon={KeyRound}>Codes Premium</SectionTitle>
       <p className="text-[11px] text-muted-foreground/60">
-        Générez des codes à durée limitée ou permanents. Les utilisateurs les saisissent dans Paramètres → Compte.
-        Pas de paiement : grant manuel ★ toujours disponible dans Utilisateurs.
+        1 redeem réussi par compte. Expiration du code, plafond d’utilisations et journal qui / quand.
+        Saisie côté utilisateur : Paramètres → Compte.
       </p>
 
       {!readOnly && (
@@ -110,10 +133,10 @@ export default function PremiumCodesSection({ readOnly = false }: Props) {
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div>
               <label className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1 block">
-                Durée (jours, vide = permanent)
+                Durée Premium (jours, vide = permanent)
               </label>
               <input
                 value={duration}
@@ -129,6 +152,17 @@ export default function PremiumCodesSection({ readOnly = false }: Props) {
               <input
                 value={maxUses}
                 onChange={(e) => setMaxUses(e.target.value)}
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1 block">
+                Expire dans (jours)
+              </label>
+              <input
+                value={expiresInDays}
+                onChange={(e) => setExpiresInDays(e.target.value)}
+                placeholder="jamais"
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
               />
             </div>
@@ -180,22 +214,80 @@ export default function PremiumCodesSection({ readOnly = false }: Props) {
                 {c.duration_days == null ? 'Permanent' : `${c.duration_days} j`}
                 {' · '}
                 {c.use_count}/{c.max_uses} utilisations
+                {c.expires_at
+                  ? ` · expire ${new Date(c.expires_at).toLocaleDateString('fr-FR')}`
+                  : ''}
                 {!c.active && ' · inactif'}
                 {c.note ? ` · ${c.note}` : ''}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setFilterCodeId((prev) => (prev === c.id ? null : c.id))}
+              className={`p-2 rounded-lg border text-xs ${
+                filterCodeId === c.id
+                  ? 'border-primary/40 text-primary bg-primary/10'
+                  : 'border-border text-muted-foreground hover:text-foreground'
+              }`}
+              title="Voir les redemptions"
+            >
+              <History className="w-3.5 h-3.5" />
+            </button>
             {c.active && !readOnly && (
               <button
                 type="button"
                 onClick={() => void handleDeactivate(c.id)}
                 className="p-2 rounded-lg border border-red-500/30 text-red-300 hover:bg-red-500/10"
-                title="Désactiver"
+                title="Révoquer / désactiver"
               >
                 <Ban className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
         ))}
+      </div>
+
+      <div className="border border-border rounded-xl overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowLog((v) => !v)}
+          className="w-full flex items-center gap-2 px-3 py-2.5 text-left bg-secondary/40 hover:bg-secondary/60"
+        >
+          <History className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs font-semibold text-foreground flex-1">
+            Journal des redemptions
+            {filterCodeId ? ' (filtré)' : ''}
+          </span>
+          {showLog ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
+        {showLog && (
+          <div className="px-3 py-2 space-y-1.5 max-h-48 overflow-y-auto">
+            {filterCodeId && (
+              <button
+                type="button"
+                onClick={() => setFilterCodeId(null)}
+                className="text-[10px] text-primary hover:underline mb-1"
+              >
+                Effacer le filtre
+              </button>
+            )}
+            {redemptions.length === 0 && (
+              <p className="text-[11px] text-muted-foreground/40 italic py-2">Aucune utilisation.</p>
+            )}
+            {redemptions.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center gap-2 text-[11px] text-muted-foreground/80 py-1 border-b border-border/40 last:border-0"
+              >
+                <code className="font-mono text-foreground/90 shrink-0">{r.code}</code>
+                <span className="truncate flex-1">{r.user_name || r.user_id.slice(0, 8)}</span>
+                <span className="tabular-nums shrink-0 text-muted-foreground/50">
+                  {new Date(r.redeemed_at).toLocaleString('fr-FR')}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

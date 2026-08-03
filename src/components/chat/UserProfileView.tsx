@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useUser, useFriends, useMuteBlock, useNotifications } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
 import UserDisplayName from './UserDisplayName';
 import { getBadgeForLevel, getUnlockedBadges, getBadgeStats } from '@/lib/diamondBadges';
-import { X, MessageSquare, UserX, Flame, Calendar, VolumeX, UserCheck, UserPlus, UserMinus } from 'lucide-react';
+import { X, MessageSquare, UserX, Flame, Calendar, VolumeX, UserCheck, UserPlus, UserMinus, Heart } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { getMood, getSignature } from '@/lib/funFeatures';
+import { hasStaffAccess } from '@/lib/utils/founderCheck';
+import { supabaseDbService } from '@/lib/supabaseDb';
+import { moderationAlertService } from '@/lib/moderationAlertService';
 
 interface UserProfileViewProps {
   targetName: string;
@@ -16,13 +19,16 @@ interface UserProfileViewProps {
   onOpenDM?: (name: string) => void;
 }
 
+const MERCI_GUEST_KEY = 'virtuel_rt_merci_modo_at';
+
 // Fiche profil en lecture seule d'un autre utilisateur
 export default function UserProfileView({ targetName, onClose, onOpenDM }: UserProfileViewProps) {
-  const { profiles, user } = useUser();
+  const { profiles, user, supabaseUser } = useUser();
   const { addNotification } = useNotifications();
   const { isFriend, sendFriendRequest, acceptRequestFromSender, rejectRequestFromSender, cancelRequestToRecipient, removeFriend, pendingRequests, outgoingRequests } = useFriends();
   const { isMuted, isBlocked, muteUser, unmuteUser, blockUser, unblockUser } = useMuteBlock();
   const target = profiles[targetName] || { name: targetName, avatar: 'av1', initials: targetName.slice(0, 2).toUpperCase(), level: 1, xp: 0 };
+  const [merciBusy, setMerciBusy] = useState(false);
 
   const lvl      = target.level || 1;
   const badge    = getBadgeForLevel(lvl);
@@ -33,6 +39,8 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
   const friend   = isFriend(targetName);
   const incomingRequest = pendingRequests.find(r => r.user_id === targetName);
   const outgoingRequest = outgoingRequests.find(r => r.friend_id === targetName);
+  const targetIsStaff = hasStaffAccess(target as typeof user);
+  const canMerci = !!user && user.name !== targetName && targetIsStaff;
 
   const handleBlock = async () => { 
     if (blocked) {
@@ -74,6 +82,37 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
   };
 
   const handleDM = () => { onClose(); onOpenDM?.(targetName); };
+
+  const handleMerciModo = async () => {
+    if (!user || merciBusy || !canMerci) return;
+    setMerciBusy(true);
+    try {
+      if (supabaseUser?.id) {
+        await supabaseDbService.sendMerciModo(targetName);
+      } else {
+        // Invité : rate-limit local + alerte staff
+        const raw = localStorage.getItem(MERCI_GUEST_KEY);
+        if (raw && Date.now() - Number(raw) < 60 * 60 * 1000) {
+          throw new Error('Merci déjà envoyé récemment — réessayez dans une heure');
+        }
+        await moderationAlertService.dispatch(
+          'merci_modo',
+          `${user.name} a dit « Merci modo » à ${targetName}`,
+          { from_name: user.name, to_name: targetName, event_type: 'merci_modo', staff: true },
+          user.name,
+        );
+        localStorage.setItem(MERCI_GUEST_KEY, String(Date.now()));
+      }
+      addNotification({ type: 'system', message: `Merci envoyé à ${targetName}` });
+    } catch (error) {
+      addNotification({
+        type: 'system',
+        message: error instanceof Error ? error.message.replace(/^.*Exception:?\s*/i, '') : 'Impossible d’envoyer le merci',
+      });
+    } finally {
+      setMerciBusy(false);
+    }
+  };
 
   return (
     <div 
@@ -174,6 +213,17 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
                 id={`profile-title-${targetName}`}
               />
             </div>
+            {canMerci && (
+              <button
+                type="button"
+                disabled={merciBusy}
+                onClick={() => void handleMerciModo()}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] font-medium hover:bg-rose-500/20 disabled:opacity-50 transition-all"
+              >
+                <Heart className="w-3.5 h-3.5" />
+                {merciBusy ? 'Envoi…' : 'Merci modo'}
+              </button>
+            )}
             {(target as any).joinedAt && (
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
                 <Calendar className="w-3 h-3" aria-hidden="true" />

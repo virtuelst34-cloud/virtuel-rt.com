@@ -1,19 +1,24 @@
 /**
  * Détection des mises à jour après déploiement (PWA + version.json).
- * - SW en mode « prompt » : skipWaiting au clic / auto-reload
+ * - SW en mode « prompt » : skipWaiting au clic / auto-reload (accueil, 1× max)
  * - Contrôle périodique + focus / visibility
  * - version.json en secours si le SW ne signale pas encore
+ * - Garde anti-boucle (Firefox : controllerchange / waiting SW flaky)
  */
 
 type NeedRefreshListener = (needRefresh: boolean) => void
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000
-const IDLE_AUTO_APPLY_MS = 3 * 60 * 1000
+const AUTO_RELOAD_SESSION_KEY = 'virtuel-rt-auto-reload'
+const AUTO_RELOAD_VERSION_KEY = 'virtuel-rt-auto-reload-ver'
 
 let needRefresh = false
 let bootVersion: string | null = null
 let updateSW: ((reloadPage?: boolean) => Promise<void>) | undefined
 let initialized = false
+let applying = false
+/** true uniquement après un applyAppUpdate volontaire (évite reload Firefox spontané). */
+let intentionalApply = false
 const listeners = new Set<NeedRefreshListener>()
 
 function notify(next: boolean) {
@@ -26,13 +31,41 @@ function markNeedRefresh() {
   notify(true)
 }
 
+function sessionGet(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function sessionSet(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value)
+  } catch {
+    // private mode / quota — ignore
+  }
+}
+
+/** Au plus une auto-actualisation par onglet ; pas de re-reload pour la même version. */
+export function canAutoApplyUpdate(): boolean {
+  if (sessionGet(AUTO_RELOAD_SESSION_KEY) === '1') return false
+  if (bootVersion && sessionGet(AUTO_RELOAD_VERSION_KEY) === bootVersion) return false
+  return true
+}
+
+function markAutoApplied(): void {
+  sessionSet(AUTO_RELOAD_SESSION_KEY, '1')
+  if (bootVersion) sessionSet(AUTO_RELOAD_VERSION_KEY, bootVersion)
+}
+
 async function checkVersionFile() {
   if (!navigator.onLine) return
   try {
     const res = await fetch(`/version.json?_=${Date.now()}`, { cache: 'no-store' })
     if (!res.ok) return
     const data = (await res.json()) as { version?: string }
-    if (!data.version) return
+    if (!data.version || typeof data.version !== 'string') return
     if (!bootVersion) {
       bootVersion = data.version
       return
@@ -42,7 +75,7 @@ async function checkVersionFile() {
       void pokeServiceWorker()
     }
   } catch {
-    // Hors ligne ou fichier absent — ignorer
+    // Hors ligne ou fichier absent — ignorer (jamais de reload)
   }
 }
 
@@ -68,79 +101,55 @@ export function getAppUpdateNeeded(): boolean {
   return needRefresh
 }
 
-/** Applique la mise à jour (skipWaiting + reload, ou reload simple). */
-export function applyAppUpdate(): void {
+export type ApplyAppUpdateSource = 'user' | 'auto'
+
+/**
+ * Applique la mise à jour (skipWaiting + reload, ou reload simple).
+ * @returns false si auto-reload refusé (garde anti-boucle) — afficher la bannière.
+ */
+export function applyAppUpdate(source: ApplyAppUpdateSource = 'user'): boolean {
+  if (applying) return source === 'user'
+
+  if (source === 'auto') {
+    if (!canAutoApplyUpdate()) return false
+    markAutoApplied()
+  }
+
+  applying = true
+  intentionalApply = true
+
   // Si un SW attend : skipWaiting → controllerchange → reload.
-  // Sinon (ex. écart version.json seul) : fallback reload.
+  // Sinon (ex. écart version.json seul) : fallback reload une seule fois.
   const fallback = window.setTimeout(() => {
     window.location.reload()
-  }, 700)
+  }, 900)
 
   if (updateSW) {
     void Promise.resolve(updateSW(true)).catch(() => {
       window.clearTimeout(fallback)
       window.location.reload()
     })
-    return
+    return true
   }
 
   window.clearTimeout(fallback)
   window.location.reload()
-}
-
-/**
- * Si une MAJ est disponible et que l’utilisateur est idle (accueil / inactif),
- * actualise sans demander.
- */
-export function armIdleAutoApply(enabled: boolean): () => void {
-  if (!enabled) return () => {}
-
-  let idleTimer: ReturnType<typeof setTimeout> | null = null
-
-  const clear = () => {
-    if (idleTimer) {
-      clearTimeout(idleTimer)
-      idleTimer = null
-    }
-  }
-
-  const schedule = () => {
-    clear()
-    if (!needRefresh) return
-    idleTimer = setTimeout(() => {
-      if (needRefresh) applyAppUpdate()
-    }, IDLE_AUTO_APPLY_MS)
-  }
-
-  const onActivity = () => {
-    if (needRefresh) schedule()
-  }
-
-  const unsub = subscribeAppUpdate((needed) => {
-    if (needed) schedule()
-    else clear()
-  })
-
-  const events = ['pointerdown', 'keydown', 'touchstart', 'scroll'] as const
-  events.forEach((ev) => window.addEventListener(ev, onActivity, { passive: true }))
-
-  schedule()
-
-  return () => {
-    unsub()
-    clear()
-    events.forEach((ev) => window.removeEventListener(ev, onActivity))
-  }
+  return true
 }
 
 export async function initAppUpdate(): Promise<void> {
   if (initialized || import.meta.env.DEV) return
   initialized = true
 
-  // Reload une fois quand le nouveau SW prend le contrôle
+  // Reload uniquement si on a demandé l’update (pas sur flip d’état Firefox)
   if ('serviceWorker' in navigator) {
     let refreshing = false
     navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!intentionalApply) {
+        // Nouveau contrôleur sans geste utilisateur → proposer la bannière, ne pas boucler
+        markNeedRefresh()
+        return
+      }
       if (refreshing) return
       refreshing = true
       window.location.reload()
@@ -157,17 +166,22 @@ export async function initAppUpdate(): Promise<void> {
       onRegisteredSW(_swUrl, registration) {
         if (!registration) return
 
-        const runChecks = () => {
-          void registration.update()
+        // Debounce les update() Firefox (visibility + focus peuvent spammer)
+        let lastPoke = 0
+        const poke = () => {
+          const now = Date.now()
+          if (now - lastPoke < 15_000) return
+          lastPoke = now
+          void registration.update().catch(() => {})
           void checkVersionFile()
         }
 
-        window.setInterval(runChecks, CHECK_INTERVAL_MS)
+        window.setInterval(poke, CHECK_INTERVAL_MS)
 
         document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') runChecks()
+          if (document.visibilityState === 'visible') poke()
         })
-        window.addEventListener('focus', runChecks)
+        window.addEventListener('focus', poke)
       },
     })
   } catch {
@@ -184,6 +198,5 @@ export async function initAppUpdate(): Promise<void> {
   })
   window.addEventListener('focus', () => {
     void checkVersionFile()
-    void pokeServiceWorker()
   })
 }

@@ -2,35 +2,51 @@ import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import {
   applyAppUpdate,
-  armIdleAutoApply,
+  canAutoApplyUpdate,
   subscribeAppUpdate,
 } from '@/lib/appUpdate'
 
 interface AppUpdateBannerProps {
-  /** Sur l’écran d’accueil : actualisation auto sans banner. */
+  /**
+   * Sur l’écran d’accueil : une seule auto-actualisation (sessionStorage).
+   * Si la garde bloque, on affiche « Actualiser » au lieu de reboucler.
+   */
   autoApply?: boolean
 }
 
 /**
  * Bannière FR quand un nouveau build est prêt.
- * Sur WelcomeScreen (`autoApply`), recharge tout de suite.
+ * Mid-session : toujours demander via « Actualiser » (pas d’idle auto-reload).
  */
 export default function AppUpdateBanner({ autoApply = false }: AppUpdateBannerProps) {
   const [needRefresh, setNeedRefresh] = useState(false)
+  const [showBanner, setShowBanner] = useState(false)
 
   useEffect(() => subscribeAppUpdate(setNeedRefresh), [])
 
   useEffect(() => {
-    if (!needRefresh || !autoApply) return
-    applyAppUpdate()
+    if (!needRefresh) {
+      setShowBanner(false)
+      return
+    }
+
+    if (!autoApply) {
+      setShowBanner(true)
+      return
+    }
+
+    // Accueil : auto-reload au plus une fois par session
+    if (!canAutoApplyUpdate()) {
+      setShowBanner(true)
+      return
+    }
+
+    const ok = applyAppUpdate('auto')
+    if (!ok) setShowBanner(true)
+    // Si ok → navigation en cours ; pas de bannière
   }, [needRefresh, autoApply])
 
-  useEffect(() => {
-    if (autoApply) return
-    return armIdleAutoApply(true)
-  }, [autoApply])
-
-  if (!needRefresh || autoApply) return null
+  if (!needRefresh || !showBanner) return null
 
   return (
     <div
@@ -44,7 +60,7 @@ export default function AppUpdateBanner({ autoApply = false }: AppUpdateBannerPr
         </p>
         <button
           type="button"
-          onClick={() => applyAppUpdate()}
+          onClick={() => applyAppUpdate('user')}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors touch-target"
         >
           <RefreshCw className="w-3.5 h-3.5" aria-hidden />

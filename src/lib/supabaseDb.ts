@@ -630,15 +630,72 @@ export const supabaseDbService = {
   },
 
   /** Staff only — grant/revoke Premium (profiles.is_premium). */
-  async adminSetPremium(userName: string, premium: boolean): Promise<boolean> {
+  async adminSetPremium(userName: string, premium: boolean, premiumUntil?: string | null): Promise<boolean> {
     const { data, error } = await supabase.rpc('admin_set_premium', {
       p_user_name: userName,
       p_premium: premium,
+      ...(premiumUntil !== undefined ? { p_premium_until: premiumUntil } : {}),
     });
     if (error) {
       console.error('Erreur admin_set_premium:', error);
       throw error;
     }
     return !!data;
+  },
+
+  async adminCreatePremiumCode(opts: {
+    code: string;
+    durationDays?: number | null;
+    maxUses?: number;
+    expiresAt?: string | null;
+    note?: string | null;
+  }): Promise<string> {
+    const { data, error } = await supabase.rpc('admin_create_premium_code', {
+      p_code: opts.code,
+      p_duration_days: opts.durationDays ?? null,
+      p_max_uses: opts.maxUses ?? 1,
+      p_expires_at: opts.expiresAt ?? null,
+      p_note: opts.note ?? null,
+    });
+    if (error) throw error;
+    return data as string;
+  },
+
+  async adminListPremiumCodes(): Promise<Array<{
+    id: string;
+    code: string;
+    duration_days: number | null;
+    max_uses: number;
+    use_count: number;
+    active: boolean;
+    expires_at: string | null;
+    note: string | null;
+    created_at: string;
+  }>> {
+    const { data, error } = await supabase.rpc('admin_list_premium_codes');
+    if (error) throw error;
+    return (data || []) as Array<{
+      id: string;
+      code: string;
+      duration_days: number | null;
+      max_uses: number;
+      use_count: number;
+      active: boolean;
+      expires_at: string | null;
+      note: string | null;
+      created_at: string;
+    }>;
+  },
+
+  async adminDeactivatePremiumCode(id: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('admin_deactivate_premium_code', { p_id: id });
+    if (error) throw error;
+    return !!data;
+  },
+
+  async redeemPremiumCode(code: string): Promise<{ ok: boolean; premium_until: string | null; permanent: boolean }> {
+    const { data, error } = await supabase.rpc('redeem_premium_code', { p_code: code });
+    if (error) throw error;
+    return data as { ok: boolean; premium_until: string | null; permanent: boolean };
   },
 };

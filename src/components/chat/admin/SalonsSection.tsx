@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { DoorOpen, Plus, Trash2, Lock, Pencil, ChevronUp, ChevronDown, Save, X } from 'lucide-react';
+import { DoorOpen, Plus, Trash2, Lock, Pencil, ChevronUp, ChevronDown, Save, X, Pin } from 'lucide-react';
 import { SALONS, SALON_TYPES, SALON_EMOJIS_LIST } from '@/lib/chatConfig';
 import { SectionTitle } from './AdminComponents';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { useUser } from '@/lib/contexts';
+import { useUser, useGlobalSettings } from '@/lib/contexts';
 import { isSalonCreator, mergeAndSortSalons } from '@/lib/salonUtils';
+import { supabase } from '@/lib/supabase';
 
 interface SalonItem {
   id: string;
@@ -47,6 +48,7 @@ export default function SalonsSection({
   setHiddenSalons,
 }: Props) {
   const { user } = useUser();
+  const { settings, refresh: refreshSettings } = useGlobalSettings();
   const { can, isAdmin } = usePermissions();
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
@@ -56,6 +58,22 @@ export default function SalonsSection({
   const [canEdit, setCanEdit] = useState(false);
   const [canReorder, setCanReorder] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
+  const featuredId = settings.featured_salon_id || null;
+
+  const pinSalon = async (salonId: string) => {
+    if (readOnly) return;
+    const next = featuredId === salonId ? null : salonId;
+    try {
+      if (settings.id) {
+        await supabase.from('global_settings').update({ featured_salon_id: next }).eq('id', settings.id);
+      } else {
+        await supabase.from('global_settings').update({ featured_salon_id: next });
+      }
+      await refreshSettings();
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   useEffect(() => {
     void Promise.all([
@@ -250,6 +268,17 @@ export default function SalonsSection({
                   {s.description && <div className="text-[10px] text-muted-foreground/50 truncate">{s.description}</div>}
                 </div>
                 {s.isPrivate && <Lock className="w-3 h-3 text-amber-400" />}
+                <button
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => void pinSalon(s.id)}
+                  className={`transition-colors disabled:opacity-30 ${
+                    featuredId === s.id ? 'text-amber-400' : 'text-muted-foreground/40 hover:text-amber-400'
+                  }`}
+                  title={featuredId === s.id ? 'Retirer salon du moment' : 'Épingler salon du moment'}
+                >
+                  <Pin className="w-3.5 h-3.5" />
+                </button>
                 {isCustom && canEditSalon(s) && (
                   <button
                     type="button"

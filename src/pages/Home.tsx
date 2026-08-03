@@ -15,6 +15,8 @@ import SettingsPanel from '@/components/chat/SettingsPanel';
 import DirectMessagePanel from '@/components/chat/DirectMessagePanel';
 import UserProfileView from '@/components/chat/UserProfileView';
 import AppUpdateBanner from '@/components/AppUpdateBanner';
+import OnboardingWizard from '@/components/chat/OnboardingWizard';
+import { isOnboardingDone } from '@/lib/onboarding';
 
 function ChatApp() {
   const { user } = useUser();
@@ -30,6 +32,7 @@ function ChatApp() {
   const [viewProfile, setViewProfile]   = useState<string | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<RemoteStreamInfo[]>([]);
   const [mobileSalonsOpen, setMobileSalonsOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const handleMicChange = useCallback((active: boolean, level: number) => {
     setMicActive(active);
@@ -55,10 +58,23 @@ function ChatApp() {
     return () => window.removeEventListener('virtuel-rt-open-settings', handler);
   }, [openSettings]);
 
+  useEffect(() => {
+    if (!user) {
+      setShowOnboarding(false);
+      return;
+    }
+    if (!isOnboardingDone()) {
+      setShowOnboarding(true);
+    }
+  }, [user?.name]);
+
   return (
     <div className="flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-background safe-area-pad">
       <AppUpdateBanner autoApply={!currentSalon} />
       {!user && <UsernameModal />}
+      {user && showOnboarding && (
+        <OnboardingWizard onComplete={() => setShowOnboarding(false)} />
+      )}
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar

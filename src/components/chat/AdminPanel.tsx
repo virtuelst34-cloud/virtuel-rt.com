@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useUI, useUser, useSalons, useMessages, useXP, useModeration, useBadges } from '@/lib/contexts';
 import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';
-import { X, ShieldAlert, LayoutDashboard, Users, Gavel, DoorOpen, Diamond, Award, BarChart2, Lock, EyeOff, LucideIcon, Settings, Bell, MessageSquare, Shield, FileText, Activity, Siren, Folders } from 'lucide-react';
+import { X, ShieldAlert, LayoutDashboard, Users, Gavel, DoorOpen, Diamond, Award, BarChart2, Lock, EyeOff, LucideIcon, Settings, Bell, MessageSquare, Shield, FileText, Activity, Siren, Folders, KeyRound } from 'lucide-react';
 import DashboardSection from './admin/DashboardSection';
 import StatsSection from './admin/StatsSection';
 import SalonsSection from './admin/SalonsSection';
@@ -19,6 +19,7 @@ import MessageSettingsSection from './admin/MessageSettingsSection';
 import SecuritySettingsSection from './admin/SecuritySettingsSection';
 import ContentModerationSection from './admin/ContentModerationSection';
 import LogsAuditSection from './admin/LogsAuditSection';
+import PremiumCodesSection from './admin/PremiumCodesSection';
 
 interface Tab {
   id: string;
@@ -32,6 +33,7 @@ const TABS: Tab[] = [
   { id: 'salons',      label: 'Salons',           icon: DoorOpen },
   { id: 'categories',  label: 'Catégories',       icon: Folders },
   { id: 'users',       label: 'Utilisateurs',     icon: Users },
+  { id: 'premiumcodes', label: 'Codes Premium',   icon: KeyRound },
   { id: 'modhub',      label: 'Centre modo',      icon: Siren },
   { id: 'moderation',  label: 'Modération',       icon: Gavel },
   { id: 'badges',      label: 'Badges',           icon: Diamond },
@@ -182,6 +184,7 @@ export default function AdminPanel() {
             {activeTab === 'salons'         && <SalonsSection readOnly={isReadOnly} customSalons={customSalons} addSalon={addSalon} updateSalon={updateSalon} deleteSalon={deleteSalon} reorderSalons={reorderSalons} displayOrder={displayOrder} hiddenSalons={hiddenSalons} setHiddenSalons={setHiddenSalons} />}
             {activeTab === 'categories'     && <CategoriesSection readOnly={isReadOnly} />}
             {activeTab === 'users'          && <UsersSection readOnly={isReadOnly} profiles={profiles} setProfiles={setProfiles} setUserStatusAdmin={setUserStatusAdmin} banUser={banUser} unbanUser={unbanUser} muteUser={muteUser} unmuteUser={unmuteUser} />}
+            {activeTab === 'premiumcodes'   && <PremiumCodesSection readOnly={isReadOnly} />}
             {activeTab === 'modhub'         && <ModerationHubSection readOnly={isReadOnly} user={user} />}
             {activeTab === 'moderation'     && <ModerationSection readOnly={isReadOnly} profiles={profiles} unbanUser={unbanUser} unmuteUser={unmuteUser} />}
             {activeTab === 'badges'         && <BadgesSection readOnly={isReadOnly} customBadges={customBadges} setCustomBadges={setCustomBadges} />}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, FormEvent, useEffect, useMemo } from 'react';
-import { useUser, useSalons, useNotifications, useXP, useMuteBlock, useUI, usePreferences } from '@/lib/contexts';
+import { useUser, useSalons, useNotifications, useXP, useMuteBlock, useUI, usePreferences, useDM, useGlobalSettings } from '@/lib/contexts';
 import { Salon } from '@/lib/chatConfig';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
@@ -8,14 +8,20 @@ import UserDisplayName from './UserDisplayName';
 import SpecialBadgeInline from './SpecialBadgeInline';
 import UserProfileView from './UserProfileView';
 import { SupabaseLogin } from '../auth/SupabaseLogin';
-import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users, Scale, ShieldAlert, ChevronDown, ChevronRight } from 'lucide-react';
+import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users, Scale, ShieldAlert, ChevronDown, ChevronRight, Star, Radio } from 'lucide-react';
 import { presenceService } from '@/lib/presenceService';
 import MembersPanel from './MembersPanel';
 import DailySparkCard from './DailySparkCard';
+import WeeklyChallengeCard from './WeeklyChallengeCard';
 import { Link } from 'react-router-dom';
 import { groupSalonsByCategory, mergeAndSortSalons } from '@/lib/salonUtils';
 import { MENTIONS_LEGALES_HREF } from '@/lib/welcomeContent';
 import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';
+import {
+  getFavoriteSalonId,
+  getLastSalonId,
+} from '@/lib/onboarding';
+import { supabase } from '@/lib/supabase';
 
 interface DisplayOnlineUser {
   name: string;
@@ -32,7 +38,7 @@ interface DisplayOnlineUser {
 }
 
 interface WelcomeScreenProps {
-  onOpenDM?: (name: string) => void;
+  onOpenDM?: (name?: string) => void;
   mobileSalonsOpen?: boolean;
   onMobileSalonsOpenChange?: (open: boolean) => void;
 }
@@ -67,7 +73,10 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
   const { xpProgress, xpForLevel, monthlyXP } = useXP();
   const { isMuted, isBlocked } = useMuteBlock();
   const { openAdmin } = useUI();
+  const { getUnreadCount } = useDM();
+  const { settings, refresh: refreshSettings } = useGlobalSettings();
   const canModerate = hasAdminAccess(user) || hasStaffAccess(user);
+  const unreadDMs = user ? getUnreadCount(user.name) : 0;
   const [waved, setWaved]             = useState<Record<string, boolean>>({});
   const [filter, setFilter]           = useState('all');
   const [viewProfile, setViewProfile] = useState<string | null>(null);
@@ -140,6 +149,51 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
     displayOrder || {},
     { coquinMode },
   );
+
+  const mostActiveSalon = useMemo(() => {
+    let best: { id: string; count: number } | null = null;
+    for (const s of allSalons) {
+      const count = salonCounts[s.id] || 0;
+      if (count <= 0) continue;
+      if (!best || count > best.count) best = { id: s.id, count };
+    }
+    return best ? allSalons.find((s) => s.id === best!.id) || null : null;
+  }, [allSalons, salonCounts]);
+
+  const featuredSalon = useMemo(() => {
+    const pinnedId = settings.featured_salon_id || null;
+    if (pinnedId) {
+      const pinned = allSalons.find((s) => s.id === pinnedId);
+      if (pinned) return { salon: pinned, reason: 'pin' as const };
+    }
+    if (mostActiveSalon) return { salon: mostActiveSalon, reason: 'live' as const };
+    return null;
+  }, [allSalons, mostActiveSalon, settings.featured_salon_id]);
+
+  const setFeaturedSalonRemote = useCallback(async (salonId: string | null) => {
+    try {
+      const id = settings.id;
+      if (id) {
+        await supabase.from('global_settings').update({ featured_salon_id: salonId }).eq('id', id);
+      } else {
+        await supabase.from('global_settings').update({ featured_salon_id: salonId }).neq('id', '00000000-0000-0000-0000-000000000000');
+      }
+      await refreshSettings();
+    } catch (err) {
+      console.error('featured_salon_id:', err);
+      addNotification({ type: 'system', message: 'Impossible d’épingler le salon (droits admin ?)' });
+    }
+  }, [settings.id, refreshSettings, addNotification]);
+
+  const shortcutSalon = useMemo(() => {
+    const fav = getFavoriteSalonId();
+    if (fav && allSalons.some((s) => s.id === fav)) return fav;
+    const last = getLastSalonId();
+    if (last && allSalons.some((s) => s.id === last)) return last;
+    return null;
+  }, [allSalons]);
+
+  const shortcutSalonMeta = shortcutSalon ? allSalons.find((s) => s.id === shortcutSalon) : null;
 
   // Données XP
   const lvl = user?.level || 1;
@@ -359,10 +413,115 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
         <p className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] text-amber-800 dark:text-amber-200/85 bg-amber-500/10 border border-amber-500/25 rounded-full px-2.5 py-1">
           <Scale className="w-3 h-3 shrink-0" /> Interdit aux mineurs · réservé aux 18 ans
         </p>
+
+        {/* Raccourcis mobiles / Accueil */}
+        {user && (
+          <div className="w-full max-w-sm flex flex-wrap gap-2 justify-center">
+            <button
+              type="button"
+              onClick={() => onOpenDM?.()}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-secondary/70 text-[11px] text-foreground touch-target relative"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-primary" />
+              MP
+              {unreadDMs > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-primary text-[9px] font-bold text-white flex items-center justify-center">
+                  {unreadDMs > 9 ? '9+' : unreadDMs}
+                </span>
+              )}
+            </button>
+            {shortcutSalonMeta && (
+              <button
+                type="button"
+                onClick={() => handleSalonClick(shortcutSalonMeta)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-secondary/70 text-[11px] text-foreground touch-target max-w-[46%]"
+                title={shortcutSalonMeta.name}
+              >
+                <Star className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="truncate">{shortcutSalonMeta.name}</span>
+              </button>
+            )}
+            {mostActiveSalon && (
+              <button
+                type="button"
+                onClick={() => handleSalonClick(mostActiveSalon)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-300 touch-target"
+              >
+                <Radio className="w-3.5 h-3.5 shrink-0" />
+                Rejoindre un salon actif
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Salon du moment */}
+        {featuredSalon && (
+          <button
+            type="button"
+            onClick={() => handleSalonClick(featuredSalon.salon)}
+            className="w-full max-w-sm text-left rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 hover:bg-primary/15 transition-all touch-target"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Flame className="w-3.5 h-3.5 text-primary" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                Salon du moment
+              </span>
+              {featuredSalon.reason === 'pin' && (
+                <span className="text-[9px] text-muted-foreground/50">épinglé</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{featuredSalon.salon.emoji || '💬'}</span>
+              <span className="text-sm font-medium text-foreground truncate">{featuredSalon.salon.name}</span>
+              {(salonCounts[featuredSalon.salon.id] || 0) > 0 && (
+                <span className="ml-auto text-[10px] text-emerald-400 tabular-nums">
+                  {salonCounts[featuredSalon.salon.id]} en ligne
+                </span>
+              )}
+            </div>
+          </button>
+        )}
+
+        {canModerate && (
+          <div className="w-full max-w-sm flex flex-wrap gap-2 justify-center text-[10px]">
+            {featuredSalon?.reason === 'pin' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void setFeaturedSalonRemote(null);
+                  addNotification({ type: 'system', message: 'Épinglage du salon du moment retiré' });
+                }}
+                className="text-muted-foreground/60 hover:text-foreground underline"
+              >
+                Retirer l’épingle
+              </button>
+            ) : mostActiveSalon ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void setFeaturedSalonRemote(mostActiveSalon.id);
+                  addNotification({ type: 'system', message: `« ${mostActiveSalon.name} » épinglé comme salon du moment` });
+                }}
+                className="text-muted-foreground/60 hover:text-foreground underline"
+              >
+                Épingler le salon actif
+              </button>
+            ) : null}
+          </div>
+        )}
+
         <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg px-4 py-2 mb-1">
           <p className="text-sm font-semibold text-purple-700 dark:text-purple-300">🎉 Pour l&apos;ouverture, Premium offert en essai !</p>
         </div>
         <DailySparkCard className="w-full max-w-sm" />
+        <WeeklyChallengeCard className="w-full max-w-sm" />
+
+        <Link
+          to="/equipe"
+          className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-primary transition-colors"
+        >
+          <Users className="w-3.5 h-3.5" /> Voir l’équipe
+        </Link>
 
         {/* En ligne — visible sur mobile / tablette (colonne droite masquée sous lg) */}
         <div className="lg:hidden w-full max-w-sm text-left">

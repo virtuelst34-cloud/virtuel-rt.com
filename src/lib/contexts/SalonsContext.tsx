@@ -126,6 +126,13 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
 
   const setCurrentSalon = useCallback((id: string | null) => {
     setCurrentSalonRaw(id);
+    if (id) {
+      try {
+        localStorage.setItem('virtuel_rt_last_salon', id);
+      } catch {
+        /* ignore */
+      }
+    }
 
     const userId = supabaseUser?.id || user?.name;
     if (userId) {

@@ -5,7 +5,7 @@ import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import UserDisplayName from './UserDisplayName';
 import { getBadgeForLevel, getUnlockedBadges } from '@/lib/diamondBadges';
-import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare, Scale, Zap, Bookmark, Smartphone } from 'lucide-react';
+import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare, Scale, Zap, Bookmark, Smartphone, KeyRound, Users } from 'lucide-react';
 import AchievementsSection from './AchievementsSection';
 import TwoFactorSection from './TwoFactorSection';
 import DailySparkCard from './DailySparkCard';
@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { AVATAR_IDS } from '@/lib/chatConfig';
 import { supabase } from '@/lib/supabase';
+import { supabaseDbService } from '@/lib/supabaseDb';
 import {
   MOOD_OPTIONS,
   getMood,
@@ -117,6 +118,9 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
   });
   const [alertPrefsSaving, setAlertPrefsSaving] = useState(false);
   const [alertPrefsMsg, setAlertPrefsMsg] = useState<string | null>(null);
+  const [premiumCode, setPremiumCode] = useState('');
+  const [redeemingCode, setRedeemingCode] = useState(false);
+  const [redeemMsg, setRedeemMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -181,6 +185,37 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
       .eq('id', supabaseUser.id);
     setAlertPrefsSaving(false);
     setAlertPrefsMsg(error ? 'Erreur lors de la sauvegarde.' : 'Préférences d\'alerte enregistrées.');
+  };
+
+  const redeemPremiumCode = async () => {
+    if (!supabaseUser) {
+      setRedeemMsg({ type: 'err', text: 'Connectez-vous avec un compte pour utiliser un code.' });
+      return;
+    }
+    const code = premiumCode.trim();
+    if (code.length < 4) {
+      setRedeemMsg({ type: 'err', text: 'Saisissez un code valide.' });
+      return;
+    }
+    setRedeemingCode(true);
+    setRedeemMsg(null);
+    try {
+      const result = await supabaseDbService.redeemPremiumCode(code);
+      setRedeemMsg({
+        type: 'ok',
+        text: result.permanent
+          ? 'Premium activé définitivement !'
+          : `Premium activé jusqu’au ${result.premium_until ? format(new Date(result.premium_until), 'd MMM yyyy', { locale: fr }) : '…'}`,
+      });
+      setPremiumCode('');
+      updateProfile({ isPremium: true });
+      addNotification({ type: 'system', message: 'Code Premium accepté — bienvenue dans Premium !' });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Code invalide ou déjà utilisé';
+      setRedeemMsg({ type: 'err', text: msg.replace(/^.*Exception:?\s*/i, '') || 'Code invalide' });
+    } finally {
+      setRedeemingCode(false);
+    }
   };
 
   if (!user) return null;
@@ -734,6 +769,45 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                     <TwoFactorSection userId={supabaseUser.id} email={user.email} />
                   </div>
                 )}
+
+                <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <KeyRound className="w-4 h-4 text-yellow-400" />
+                    <span className="text-xs font-semibold text-foreground">J’ai un code Premium</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mb-3">
+                    Entrez un code fourni par l’équipe pour activer Premium (durée ou permanent). Compte email requis.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      value={premiumCode}
+                      onChange={(e) => setPremiumCode(e.target.value.toUpperCase())}
+                      placeholder="VR-XXXXXXXX"
+                      className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-yellow-500/40"
+                      disabled={redeemingCode}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void redeemPremiumCode()}
+                      disabled={redeemingCode || !premiumCode.trim()}
+                      className="px-3 py-2 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 text-xs font-semibold hover:bg-yellow-500/25 disabled:opacity-40"
+                    >
+                      {redeemingCode ? '…' : 'Valider'}
+                    </button>
+                  </div>
+                  {redeemMsg && (
+                    <p className={`text-[11px] mt-2 ${redeemMsg.type === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {redeemMsg.text}
+                    </p>
+                  )}
+                </div>
+
+                <Link
+                  to="/equipe"
+                  className="flex items-center gap-2 mb-4 px-3 py-2.5 rounded-xl border border-border bg-secondary/50 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all"
+                >
+                  <Users className="w-4 h-4 text-primary" /> Voir l’équipe Virtuel-RT
+                </Link>
 
                 {supabaseUser && (
                   <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
@@ -1393,8 +1467,15 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                     <button onClick={activatePremium} className="w-full py-3 rounded-xl premium-gradient text-white font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
                       <Star className="w-4 h-4" /> Demander Premium
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('account')}
+                      className="w-full py-2.5 rounded-xl border border-yellow-500/30 bg-yellow-500/10 text-yellow-300 text-sm font-medium flex items-center justify-center gap-2 hover:bg-yellow-500/20"
+                    >
+                      <KeyRound className="w-4 h-4" /> J’ai un code Premium
+                    </button>
                     <p className="text-[10px] text-muted-foreground/40 text-center">
-                      Accès accordé par le staff (serveur) — plus d’activation démo locale. Mode coquin 18+ inclus.
+                      Accès par code ou accordé par le staff (★) — pas de paiement en ligne. Mode coquin 18+ inclus.
                     </p>
                   </div>
                 )}

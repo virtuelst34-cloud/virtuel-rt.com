@@ -16,6 +16,7 @@ export interface GlobalSettings {
   enable_dm: boolean;
   enable_voice: boolean;
   auto_cleanup_days: number;
+  featured_salon_id?: string | null;
 }
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
@@ -33,6 +34,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   enable_dm: true,
   enable_voice: false,
   auto_cleanup_days: 30,
+  featured_salon_id: null,
 };
 
 export async function fetchGlobalSettings(): Promise<GlobalSettings> {

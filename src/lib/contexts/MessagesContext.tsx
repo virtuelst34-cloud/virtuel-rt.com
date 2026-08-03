@@ -1,4 +1,13 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+  ReactNode,
+} from 'react';
 import { supabase } from '../supabase';
 import { supabaseDbService, Message as SupabaseMessage } from '../supabaseDb';
 import { offlineModeService } from '../offlineMode';
@@ -12,8 +21,12 @@ import {
 
 type Message = ChatMessage;
 
-interface MessagesContextType {
+interface MessagesState {
   salonMessages: Record<string, Message[]>;
+  isLoadingHistory: boolean;
+}
+
+interface MessagesActions {
   addMessage: (salonId: string, message: Message) => void;
   getMessages: (salonId: string) => Message[];
   deleteMessage: (salonId: string, messageId: string) => void;
@@ -23,10 +36,12 @@ interface MessagesContextType {
   loadMessages: (salonId: string, limit?: number, offset?: number) => Promise<void>;
   loadMoreMessages: (salonId: string) => Promise<void>;
   setCurrentSalonId: (salonId: string | null) => void;
-  isLoadingHistory: boolean;
 }
 
-const MessagesContext = createContext<MessagesContextType | null>(null);
+type MessagesContextType = MessagesState & MessagesActions;
+
+const MessagesStateContext = createContext<MessagesState | null>(null);
+const MessagesActionsContext = createContext<MessagesActions | null>(null);
 
 const MAX_PER_SALON = 200;
 const PAGE_SIZE = 50;
@@ -45,6 +60,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const loadingHistoryRef = useRef(false);
   const historyExhaustedRef = useRef<Record<string, boolean>>({});
+  const salonMessagesRef = useRef(salonMessages);
+  salonMessagesRef.current = salonMessages;
 
   useEffect(() => {
     offlineModeService.setSyncHandler(async (action) => {
@@ -113,13 +130,13 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     loadingHistoryRef.current = true;
     setIsLoadingHistory(true);
     try {
-      const existing = salonMessages[salonId] || [];
+      const existing = salonMessagesRef.current[salonId] || [];
       await loadMessages(salonId, PAGE_SIZE, existing.length);
     } finally {
       loadingHistoryRef.current = false;
       setIsLoadingHistory(false);
     }
-  }, [salonMessages, loadMessages]);
+  }, [loadMessages]);
 
   useEffect(() => {
     if (!currentSalonId) return;
@@ -239,8 +256,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getMessages = useCallback((salonId: string) => {
-    return salonMessages[salonId] || [];
-  }, [salonMessages]);
+    return salonMessagesRef.current[salonId] || [];
+  }, []);
 
   const deleteMessage = useCallback(async (salonId: string, messageId: string) => {
     setSalonMessages(prev => ({
@@ -307,29 +324,67 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const value: MessagesContextType = {
-    salonMessages,
-    addMessage,
-    getMessages,
-    deleteMessage,
-    pinMessage,
-    updateMessage,
-    updateReaction,
-    loadMessages,
-    loadMoreMessages,
-    setCurrentSalonId,
-    isLoadingHistory,
-  };
+  const stateValue = useMemo<MessagesState>(
+    () => ({ salonMessages, isLoadingHistory }),
+    [salonMessages, isLoadingHistory],
+  );
+
+  const actionsValue = useMemo<MessagesActions>(
+    () => ({
+      addMessage,
+      getMessages,
+      deleteMessage,
+      pinMessage,
+      updateMessage,
+      updateReaction,
+      loadMessages,
+      loadMoreMessages,
+      setCurrentSalonId,
+    }),
+    [
+      addMessage,
+      getMessages,
+      deleteMessage,
+      pinMessage,
+      updateMessage,
+      updateReaction,
+      loadMessages,
+      loadMoreMessages,
+    ],
+  );
 
   return (
-    <MessagesContext.Provider value={value}>
-      {children}
-    </MessagesContext.Provider>
+    <MessagesStateContext.Provider value={stateValue}>
+      <MessagesActionsContext.Provider value={actionsValue}>
+        {children}
+      </MessagesActionsContext.Provider>
+    </MessagesStateContext.Provider>
   );
 }
 
-export function useMessages(): MessagesContextType {
-  const context = useContext(MessagesContext);
-  if (!context) throw new Error('useMessages must be used inside MessagesProvider');
+/** État messages (re-render quand salonMessages / loading change). */
+export function useMessagesState(): MessagesState {
+  const context = useContext(MessagesStateContext);
+  if (!context) throw new Error('useMessagesState must be used inside MessagesProvider');
   return context;
+}
+
+/** Actions stables (évite re-render si seul l’état change). */
+export function useMessagesActions(): MessagesActions {
+  const context = useContext(MessagesActionsContext);
+  if (!context) throw new Error('useMessagesActions must be used inside MessagesProvider');
+  return context;
+}
+
+/** Messages d’un salon — sélecteur léger. */
+export function useSalonMessages(salonId: string | null | undefined): Message[] {
+  const { salonMessages } = useMessagesState();
+  return salonId ? (salonMessages[salonId] || []) : [];
+}
+
+/** API complète (compat). */
+export function useMessages(): MessagesContextType {
+  const state = useMessagesState();
+  const actions = useMessagesActions();
+  return useMemo(() => ({ ...state, ...actions }), [state, actions]);
 }

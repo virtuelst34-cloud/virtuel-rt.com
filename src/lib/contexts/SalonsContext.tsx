@@ -196,7 +196,7 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadCustomSalons();
     loadCategories();
-  }, [loadCustomSalons, loadCategories]);
+  }, [loadCustomSalons, loadCategories, user?.isPremium]);
 
   useEffect(() => {
     const channel = supabase

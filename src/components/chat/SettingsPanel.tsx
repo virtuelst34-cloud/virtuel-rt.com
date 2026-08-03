@@ -1391,9 +1391,11 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                       ))}
                     </div>
                     <button onClick={activatePremium} className="w-full py-3 rounded-xl premium-gradient text-white font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
-                      <Star className="w-4 h-4" /> Activer Premium (démo)
+                      <Star className="w-4 h-4" /> Demander Premium
                     </button>
-                    <p className="text-[10px] text-muted-foreground/40 text-center">Mode démo — aucun paiement requis</p>
+                    <p className="text-[10px] text-muted-foreground/40 text-center">
+                      Accès accordé par le staff (serveur) — plus d’activation démo locale. Mode coquin 18+ inclus.
+                    </p>
                   </div>
                 )}
               </div>

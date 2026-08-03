@@ -1,5 +1,5 @@
 import React from 'react';
-import { useChat, useFriends, useMuteBlock, useNotifications } from '@/lib/contexts';
+import { useUser, useFriends, useMuteBlock, useNotifications } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
@@ -18,7 +18,7 @@ interface UserProfileViewProps {
 
 // Fiche profil en lecture seule d'un autre utilisateur
 export default function UserProfileView({ targetName, onClose, onOpenDM }: UserProfileViewProps) {
-  const { profiles, user } = useChat();
+  const { profiles, user } = useUser();
   const { addNotification } = useNotifications();
   const { isFriend, sendFriendRequest, acceptRequestFromSender, rejectRequestFromSender, cancelRequestToRecipient, removeFriend, pendingRequests, outgoingRequests } = useFriends();
   const { isMuted, isBlocked, muteUser, unmuteUser, blockUser, unblockUser } = useMuteBlock();

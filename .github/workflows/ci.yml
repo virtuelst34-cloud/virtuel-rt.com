@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install dependencies
@@ -54,7 +54,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install dependencies
@@ -73,7 +73,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install dependencies
@@ -101,7 +101,7 @@ jobs:
     concurrency:
       group: hostinger-ftps-deploy
       cancel-in-progress: false
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -110,7 +110,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install dependencies
@@ -146,7 +146,8 @@ jobs:
           protocol: ftps
           port: 21
           security: loose
-          timeout: 120000
+          timeout: 180000
+          log-level: verbose
           local-dir: ./dist/
           server-dir: ${{ secrets.FTP_SERVER_DIR || '/domains/virtuel-rt.com/public_html/' }}
           # Supprime les anciens chunks/index hashés absents du nouveau build
@@ -156,11 +157,13 @@ jobs:
             **/.git*/**
             **/node_modules/**
 
-      - name: Wait before FTPS retry
+      - name: Wait before FTPS retry 1
         if: steps.ftp_deploy.outcome == 'failure'
-        run: sleep 20
+        run: |
+          echo "::warning::FTPS attempt 1 failed (often Hostinger control-socket timeout). Waiting 30s before retry…"
+          sleep 30
 
-      - name: Retry Deploy to Hostinger via FTPS
+      - name: Retry Deploy to Hostinger via FTPS (2/3)
         id: ftp_deploy_retry
         if: steps.ftp_deploy.outcome == 'failure'
         continue-on-error: true
@@ -172,7 +175,36 @@ jobs:
           protocol: ftps
           port: 21
           security: loose
-          timeout: 180000
+          timeout: 240000
+          log-level: verbose
+          local-dir: ./dist/
+          server-dir: ${{ secrets.FTP_SERVER_DIR || '/domains/virtuel-rt.com/public_html/' }}
+          dangerous-clean-slate: true
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+
+      - name: Wait before FTPS retry 2
+        if: steps.ftp_deploy.outcome == 'failure' && steps.ftp_deploy_retry.outcome == 'failure'
+        run: |
+          echo "::warning::FTPS attempt 2 failed. Waiting 45s before final retry…"
+          sleep 45
+
+      - name: Retry Deploy to Hostinger via FTPS (3/3)
+        id: ftp_deploy_retry2
+        if: steps.ftp_deploy.outcome == 'failure' && steps.ftp_deploy_retry.outcome == 'failure'
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          security: loose
+          timeout: 300000
+          log-level: verbose
           local-dir: ./dist/
           server-dir: ${{ secrets.FTP_SERVER_DIR || '/domains/virtuel-rt.com/public_html/' }}
           dangerous-clean-slate: true
@@ -182,9 +214,20 @@ jobs:
             **/node_modules/**
 
       - name: FTPS fallback notice
-        if: steps.ftp_deploy.outcome == 'failure' && steps.ftp_deploy_retry.outcome == 'failure'
+        if: >-
+          steps.ftp_deploy.outcome == 'failure' &&
+          steps.ftp_deploy_retry.outcome == 'failure' &&
+          steps.ftp_deploy_retry2.outcome == 'failure'
         run: |
-          echo "::error::Hostinger FTPS deploy failed after retry (Timeout / control socket)."
-          echo "Fallback: download artifact hostinger-dist-${GITHUB_SHA} from this run,"
-          echo "or redeploy via hPanel with scripts/make-hostinger-source-zip.py (see HOSTINGER-ZIP.txt)."
+          echo "::error::Hostinger FTPS deploy failed after 3 attempts (Timeout / control socket)."
+          echo ""
+          echo "=== FALLBACK (do this now) ==="
+          echo "1) Download Actions artifact: hostinger-dist-${GITHUB_SHA}"
+          echo "   → unzip into public_html (index.html + assets/ at document root)"
+          echo "2) OR rebuild via hPanel SOURCE zip:"
+          echo "   python ./scripts/make-hostinger-source-zip.py"
+          echo "   See HOSTINGER-ZIP.txt (Option A) for full steps."
+          echo ""
+          echo "Settings that usually work: protocol=ftps, port=21, security=loose,"
+          echo "FTP_SERVER=Hostinger IP, FTP_SERVER_DIR=real www document root."
           exit 1

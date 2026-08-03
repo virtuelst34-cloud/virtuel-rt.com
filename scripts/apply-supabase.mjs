@@ -89,6 +89,8 @@ const MIGRATION_ORDER = [
   "reorganize_salon_categories.sql",
   "add_staff_messages_files_reactions.sql",
   "add_staff_notifications.sql",
+  "gate_premium_coquin.sql",
+  "tighten_user_presence_rls.sql",
 ];
 const SKIP_ERROR_CODES = new Set([
   "42P07", // duplicate_table

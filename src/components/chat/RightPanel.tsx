@@ -6,7 +6,7 @@ import GenderIcon from './GenderIcon';
 import UserDisplayName from './UserDisplayName';
 import SpecialBadgeInline from './SpecialBadgeInline';
 import UserProfileView from './UserProfileView';
-import { useChat } from '@/lib/contexts';
+import { useUser, useXP } from '@/lib/contexts';
 import { presenceService, OnlineUser } from '@/lib/presenceService';
 
 const MEDAL  = ['🥇', '🥈', '🥉'];
@@ -30,7 +30,8 @@ interface RightPanelProps {
 }
 
 export default function RightPanel({ onOpenDM }: RightPanelProps) {
-  const { user, profiles, xpProgress, xpForLevel, monthlyXP } = useChat();
+  const { user, profiles } = useUser();
+  const { xpProgress, xpForLevel, monthlyXP } = useXP();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [viewProfile, setViewProfile] = useState<string | null>(null);
 

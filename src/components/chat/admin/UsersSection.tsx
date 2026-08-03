@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Users, Search, Ban, CheckCircle, VolumeX, Volume2, Trash2 } from 'lucide-react';
+import { Users, Search, Ban, CheckCircle, VolumeX, Volume2, Trash2, Star } from 'lucide-react';
+import { toast } from 'sonner';
 import Avatar from '../Avatar';
 import UserDisplayName from '../UserDisplayName';
 import { SectionTitle, StatCard } from './AdminComponents';
+import { supabaseDbService } from '@/lib/supabaseDb';
 
 const STATUS_OPTIONS = [
   { id: 'online',  label: 'En ligne',        color: 'bg-emerald-500' },
@@ -25,7 +27,26 @@ interface Props {
 export default function UsersSection({ readOnly = false, profiles, setProfiles, setUserStatusAdmin, banUser, unbanUser, muteUser, unmuteUser }: Props) {
   const [search, setSearch] = useState('');
   const [banReason, setBanReason] = useState<Record<string, string>>({});
+  const [premiumBusy, setPremiumBusy] = useState<string | null>(null);
   const all = Object.values(profiles || {}).filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
+
+  const togglePremium = async (profile: { name: string; isPremium?: boolean }) => {
+    if (readOnly || premiumBusy) return;
+    const next = !profile.isPremium;
+    setPremiumBusy(profile.name);
+    try {
+      await supabaseDbService.adminSetPremium(profile.name, next);
+      setProfiles(prev => ({
+        ...prev,
+        [profile.name]: { ...prev[profile.name], isPremium: next },
+      }));
+      toast.success(next ? `Premium accordé à ${profile.name}` : `Premium retiré à ${profile.name}`);
+    } catch {
+      toast.error('Impossible de modifier Premium (droits admin requis)');
+    } finally {
+      setPremiumBusy(null);
+    }
+  };
 
   const btnClass = (color: string) =>
     `p-1.5 rounded-lg border transition-colors ${
@@ -66,6 +87,7 @@ export default function UsersSection({ readOnly = false, profiles, setProfiles, 
                     showSpecialLabels={false}
                     nameClassName="text-xs font-medium text-foreground"
                   />
+                  {profile.isPremium && <span className="text-[9px] bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 rounded px-1.5 py-px">PREMIUM</span>}
                   {profile.isBanned && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/30 rounded px-1.5 py-px">BANNI</span>}
                   {profile.isMuted  && <span className="text-[9px] bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded px-1.5 py-px">MUTÉ</span>}
                 </div>
@@ -73,6 +95,18 @@ export default function UsersSection({ readOnly = false, profiles, setProfiles, 
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => void togglePremium(profile)}
+                  disabled={readOnly || premiumBusy === profile.name}
+                  title={profile.isPremium ? 'Retirer Premium' : 'Accorder Premium'}
+                  className={btnClass(
+                    profile.isPremium
+                      ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/30'
+                      : 'bg-white/5 border-white/10 text-muted-foreground/60 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/30'
+                  )}
+                >
+                  <Star className="w-3 h-3" />
+                </button>
                 {!profile.isBanned
                   ? <button onClick={() => !readOnly && banUser(profile.name, banReason[profile.name] || 'Violation des règles')}
                       disabled={readOnly} title="Bannir"

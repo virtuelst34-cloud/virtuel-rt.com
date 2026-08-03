@@ -628,4 +628,17 @@ export const supabaseDbService = {
       console.error('Erreur notification utilisateur:', error);
     }
   },
+
+  /** Staff only — grant/revoke Premium (profiles.is_premium). */
+  async adminSetPremium(userName: string, premium: boolean): Promise<boolean> {
+    const { data, error } = await supabase.rpc('admin_set_premium', {
+      p_user_name: userName,
+      p_premium: premium,
+    });
+    if (error) {
+      console.error('Erreur admin_set_premium:', error);
+      throw error;
+    }
+    return !!data;
+  },
 };

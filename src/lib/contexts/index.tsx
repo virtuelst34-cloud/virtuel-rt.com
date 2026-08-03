@@ -58,7 +58,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
 // Réexporter tous les hooks pour un accès facile
 export { useUser, UserProvider };
-export { useMessages, MessagesProvider };
+export { useMessages, useMessagesState, useMessagesActions, useSalonMessages, MessagesProvider };
 export { useModeration, ModerationProvider };
 export { useNotifications, NotificationsProvider };
 export { usePreferences, PreferencesProvider };

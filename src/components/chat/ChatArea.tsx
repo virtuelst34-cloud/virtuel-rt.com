@@ -69,7 +69,7 @@ interface ChatAreaProps {
 export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProps) {
   const { user, profiles } = useUser();
   const { currentSalon, setCurrentSalon, customSalons, hiddenSalons, displayOrder } = useSalons();
-  const { coquinMode } = usePreferences();
+  const { coquinMode, isPremium } = usePreferences();
   const { awardXP, sounds } = useXP();
   const { isUserBanned, isUserMuted, isBlocked } = useModeration();
   const { isMuted: isLocallyMuted, isBlocked: isLocallyBlocked } = useMuteBlock();
@@ -110,19 +110,19 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const [showTools, setShowTools]           = useState(false);
   const [reactionRain, setReactionRain]     = useState<ReactionRainDetail | null>(null);
 
-  const allSalons    = mergeAndSortSalons(customSalons || [], hiddenSalons || [], displayOrder || {}, { coquinMode });
+  const allSalons    = mergeAndSortSalons(customSalons || [], hiddenSalons || [], displayOrder || {}, { coquinMode: coquinMode && isPremium });
   const salon        = allSalons.find(s => s.id === currentSalon);
 
-  // Quitter un salon coquin si le mode est désactivé
+  // Quitter un salon coquin si Premium / mode coquin off (UI) — le serveur refuse aussi
   useEffect(() => {
-    if (!currentSalon || coquinMode) return;
+    if (!currentSalon || (coquinMode && isPremium)) return;
     const fromBuiltin = SALONS.find(s => s.id === currentSalon);
     const fromCustom = (customSalons || []).find(s => s.id === currentSalon);
     const target = fromCustom || fromBuiltin;
     if (target && (target.isCoquin || target.category_id === 'coquin')) {
       setCurrentSalon(null);
     }
-  }, [coquinMode, currentSalon, customSalons, setCurrentSalon]);
+  }, [coquinMode, isPremium, currentSalon, customSalons, setCurrentSalon]);
 
   const onlineUsers  = currentSalon
     ? presenceService.getOnlineUsersInSalon(currentSalon).filter(u => !isLocallyMuted(u.name) && !isLocallyBlocked(u.name))

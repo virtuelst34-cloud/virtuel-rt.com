@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
 import { useNotifications } from './NotificationsContext';
 import { useUser } from './UserContext';
 import { supabaseDbService } from '../supabaseDb';
@@ -196,23 +196,24 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     document.documentElement.classList.toggle('coquin-mode', effectiveCoquin);
   }, [applyAccent, applyTheme]);
 
-  const loadFromLocal = useCallback((key: string) => {
+  const loadFromLocal = useCallback((key: string, serverPremium = false) => {
     const savedTheme = readPrefsField(key, 'theme');
     const savedParty = readPrefsField(key, 'party') === 'true';
     const savedAccent = readPrefsField(key, 'accent') || ACCENT_COLORS[0].id;
     const savedCompact = readPrefsField(key, 'compact') === 'true';
-    const savedPremium = readPrefsField(key, 'premium') === 'true';
+    // Premium = profiles.is_premium côté serveur uniquement (jamais localStorage)
+    const premium = !!serverPremium;
     const savedAmbiance = parseAmbiance(readPrefsField(key, 'ambiance'));
     const savedCoquin = readPrefsField(key, 'coquin') === 'true' || savedAmbiance === 'coquin';
 
     applyAll({
       theme: savedTheme || getSystemTheme(),
       partyMode: savedParty,
-      isPremium: savedPremium,
+      isPremium: premium,
       accentColor: savedAccent,
       compactMode: savedCompact,
-      ambianceMode: savedPremium ? savedAmbiance : (savedAmbiance === 'coquin' ? 'off' : savedAmbiance),
-      coquinMode: savedPremium && savedCoquin,
+      ambianceMode: premium ? savedAmbiance : (savedAmbiance === 'coquin' ? 'off' : savedAmbiance),
+      coquinMode: premium && savedCoquin,
     });
   }, [applyAll]);
 
@@ -227,7 +228,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   }) => {
     if (prefs.theme !== undefined) writePrefsField(key, 'theme', prefs.theme);
     if (prefs.partyMode !== undefined) writePrefsField(key, 'party', String(prefs.partyMode));
-    if (prefs.isPremium !== undefined) writePrefsField(key, 'premium', String(prefs.isPremium));
+    // Ne pas persister isPremium en local — source de vérité = profil serveur
     if (prefs.accentColor !== undefined) writePrefsField(key, 'accent', prefs.accentColor);
     if (prefs.compactMode !== undefined) writePrefsField(key, 'compact', String(prefs.compactMode));
     if (prefs.ambianceMode !== undefined) writePrefsField(key, 'ambiance', prefs.ambianceMode);
@@ -236,7 +237,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   const loadPreferences = useCallback(async () => {
     if (!user) {
-      loadFromLocal('anonymous');
+      loadFromLocal('anonymous', false);
       return;
     }
 
@@ -245,7 +246,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       if (prefs) {
         const localAmbiance = parseAmbiance(readPrefsField(userKey, 'ambiance'));
         const localCoquin = readPrefsField(userKey, 'coquin') === 'true' || localAmbiance === 'coquin';
-        const premium = prefs.is_premium;
+        // Profil serveur prioritaire ; preferences.is_premium n'est qu'un miroir
+        const premium = !!(user.isPremium || prefs.is_premium);
         const merged = {
           theme: prefs.theme,
           partyMode: prefs.party_mode,
@@ -263,12 +265,30 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       console.error('Erreur lors du chargement des préférences:', error);
     }
 
-    loadFromLocal(userKey);
+    loadFromLocal(userKey, !!user.isPremium);
   }, [user, userKey, applyAll, loadFromLocal, persistLocal]);
 
   useEffect(() => {
     void loadPreferences();
   }, [loadPreferences]);
+
+  // Resync Premium si le profil serveur change (ex. grant admin)
+  useEffect(() => {
+    if (!user) return;
+    const premium = !!user.isPremium;
+    if (premium === isPremium) return;
+    const localAmbiance = parseAmbiance(readPrefsField(userKey, 'ambiance'));
+    const localCoquin = readPrefsField(userKey, 'coquin') === 'true' || localAmbiance === 'coquin';
+    applyAll({
+      theme,
+      partyMode,
+      isPremium: premium,
+      accentColor,
+      compactMode,
+      ambianceMode: premium ? ambianceMode : (ambianceMode === 'coquin' ? 'off' : ambianceMode),
+      coquinMode: premium && (coquinMode || localCoquin),
+    });
+  }, [user?.isPremium]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -287,12 +307,12 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const syncPreferences = useCallback(async (updates: {
     theme?: 'dark' | 'light';
     party_mode?: boolean;
-    is_premium?: boolean;
     accent_color?: string;
     compact_mode?: boolean;
   }) => {
     if (!user) return;
     try {
+      // Ne jamais envoyer is_premium depuis le client — trigger / admin RPC uniquement
       await supabaseDbService.updatePreferences(user.name, updates);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde des préférences:', error);
@@ -314,12 +334,18 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     await syncPreferences({ party_mode: next });
   }, [theme, partyMode, isPremium, accentColor, compactMode, ambianceMode, coquinMode, userKey, applyAll, persistLocal, syncPreferences]);
 
-  const activatePremium = useCallback(async () => {
-    applyAll({ theme, partyMode, isPremium: true, accentColor, compactMode, ambianceMode, coquinMode });
-    persistLocal(userKey, { isPremium: true });
-    addNotification({ type: 'premium', message: '🌟 Bienvenue dans le club Premium !' });
-    await syncPreferences({ is_premium: true });
-  }, [theme, partyMode, accentColor, compactMode, ambianceMode, coquinMode, userKey, applyAll, persistLocal, addNotification, syncPreferences]);
+  /** Upsell uniquement — le Premium est accordé côté serveur (staff / admin_set_premium). */
+  const activatePremium = useCallback(() => {
+    if (isPremium) {
+      addNotification({ type: 'premium', message: '🌟 Vous êtes déjà Premium.' });
+      return;
+    }
+    addNotification({
+      type: 'premium',
+      message: '🔒 Premium est accordé par l’équipe Virtuel-RT — contactez le staff ou utilisez le canal prévu. L’activation locale ne suffit plus.',
+    });
+    window.dispatchEvent(new CustomEvent('virtuel-rt-open-settings', { detail: { tab: 'premium' } }));
+  }, [isPremium, addNotification]);
 
   const changeAccent = useCallback(async (colorId: string) => {
     applyAll({ theme, partyMode, isPremium, accentColor: colorId, compactMode, ambianceMode, coquinMode });
@@ -395,13 +421,18 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     }
   }, [theme, partyMode, isPremium, accentColor, compactMode, ambianceMode, coquinMode, userKey, applyAll, persistLocal, syncPreferences, addNotification]);
 
-  const value: PreferencesContextType = {
+  const value: PreferencesContextType = useMemo(() => ({
     theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium,
     accentColor, changeAccent, ACCENT_COLORS, compactMode, toggleCompactMode,
     ambianceMode, setAmbianceMode, AMBIANCE_OPTIONS,
     coquinMode, setCoquinMode, toggleCoquinMode,
     loadPreferences,
-  };
+  }), [
+    theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium,
+    accentColor, changeAccent, compactMode, toggleCompactMode,
+    ambianceMode, setAmbianceMode, coquinMode, setCoquinMode, toggleCoquinMode,
+    loadPreferences,
+  ]);
 
   return (
     <PreferencesContext.Provider value={value}>

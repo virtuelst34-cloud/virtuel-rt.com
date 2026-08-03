@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
 import { toast } from 'sonner';
-import { useChat } from '@/lib/contexts';
+import { useUser, useSalons } from '@/lib/contexts';
 import { SALONS } from '@/lib/chatConfig';
 import { mediaBroadcastService } from '@/lib/mediaBroadcastService';
 import { webrtcService, RemoteStreamInfo } from '@/lib/webrtcService';
@@ -17,7 +17,8 @@ function isMediaSalonType(type?: string): boolean {
 }
 
 export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps) {
-  const { currentSalon, setCurrentSalon, user, customSalons = [] } = useChat();
+  const { user } = useUser();
+  const { currentSalon, setCurrentSalon, customSalons = [] } = useSalons();
   const [micActive, setMicActive] = useState(false);
   const [camActive, setCamActive] = useState(false);
   const [bars, setBars] = useState([3, 5, 7, 5, 3]);

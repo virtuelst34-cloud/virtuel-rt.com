@@ -374,7 +374,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
           status_text: updated.statusText,
           level: updated.level,
           xp: updated.xp,
-          is_premium: updated.isPremium,
+          // is_premium : uniquement via admin_set_premium (RLS/trigger)
           age: updated.age,
           city: updated.city,
           gender: updated.gender,

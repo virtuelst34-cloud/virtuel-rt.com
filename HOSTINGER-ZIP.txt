@@ -32,3 +32,5 @@
 #
 # Permissions zip Windows (EACCES Hostinger) :
 #   powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\zip-for-hostinger.ps1"
+
+# Align deploy 2026-08-06T22:40:51Z

@@ -9,6 +9,7 @@ import UserDisplayName from '../UserDisplayName';
 import { SectionTitle, StatCard } from './AdminComponents';
 import { supabaseDbService } from '@/lib/supabaseDb';
 import { supabase } from '@/lib/supabase';
+import { rpcErrorMessage } from '@/lib/rpcError';
 import { SPECIAL_BADGES } from '@/lib/diamondBadges';
 import {
   badgesFromProfile,
@@ -107,8 +108,8 @@ export default function UsersSection({
         [profile.name]: { ...prev[profile.name], isPremium: next },
       }));
       toast.success(next ? `Premium accordé à ${profile.name}` : `Premium retiré à ${profile.name}`);
-    } catch {
-      toast.error('Impossible de modifier Premium (droits admin requis)');
+    } catch (e: unknown) {
+      toast.error(rpcErrorMessage(e, 'Impossible de modifier Premium (droits admin requis)'));
     } finally {
       setPremiumBusy(null);
     }

@@ -62,10 +62,10 @@ export default function AdminPanel() {
   const { customBadges, setCustomBadges } = useBadges();
   const { can, isFounder } = usePermissions();
   const [premiumPerms, setPremiumPerms] = useState({
-    view: true,
-    create_codes: true,
-    revoke_codes: true,
-    grant_premium: true,
+    view: false,
+    create_codes: false,
+    revoke_codes: false,
+    grant_premium: false,
   });
   const [activeTab, setActiveTab] = useState(() =>
     adminInitialTab && ALL_TABS.some((t) => t.id === adminInitialTab) ? adminInitialTab : 'dashboard',

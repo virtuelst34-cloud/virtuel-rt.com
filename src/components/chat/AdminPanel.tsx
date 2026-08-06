@@ -52,7 +52,7 @@ const ALL_TABS: Tab[] = [
 
 export default function AdminPanel() {
   const { setShowAdmin, adminInitialTab, setAdminInitialTab } = useUI();
-  const { user, supabaseUser, profiles, setProfiles, setUserStatusAdmin } = useUser();
+  const { user, supabaseUser, profiles, setProfiles } = useUser();
   const { customSalons, addSalon, updateSalon, deleteSalon, reorderSalons, displayOrder, hiddenSalons, setHiddenSalons } = useSalons();
   const { salonMessages } = useMessages();
   const { monthlyXP } = useXP();
@@ -237,7 +237,7 @@ export default function AdminPanel() {
             {activeTab === 'stats'          && <StatsSection profiles={profiles} customSalons={customSalons} salonMessages={salonMessages} monthlyXP={monthlyXP} />}
             {activeTab === 'salons'         && <SalonsSection readOnly={isReadOnly} customSalons={customSalons} addSalon={addSalon} updateSalon={updateSalon} deleteSalon={deleteSalon} reorderSalons={reorderSalons} displayOrder={displayOrder} hiddenSalons={hiddenSalons} setHiddenSalons={setHiddenSalons} />}
             {activeTab === 'categories'     && <CategoriesSection readOnly={isReadOnly} />}
-            {activeTab === 'users'          && <UsersSection readOnly={isReadOnly} profiles={profiles} setProfiles={setProfiles} setUserStatusAdmin={setUserStatusAdmin} banUser={banUser} unbanUser={unbanUser} muteUser={muteUser} unmuteUser={unmuteUser} />}
+            {activeTab === 'users'          && <UsersSection readOnly={isReadOnly} profiles={profiles} setProfiles={setProfiles} banUser={banUser} unbanUser={unbanUser} muteUser={muteUser} unmuteUser={unmuteUser} />}
             {activeTab === 'premiumprofiles' && (
               <PremiumProfilesSection
                 readOnly={isReadOnly}

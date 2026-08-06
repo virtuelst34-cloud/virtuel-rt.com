@@ -88,6 +88,8 @@ function markNeedRefresh() {
 
 /** Au plus une auto-actualisation par onglet ; pas de re-reload pour la même version. */
 export function canAutoApplyUpdate(): boolean {
+  // Jamais d’auto-reload en DEV (évite boucles SW / HMR / banner)
+  if (import.meta.env.DEV) return false
   if (sessionGet(AUTO_RELOAD_SESSION_KEY) === '1') return false
   if (bootVersion && sessionGet(AUTO_RELOAD_VERSION_KEY) === bootVersion) return false
   if (isVersionHandled(rememberedVersion())) return false
@@ -228,6 +230,12 @@ export type ApplyAppUpdateSource = 'user' | 'auto'
  * @returns false si auto-reload refusé (garde anti-boucle) — afficher la bannière.
  */
 export function applyAppUpdate(source: ApplyAppUpdateSource = 'user'): boolean {
+  // En DEV : aucun reload agressif (SW résiduel / banner ne doivent pas boucler)
+  if (import.meta.env.DEV) {
+    notify(false)
+    return false
+  }
+
   if (applying) {
     // 2ᵉ clic pendant un apply coincé → forcer hard navigate
     if (source === 'user') {

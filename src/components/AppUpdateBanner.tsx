@@ -23,9 +23,18 @@ export default function AppUpdateBanner({ autoApply = false }: AppUpdateBannerPr
   const [needRefresh, setNeedRefresh] = useState(false)
   const [showBanner, setShowBanner] = useState(false)
 
-  useEffect(() => subscribeAppUpdate(setNeedRefresh), [])
+  useEffect(() => {
+    // Pas de détection / auto-reload PWA en DEV
+    if (import.meta.env.DEV) return
+    return subscribeAppUpdate(setNeedRefresh)
+  }, [])
 
   useEffect(() => {
+    if (import.meta.env.DEV) {
+      setShowBanner(false)
+      return
+    }
+
     if (!needRefresh) {
       setShowBanner(false)
       return

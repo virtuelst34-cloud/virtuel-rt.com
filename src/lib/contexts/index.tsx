@@ -1,6 +1,12 @@
 import React, { ReactNode, useMemo } from 'react';
 import { UserProvider, useUser } from './UserContext';
-import { MessagesProvider, useMessages } from './MessagesContext';
+import {
+  MessagesProvider,
+  useMessages,
+  useMessagesState,
+  useMessagesActions,
+  useSalonMessages,
+} from './MessagesContext';
 import { ModerationProvider, useModeration } from './ModerationContext';
 import { NotificationsProvider, useNotifications } from './NotificationsContext';
 import { PreferencesProvider, usePreferences } from './PreferencesContext';

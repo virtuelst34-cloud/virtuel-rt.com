@@ -122,7 +122,7 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
   const [displayOrder, setDisplayOrder] = useState<Record<string, number>>({});
   const [categories, setCategories] = useState<SalonCategoryState[]>(defaultCategoriesState);
   const [currentSalon, setCurrentSalonRaw] = useState<string | null>(null);
-  const { user, supabaseUser } = useUser();
+  const { user } = useUser();
 
   const setCurrentSalon = useCallback((id: string | null) => {
     setCurrentSalonRaw(id);
@@ -134,16 +134,16 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const userId = supabaseUser?.id || user?.name;
-    if (userId) {
-      presenceService.updateCurrentSalon(userId, id, {
-        name: user?.name || userId,
+    const presenceKey = user?.name;
+    if (presenceKey) {
+      presenceService.updateCurrentSalon(presenceKey, id, {
+        name: presenceKey,
         avatar: user?.avatar || 'av1',
-        initials: user?.initials || userId.slice(0, 2).toUpperCase(),
+        initials: user?.initials || presenceKey.slice(0, 2).toUpperCase(),
         status: user?.status || 'online',
       });
     }
-  }, [supabaseUser, user]);
+  }, [user]);
 
   const { addNotification } = useNotifications();
 

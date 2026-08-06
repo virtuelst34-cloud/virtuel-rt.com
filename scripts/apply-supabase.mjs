@@ -91,6 +91,7 @@ const MIGRATION_ORDER = [
   "add_staff_notifications.sql",
   "gate_premium_coquin.sql",
   "tighten_user_presence_rls.sql",
+  "fix_presence_actor_name_rls.sql",
   "premium_codes.sql",
   "premium_codes_abuse_staff_merci.sql",
 ];

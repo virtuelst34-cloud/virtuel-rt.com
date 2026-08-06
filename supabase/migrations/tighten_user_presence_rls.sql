@@ -1,5 +1,6 @@
 -- Restreindre user_presence : lecture récente / non invisible ; écriture = soi uniquement
--- Présence auth = auth.uid()::text ; invités = current_guest_name() (set_guest_session)
+-- Clé présence = pseudo (current_actor_name) pour comptes ET invités — pas auth.uid()
+-- (voir aussi fix_presence_actor_name_rls.sql si cette migration a déjà été appliquée)
 
 DROP POLICY IF EXISTS "Allow public read access" ON public.user_presence;
 DROP POLICY IF EXISTS "Allow public read presence" ON public.user_presence;
@@ -22,7 +23,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT COALESCE(auth.uid()::text, public.current_guest_name());
+  SELECT public.current_actor_name();
 $$;
 
 GRANT EXECUTE ON FUNCTION public.current_presence_actor_id() TO anon, authenticated;

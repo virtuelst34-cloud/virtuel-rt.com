@@ -292,27 +292,28 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const mappedUser = mapSupabaseProfile(sbUser);
     setUser(mappedUser);
     setProfiles(prev => ({ ...prev, [mappedUser.name]: mappedUser }));
-    void presenceService.initialize(sbUser.id).then(() => {
-      presenceService.setOnline(sbUser.id, undefined, {
-        name: sbUser.name,
-        avatar: sbUser.avatar,
-        initials: sbUser.initials,
-        status: sbUser.status || 'online',
+    // Présence clé = pseudo (aligné RLS current_actor_name), jamais l'UUID auth
+    void presenceService.initialize(mappedUser.name).then(() => {
+      presenceService.setOnline(mappedUser.name, undefined, {
+        name: mappedUser.name,
+        avatar: mappedUser.avatar,
+        initials: mappedUser.initials,
+        status: mappedUser.status || 'online',
       });
     });
   }, []);
 
   useEffect(() => {
-    const userId = supabaseUser?.id || user?.name;
-    if (!userId) return;
+    const presenceKey = user?.name;
+    if (!presenceKey) return;
 
     const markOffline = () => {
-      void presenceService.setOffline(userId);
+      void presenceService.setOffline(presenceKey);
     };
 
     // Presence touch fans out via postgres_changes to every client — keep sparse.
     const heartbeat = window.setInterval(() => {
-      void presenceService.touch(userId, user?.status || 'online');
+      void presenceService.touch(presenceKey, user?.status || 'online');
     }, 90_000);
 
     window.addEventListener('pagehide', markOffline);
@@ -323,12 +324,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('pagehide', markOffline);
       window.removeEventListener('beforeunload', markOffline);
     };
-  }, [supabaseUser?.id, user?.name, user?.status]);
+  }, [user?.name, user?.status]);
 
   const logout = useCallback(async () => {
-    const userId = supabaseUser?.id || user?.name;
-    if (userId) {
-      presenceService.setOffline(userId);
+    const presenceKey = user?.name;
+    if (presenceKey) {
+      presenceService.setOffline(presenceKey);
     }
 
     if (user && !supabaseUser) {
@@ -356,8 +357,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       saveGuestProfileCache(updated as unknown as Record<string, unknown>);
     }
 
-    const presenceUserId = supabaseUser?.id || updated.name;
-    void presenceService.updateStatus(presenceUserId, (updated.status || 'online') as UserProfile['status'], {
+    void presenceService.updateStatus(updated.name, (updated.status || 'online') as UserProfile['status'], {
       name: updated.name,
       avatar: updated.avatar,
       initials: updated.initials,
@@ -388,28 +388,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const setStatus = useCallback((status: UserProfile['status']) => {
     updateProfile({ status });
 
-    if (supabaseUser) {
-      if (status === 'offline') {
-        presenceService.setOffline(supabaseUser.id);
-      } else {
-        presenceService.updateStatus(supabaseUser.id, status, {
-          name: user?.name || '',
-          avatar: user?.avatar || 'av1',
-          initials: user?.initials || '',
-        });
-      }
-    } else if (user) {
-      if (status === 'offline') {
-        presenceService.setOffline(user.name);
-      } else {
-        presenceService.updateStatus(user.name, status, {
-          name: user.name,
-          avatar: user.avatar,
-          initials: user.initials,
-        });
-      }
+    if (!user?.name) return;
+    if (status === 'offline') {
+      presenceService.setOffline(user.name);
+    } else {
+      presenceService.updateStatus(user.name, status, {
+        name: user.name,
+        avatar: user.avatar || 'av1',
+        initials: user.initials || '',
+      });
     }
-  }, [updateProfile, supabaseUser, user]);
+  }, [updateProfile, user]);
 
   const setUserStatusAdmin = useCallback((name: string, status: UserProfile['status']) => {
     setProfiles(prev => {

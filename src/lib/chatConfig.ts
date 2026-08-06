@@ -18,7 +18,7 @@ export interface Salon {
 
 export const SALONS: Salon[] = [
   // Général — essentiels uniquement
-  { id: 'bienvenue', name: 'Bienvenue', type: 'chat', icon: 'DoorOpen', emoji: '👋', count: 0, category_id: 'general', subcategory: 'Accueil', sort_order: 0, welcome: '👋 Bienvenue sur Virtuel-RT ! Lisez les règles et le guide épinglés ci-dessous, puis explorez les salons.' },
+  { id: 'bienvenue', name: 'Bienvenue', type: 'chat', icon: 'DoorOpen', emoji: '👋', count: 0, category_id: 'general', subcategory: 'Accueil', sort_order: 0, welcome: '👋 Bienvenue sur Virtuel-RT ! Lisez les règles et le guide épinglés ci-dessous, puis explorez les salons. (Annonces fondateur uniquement — lecture seule pour les membres.)' },
   { id: 'annonces', name: 'Annonces', type: 'chat', icon: 'Megaphone', emoji: '📢', count: 0, category_id: 'general', subcategory: 'Annonces', sort_order: 5, welcome: '📢 Salon Annonces — infos officielles et nouveautés Virtuel-RT.' },
   { id: 'general', name: 'Salon général', type: 'chat vocal', icon: 'MessagesSquare', emoji: '💬', count: 0, category_id: 'general', subcategory: 'Communauté', sort_order: 8, welcome: '💬 Salon général — le point de rencontre de la communauté Virtuel-RT.' },
 

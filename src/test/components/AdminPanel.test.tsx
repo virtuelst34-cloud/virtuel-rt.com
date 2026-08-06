@@ -27,6 +27,8 @@ describe('AdminPanel component', () => {
     expect(screen.getByText(/Modération/i)).toBeInTheDocument()
     expect(screen.getAllByText(/Badges/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Badges spéciaux/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Profils/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Codes Premium/i).length).toBeGreaterThan(0)
   })
 
   it('should have close button', () => {

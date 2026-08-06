@@ -90,6 +90,9 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       return { ...prev, [salonId]: combined.slice(0, MAX_PER_SALON) };
     });
 
+    if (offset === 0) {
+      offlineModeService.clearSalonCache(salonId);
+    }
     resolved.forEach(msg => {
       offlineModeService.cacheMessage({
         id: msg.id,

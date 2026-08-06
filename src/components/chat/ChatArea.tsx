@@ -74,7 +74,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const { isUserBanned, isUserMuted, isBlocked } = useModeration();
   const { isMuted: isLocallyMuted, isBlocked: isLocallyBlocked } = useMuteBlock();
   const { getTypingUsers } = useTyping();
-  const { can, isAdmin } = usePermissions();
+  const { can, isAdmin, isFounder } = usePermissions();
   const { getMessages, addMessage, deleteMessage, pinMessage, updateMessage, updateReaction, setCurrentSalonId, loadMoreMessages, isLoadingHistory } = useMessages();
   const { addNotification } = useNotifications();
 
@@ -360,6 +360,13 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const handleSend = useCallback(async (text: string, imageUrl: string | null, reply: any = null, file?: File | null) => {
     if (!user || !currentSalon) return;
     if (isUserBanned(user.name) || isUserMuted(user.name)) return;
+    if (currentSalon === 'bienvenue' && !isFounder) {
+      addNotification({
+        type: 'system',
+        message: 'Le salon Bienvenue est réservé aux annonces du fondateur (lecture seule).',
+      });
+      return;
+    }
 
     const ownerFolder = user.id || user.name || 'guest';
     let uploadedImageUrl: string | null = null;
@@ -409,7 +416,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     }
     const newLevel = await awardXP();
     if (newLevel) setLevelUp(newLevel);
-  }, [user, currentSalon, isUserBanned, isUserMuted, addMessage, sounds, recordMessageSent, awardXP, addNotification, salon?.name]);
+  }, [user, currentSalon, isUserBanned, isUserMuted, isFounder, addMessage, sounds, recordMessageSent, awardXP, addNotification, salon?.name]);
 
   const handleQuizAnswerPosted = useCallback((text: string) => {
     if (!currentSalon || currentSalon !== 'quiz') return;
@@ -698,7 +705,9 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
             className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-0.5 relative overscroll-contain">
             <ReactionRainOverlay burst={reactionRain} />
             {!searchQuery && currentSalon === 'bienvenue' && (
-              <WelcomeGuideCard />
+              <div className="sticky top-0 z-[5] -mx-1 px-1 pb-1 bg-background/95 backdrop-blur-sm">
+                <WelcomeGuideCard />
+              </div>
             )}
             {!searchQuery && (
               <div className="text-center text-[10px] text-muted-foreground/40 py-2 flex items-center gap-2">
@@ -747,7 +756,12 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
           <ChatInput
             onSend={handleSend}
             onTyping={handleTyping}
-            disabled={banned || muted || undefined}
+            disabled={banned || muted || (currentSalon === 'bienvenue' && !isFounder) || undefined}
+            disabledPlaceholder={
+              currentSalon === 'bienvenue' && !isFounder
+                ? 'Salon Bienvenue — annonces du fondateur uniquement (lecture seule).'
+                : undefined
+            }
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
             members={allMembers}

@@ -94,6 +94,7 @@ const MIGRATION_ORDER = [
   "fix_presence_actor_name_rls.sql",
   "premium_codes.sql",
   "premium_codes_abuse_staff_merci.sql",
+  "bienvenue_founder_only_and_purge.sql",
 ];
 const SKIP_ERROR_CODES = new Set([
   "42P07", // duplicate_table

@@ -23,12 +23,14 @@ interface ChatInputProps {
   onSend: (text: string, image: string | null, replyTo: Message | null, file?: File | null) => void;
   onTyping?: () => void;
   disabled?: boolean;
+  /** Placeholder quand disabled (ex. salon lecture seule). */
+  disabledPlaceholder?: string;
   replyTo?: Message | null;
   onCancelReply?: () => void;
   members?: Member[];
 }
 
-export default function ChatInput({ onSend, onTyping, disabled = false, replyTo = null, onCancelReply, members = [] }: ChatInputProps) {
+export default function ChatInput({ onSend, onTyping, disabled = false, disabledPlaceholder, replyTo = null, onCancelReply, members = [] }: ChatInputProps) {
   const { profiles, user } = useUser();
   const { currentSalon } = useSalons();
   const { setTyping } = useTyping();
@@ -411,7 +413,7 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
           onKeyDown={handleKeyDown}
           onSelect={e => { caretRef.current = (e.target as HTMLTextAreaElement).selectionStart || 0; }}
           disabled={disabled}
-          placeholder={disabled ? 'Vous ne pouvez pas envoyer de messages.' : 'Envoyer un message... (@ pour mentionner)'}
+          placeholder={disabled ? (disabledPlaceholder || 'Vous ne pouvez pas envoyer de messages.') : 'Envoyer un message... (@ pour mentionner)'}
           rows={1}
           aria-label="Message"
           aria-describedby={mentions.length > 0 ? 'mention-suggestions' : undefined}

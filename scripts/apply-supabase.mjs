@@ -98,6 +98,7 @@ const MIGRATION_ORDER = [
   "bienvenue_founder_only_and_purge.sql",
   "20260806220000_fix_premium_redeem_and_permissions.sql",
   "20260807224500_fix_admin_premium_grant_rights.sql",
+  "20260807235200_fix_preferences_premium_upsert.sql",
 ];
 const SKIP_ERROR_CODES = new Set([
   "42P07", // duplicate_table

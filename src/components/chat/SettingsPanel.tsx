@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useUser, usePreferences, useXP, useBadges, useMuteBlock, useFriends, useNotifications } from '@/lib/contexts';
 import { supabaseAuthService } from '@/lib/supabaseAuth';
+import { mapSupabaseProfile } from '@/lib/utils/profileBadges';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import UserDisplayName from './UserDisplayName';
@@ -208,7 +209,14 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
           : `Premium activé jusqu’au ${result.premium_until ? format(new Date(result.premium_until), 'd MMM yyyy', { locale: fr }) : '…'}`,
       });
       setPremiumCode('');
-      updateProfile({ isPremium: true });
+      // Recharger le profil serveur (source de vérité is_premium / premium_until)
+      const refreshed = await supabaseAuthService.getCurrentUser();
+      if (refreshed) {
+        const mapped = mapSupabaseProfile(refreshed);
+        updateProfile({ isPremium: mapped.isPremium });
+      } else {
+        updateProfile({ isPremium: true });
+      }
       addNotification({ type: 'system', message: 'Code Premium accepté — bienvenue dans Premium !' });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Code invalide ou déjà utilisé';

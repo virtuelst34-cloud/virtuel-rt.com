@@ -643,6 +643,34 @@ export const supabaseDbService = {
     return !!data;
   },
 
+  /** Staff only — search profiles by pseudo for Premium Profils tab. */
+  async adminSearchProfiles(query: string, limit = 20): Promise<Array<{
+    id: string;
+    name: string;
+    avatar: string;
+    initials: string;
+    is_premium: boolean;
+    premium_until: string | null;
+    level: number;
+    xp: number;
+  }>> {
+    const { data, error } = await supabase.rpc('admin_search_profiles', {
+      p_query: query,
+      p_limit: limit,
+    });
+    if (error) throw error;
+    return (data || []) as Array<{
+      id: string;
+      name: string;
+      avatar: string;
+      initials: string;
+      is_premium: boolean;
+      premium_until: string | null;
+      level: number;
+      xp: number;
+    }>;
+  },
+
   async adminCreatePremiumCode(opts: {
     code: string;
     durationDays?: number | null;

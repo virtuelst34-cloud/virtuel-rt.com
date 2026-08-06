@@ -34,11 +34,18 @@ function resolveIdentifiers(
 export function usePermissions() {
   const { user, supabaseUser } = useUser();
 
+  const isFounder = !!(user?.isFounder || supabaseUser?.is_founder);
   const isAdmin = !!(user?.isAdmin || user?.isFounder || supabaseUser?.is_admin || supabaseUser?.is_founder);
 
   const can = useCallback(
     async (section: PermissionSection, action: PermissionAction): Promise<boolean> => {
-      if (isAdmin) return true;
+      // Fondateur : toujours tout. Section premium : pas de bypass Direction/Master OP
+      // (configurable via Admin → Permissions → Premium).
+      if (section === 'premium') {
+        if (isFounder) return true;
+      } else if (isAdmin) {
+        return true;
+      }
       const identifiers = resolveIdentifiers(user, supabaseUser);
       for (const { id, type } of identifiers) {
         const allowed = await permissionsService.hasPermission(id, type, section, action);
@@ -46,8 +53,8 @@ export function usePermissions() {
       }
       return false;
     },
-    [user, supabaseUser, isAdmin],
+    [user, supabaseUser, isAdmin, isFounder],
   );
 
-  return { can, isAdmin };
+  return { can, isAdmin, isFounder };
 }

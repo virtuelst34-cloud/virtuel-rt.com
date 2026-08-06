@@ -34,7 +34,19 @@ export type IdentifierType = 'user_type' | 'badge';
 /**
  * Sections de l'application où les permissions s'appliquent
  */
-export type PermissionSection = 'chat' | 'moderation' | 'admin' | 'settings' | 'salons' | 'badges' | 'xp';
+export type PermissionSection =
+  | 'chat'
+  | 'moderation'
+  | 'admin'
+  | 'settings'
+  | 'salons'
+  | 'badges'
+  | 'xp'
+  | 'premium'
+  | 'messages'
+  | 'security'
+  | 'content'
+  | 'logs';
 
 /**
  * Actions possibles dans chaque section
@@ -47,7 +59,11 @@ export type PermissionAction =
   | 'view_own' | 'edit_own' | 'edit_any'
   | 'view_all' | 'create_custom' | 'delete_custom' | 'edit_custom' | 'reorder' | 'manage_messages' | 'pin_messages'
   | 'view_all_badges' | 'assign_special'
-  | 'view_own_xp' | 'view_all_xp' | 'modify_any_xp';
+  | 'view_own_xp' | 'view_all_xp' | 'modify_any_xp'
+  | 'view' | 'create_codes' | 'revoke_codes' | 'grant_premium'
+  | 'view_settings' | 'edit_settings' | 'edit_limits'
+  | 'manage_bans' | 'view_logs' | 'manage_filters' | 'review_queue'
+  | 'export_logs' | 'manage_settings';
 
 /**
  * Interface représentant une permission dans la base de données
@@ -267,5 +283,22 @@ export const permissionsService = {
    */
   async canAssignSpecialBadges(userIdentifier: UserIdentifier, identifierType: IdentifierType): Promise<boolean> {
     return this.hasPermission(userIdentifier, identifierType, 'badges', 'assign_special');
+  },
+
+  /** Codes Premium / générateur / grant Profils */
+  async canViewPremiumAdmin(userIdentifier: UserIdentifier, identifierType: IdentifierType): Promise<boolean> {
+    return this.hasPermission(userIdentifier, identifierType, 'premium', 'view');
+  },
+
+  async canCreatePremiumCodes(userIdentifier: UserIdentifier, identifierType: IdentifierType): Promise<boolean> {
+    return this.hasPermission(userIdentifier, identifierType, 'premium', 'create_codes');
+  },
+
+  async canRevokePremiumCodes(userIdentifier: UserIdentifier, identifierType: IdentifierType): Promise<boolean> {
+    return this.hasPermission(userIdentifier, identifierType, 'premium', 'revoke_codes');
+  },
+
+  async canGrantPremium(userIdentifier: UserIdentifier, identifierType: IdentifierType): Promise<boolean> {
+    return this.hasPermission(userIdentifier, identifierType, 'premium', 'grant_premium');
   },
 };

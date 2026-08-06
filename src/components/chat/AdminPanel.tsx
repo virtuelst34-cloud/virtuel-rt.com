@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, KeyboardEvent } from 'react';
+import React, { useState, useEffect, useRef, KeyboardEvent, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useUI, useUser, useSalons, useMessages, useXP, useModeration, useBadges } from '@/lib/contexts';
 import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';
-import { X, ShieldAlert, LayoutDashboard, Users, Gavel, DoorOpen, Diamond, Award, BarChart2, Lock, EyeOff, LucideIcon, Settings, Bell, MessageSquare, Shield, FileText, Activity, Siren, Folders, KeyRound } from 'lucide-react';
+import { usePermissions } from '@/lib/hooks/usePermissions';
+import { X, ShieldAlert, LayoutDashboard, Users, Gavel, DoorOpen, Diamond, Award, BarChart2, Lock, EyeOff, LucideIcon, Settings, Bell, MessageSquare, Shield, FileText, Activity, Siren, Folders, KeyRound, UserCircle2 } from 'lucide-react';
 import DashboardSection from './admin/DashboardSection';
 import StatsSection from './admin/StatsSection';
 import SalonsSection from './admin/SalonsSection';
@@ -20,6 +21,7 @@ import SecuritySettingsSection from './admin/SecuritySettingsSection';
 import ContentModerationSection from './admin/ContentModerationSection';
 import LogsAuditSection from './admin/LogsAuditSection';
 import PremiumCodesSection from './admin/PremiumCodesSection';
+import PremiumProfilesSection from './admin/PremiumProfilesSection';
 
 interface Tab {
   id: string;
@@ -27,12 +29,13 @@ interface Tab {
   icon: LucideIcon;
 }
 
-const TABS: Tab[] = [
+const ALL_TABS: Tab[] = [
   { id: 'dashboard',   label: 'Tableau de bord',  icon: LayoutDashboard },
   { id: 'stats',       label: 'Statistiques',     icon: BarChart2 },
   { id: 'salons',      label: 'Salons',           icon: DoorOpen },
   { id: 'categories',  label: 'Catégories',       icon: Folders },
   { id: 'users',       label: 'Utilisateurs',     icon: Users },
+  { id: 'premiumprofiles', label: 'Profils',      icon: UserCircle2 },
   { id: 'premiumcodes', label: 'Codes Premium',   icon: KeyRound },
   { id: 'modhub',      label: 'Centre modo',      icon: Siren },
   { id: 'moderation',  label: 'Modération',       icon: Gavel },
@@ -55,8 +58,15 @@ export default function AdminPanel() {
   const { monthlyXP } = useXP();
   const { banUser, unbanUser, muteUser, unmuteUser } = useModeration();
   const { customBadges, setCustomBadges } = useBadges();
+  const { can, isFounder } = usePermissions();
+  const [premiumPerms, setPremiumPerms] = useState({
+    view: true,
+    create_codes: true,
+    revoke_codes: true,
+    grant_premium: true,
+  });
   const [activeTab, setActiveTab] = useState(() =>
-    adminInitialTab && TABS.some((t) => t.id === adminInitialTab) ? adminInitialTab : 'dashboard',
+    adminInitialTab && ALL_TABS.some((t) => t.id === adminInitialTab) ? adminInitialTab : 'dashboard',
   );
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -67,11 +77,55 @@ export default function AdminPanel() {
   const isReadOnly = !supabaseUser;
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (isFounder) {
+        if (!cancelled) {
+          setPremiumPerms({
+            view: true,
+            create_codes: true,
+            revoke_codes: true,
+            grant_premium: true,
+          });
+        }
+        return;
+      }
+      const [view, create_codes, revoke_codes, grant_premium] = await Promise.all([
+        can('premium', 'view'),
+        can('premium', 'create_codes'),
+        can('premium', 'revoke_codes'),
+        can('premium', 'grant_premium'),
+      ]);
+      if (!cancelled) {
+        setPremiumPerms({ view, create_codes, revoke_codes, grant_premium });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [can, isFounder, user?.name, supabaseUser?.id]);
+
+  const TABS = useMemo(() => {
+    return ALL_TABS.filter((tab) => {
+      if (tab.id === 'premiumcodes' || tab.id === 'premiumprofiles') {
+        return premiumPerms.view || isFounder;
+      }
+      return true;
+    });
+  }, [premiumPerms.view, isFounder]);
+
+  useEffect(() => {
     if (adminInitialTab && TABS.some((t) => t.id === adminInitialTab)) {
       setActiveTab(adminInitialTab);
       setAdminInitialTab(null);
     }
-  }, [adminInitialTab, setAdminInitialTab]);
+  }, [adminInitialTab, setAdminInitialTab, TABS]);
+
+  useEffect(() => {
+    if (!TABS.some((t) => t.id === activeTab) && TABS.length > 0) {
+      setActiveTab(TABS[0].id);
+    }
+  }, [TABS, activeTab]);
 
   // Sécurité : fermer si l'utilisateur n'a pas les droits staff/admin
   useEffect(() => {
@@ -184,7 +238,19 @@ export default function AdminPanel() {
             {activeTab === 'salons'         && <SalonsSection readOnly={isReadOnly} customSalons={customSalons} addSalon={addSalon} updateSalon={updateSalon} deleteSalon={deleteSalon} reorderSalons={reorderSalons} displayOrder={displayOrder} hiddenSalons={hiddenSalons} setHiddenSalons={setHiddenSalons} />}
             {activeTab === 'categories'     && <CategoriesSection readOnly={isReadOnly} />}
             {activeTab === 'users'          && <UsersSection readOnly={isReadOnly} profiles={profiles} setProfiles={setProfiles} setUserStatusAdmin={setUserStatusAdmin} banUser={banUser} unbanUser={unbanUser} muteUser={muteUser} unmuteUser={unmuteUser} />}
-            {activeTab === 'premiumcodes'   && <PremiumCodesSection readOnly={isReadOnly} />}
+            {activeTab === 'premiumprofiles' && (
+              <PremiumProfilesSection
+                readOnly={isReadOnly}
+                canGrant={premiumPerms.grant_premium || isFounder}
+              />
+            )}
+            {activeTab === 'premiumcodes'   && (
+              <PremiumCodesSection
+                readOnly={isReadOnly}
+                canCreate={premiumPerms.create_codes || isFounder}
+                canRevoke={premiumPerms.revoke_codes || isFounder}
+              />
+            )}
             {activeTab === 'modhub'         && <ModerationHubSection readOnly={isReadOnly} user={user} />}
             {activeTab === 'moderation'     && <ModerationSection readOnly={isReadOnly} profiles={profiles} unbanUser={unbanUser} unmuteUser={unmuteUser} />}
             {activeTab === 'badges'         && <BadgesSection readOnly={isReadOnly} customBadges={customBadges} setCustomBadges={setCustomBadges} />}

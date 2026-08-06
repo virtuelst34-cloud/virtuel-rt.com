@@ -26,6 +26,8 @@ interface RedemptionRow {
 
 interface Props {
   readOnly?: boolean;
+  canCreate?: boolean;
+  canRevoke?: boolean;
 }
 
 function randomCode(): string {
@@ -35,7 +37,11 @@ function randomCode(): string {
   return s;
 }
 
-export default function PremiumCodesSection({ readOnly = false }: Props) {
+export default function PremiumCodesSection({
+  readOnly = false,
+  canCreate = true,
+  canRevoke = true,
+}: Props) {
   const [codes, setCodes] = useState<PremiumCodeRow[]>([]);
   const [redemptions, setRedemptions] = useState<RedemptionRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,7 +77,7 @@ export default function PremiumCodesSection({ readOnly = false }: Props) {
   }, [load]);
 
   const handleCreate = async () => {
-    if (readOnly) return;
+    if (readOnly || !canCreate) return;
     setError('');
     setOk('');
     try {
@@ -98,7 +104,7 @@ export default function PremiumCodesSection({ readOnly = false }: Props) {
   };
 
   const handleDeactivate = async (id: string) => {
-    if (readOnly) return;
+    if (readOnly || !canRevoke) return;
     try {
       await supabaseDbService.adminDeactivatePremiumCode(id);
       await load();
@@ -115,7 +121,7 @@ export default function PremiumCodesSection({ readOnly = false }: Props) {
         Saisie côté utilisateur : Paramètres → Compte.
       </p>
 
-      {!readOnly && (
+      {!readOnly && canCreate && (
         <div className="bg-secondary border border-border rounded-xl p-4 space-y-3">
           <div className="flex flex-wrap gap-2">
             <input
@@ -185,6 +191,11 @@ export default function PremiumCodesSection({ readOnly = false }: Props) {
 
       {error && <p className="text-xs text-red-400">{error}</p>}
       {ok && <p className="text-xs text-emerald-400">{ok}</p>}
+      {!canCreate && !readOnly && (
+        <p className="text-[11px] text-amber-400/90">
+          Générateur désactivé pour votre rôle — Direction peut l’activer dans Permissions → Premium → « Générer des codes Premium ».
+        </p>
+      )}
 
       <div className="space-y-2">
         {loading && <p className="text-xs text-muted-foreground/50">Chargement…</p>}
@@ -233,7 +244,7 @@ export default function PremiumCodesSection({ readOnly = false }: Props) {
             >
               <History className="w-3.5 h-3.5" />
             </button>
-            {c.active && !readOnly && (
+            {c.active && !readOnly && canRevoke && (
               <button
                 type="button"
                 onClick={() => void handleDeactivate(c.id)}

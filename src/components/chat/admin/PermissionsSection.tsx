@@ -72,6 +72,13 @@ const SECTIONS: SectionConfig[] = [
     actions: ['view_own', 'view_all', 'modify_any'],
   },
   {
+    id: 'premium',
+    name: 'Premium',
+    description: 'Codes Premium, générateur et grant Profils',
+    icon: '🔑',
+    actions: ['view', 'create_codes', 'revoke_codes', 'grant_premium'],
+  },
+  {
     id: 'messages',
     name: 'Messages',
     description: 'Permissions pour la gestion des messages système',
@@ -147,7 +154,19 @@ const ACTION_LABELS: Record<string, string> = {
   review_queue: 'Voir la file d\'attente de modération',
   export_logs: 'Exporter les logs',
   manage_settings: 'Gérer les paramètres de logs',
+  view: 'Voir Codes / Profils Premium',
+  create_codes: 'Générer des codes Premium',
+  revoke_codes: 'Révoquer des codes Premium',
+  grant_premium: 'Accorder Premium (Profils)',
 };
+
+/** Defaults for auto-seeded missing rows (Premium générateur). */
+function defaultAllowedFor(section: string, action: string, entityId: string): boolean {
+  if (section !== 'premium') return false;
+  const staff = entityId === 'founder' || entityId === 'direction' || entityId === 'master_op';
+  if (!staff) return false;
+  return ['view', 'create_codes', 'revoke_codes', 'grant_premium'].includes(action);
+}
 
 interface Props {
   readOnly?: boolean;
@@ -221,7 +240,7 @@ export default function PermissionsSection({ readOnly = false, user }: Props) {
               action,
               user_identifier: entity.id,
               identifier_type: identifierType,
-              allowed: false,
+              allowed: defaultAllowedFor(section.id, action, entity.id),
             });
           }
         }
@@ -250,7 +269,7 @@ export default function PermissionsSection({ readOnly = false, user }: Props) {
               action,
               user_identifier: entity.id,
               identifier_type: identifierType,
-              allowed: false,
+              allowed: defaultAllowedFor(section.id, action, entity.id),
             });
           }
         }

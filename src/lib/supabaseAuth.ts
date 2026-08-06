@@ -11,6 +11,7 @@ export interface UserProfile {
   level: number;
   xp: number;
   is_premium: boolean;
+  premium_until?: string | null;
   created_at: string;
   updated_at: string;
   email?: string;

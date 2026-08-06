@@ -88,7 +88,7 @@ export { useGlobalSettings, GlobalSettingsProvider };
  *   NotificationsCtx : notifications, addNotification, markAllRead, clearNotifications, unreadCount
  *   PreferencesCtx   : theme, accentColor, toggleTheme, partyMode, togglePartyMode, isPremium, setPremium, compactMode, toggleCompactMode
  *   SalonsContext    : customSalons, currentSalon, addSalon, removeSalon, updateSalon, isSalonLocked, setCurrentSalon
- *   UIContext        : showAdmin, showProfile, openAdmin, closeAdmin, openProfile, closeProfile
+ *   UIContext        : showAdmin, profileTarget, openUserProfile, closeUserProfile, openAdmin, openStaffChat
  *   XPContext        : monthlyXP, awardXP, sounds, getTopUsers
  *   BadgesContext    : customBadges, addBadge, removeBadge, updateBadge
  *   DMContext        : (dm state & actions)

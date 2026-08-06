@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useUser, useSalons, useMuteBlock } from '@/lib/contexts';
+import { useUser, useSalons, useMuteBlock, useUI } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
 import UserDisplayName from './UserDisplayName';
-import UserProfileView from './UserProfileView';
 import { Users, Search, X, MessageSquare, UserX, Eye } from 'lucide-react';
 import { presenceService } from '@/lib/presenceService';
 
@@ -17,10 +16,10 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
   const { user, profiles } = useUser();
   const { currentSalon } = useSalons();
   const { isMuted, isBlocked, blockUser, unblockUser } = useMuteBlock();
+  const { openUserProfile } = useUI();
   const [search, setSearch] = useState('');
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [presenceMembers, setPresenceMembers] = useState<any[]>([]);
-  const [viewProfile, setViewProfile] = useState<string | null>(null);
 
   useEffect(() => {
     const loadOnlineUsers = () => {
@@ -66,7 +65,6 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
   };
 
   return (
-    <>
       <div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto sm:w-80 bg-card sm:border-l border-border flex flex-col z-40 animate-in slide-in-from-right duration-300 safe-area-pad">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
@@ -101,7 +99,7 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
                   member={member}
                   isOnline
                   blocked={isBlocked(member.name)}
-                  onViewProfile={() => setViewProfile(member.name)}
+                  onViewProfile={() => openUserProfile(member.name)}
                   onOpenDM={() => openDM(member.name)}
                   onToggleBlock={() => handleBlockToggle(member.name)}
                 />
@@ -118,7 +116,7 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
                   member={member}
                   isOnline={false}
                   blocked={isBlocked(member.name)}
-                  onViewProfile={() => setViewProfile(member.name)}
+                  onViewProfile={() => openUserProfile(member.name)}
                   onOpenDM={() => openDM(member.name)}
                   onToggleBlock={() => handleBlockToggle(member.name)}
                 />
@@ -134,15 +132,6 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
           )}
         </div>
       </div>
-
-      {viewProfile && (
-        <UserProfileView
-          targetName={viewProfile}
-          onClose={() => setViewProfile(null)}
-          onOpenDM={(name) => openDM(name)}
-        />
-      )}
-    </>
   );
 }
 
@@ -178,6 +167,7 @@ function MemberItem({
             size="xs"
             showLevelDiamond={false}
             showSpecialLabels={false}
+            openProfileOnClick={false}
             nameClassName={`text-xs font-medium ${blocked ? 'text-red-300' : 'text-foreground'}`}
           />
         </div>

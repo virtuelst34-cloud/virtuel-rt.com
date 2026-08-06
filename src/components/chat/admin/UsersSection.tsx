@@ -203,7 +203,7 @@ export default function UsersSection({
               : 'bg-secondary/80 border-border/80'
         }`}
       >
-        <Avatar avatarClass={profile.avatar} initials={profile.initials} size="sm" />
+        <Avatar avatarClass={profile.avatar} initials={profile.initials} size="sm" profileName={profile.name} openProfileOnClick />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1 flex-wrap">
             <UserDisplayName

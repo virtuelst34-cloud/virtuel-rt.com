@@ -22,6 +22,7 @@ import ContentModerationSection from './admin/ContentModerationSection';
 import LogsAuditSection from './admin/LogsAuditSection';
 import PremiumCodesSection from './admin/PremiumCodesSection';
 import PremiumProfilesSection from './admin/PremiumProfilesSection';
+import StaffProfileActionsSection from './admin/StaffProfileActionsSection';
 
 interface Tab {
   id: string;
@@ -42,6 +43,7 @@ const ALL_TABS: Tab[] = [
   { id: 'badges',      label: 'Badges',           icon: Diamond },
   { id: 'special',     label: 'Badges spéciaux',  icon: Award },
   { id: 'permissions', label: 'Permissions',      icon: Lock },
+  { id: 'staffprofile', label: 'Actions staff',  icon: UserCircle2 },
   { id: 'settings',    label: 'Paramètres',       icon: Settings },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'messages',    label: 'Messages',         icon: MessageSquare },
@@ -256,6 +258,7 @@ export default function AdminPanel() {
             {activeTab === 'badges'         && <BadgesSection readOnly={isReadOnly} customBadges={customBadges} setCustomBadges={setCustomBadges} />}
             {activeTab === 'special'        && <SpecialBadgesSection readOnly={isReadOnly} profiles={profiles} setProfiles={setProfiles} />}
             {activeTab === 'permissions'    && <PermissionsSection readOnly={isReadOnly} user={user} />}
+            {activeTab === 'staffprofile'   && <StaffProfileActionsSection readOnly={isReadOnly} user={user} />}
             {activeTab === 'settings'       && <GlobalSettingsSection readOnly={isReadOnly} user={user} />}
             {activeTab === 'notifications'  && <NotificationsSettingsSection readOnly={isReadOnly} user={user} />}
             {activeTab === 'messages'       && <MessageSettingsSection readOnly={isReadOnly} user={user} />}

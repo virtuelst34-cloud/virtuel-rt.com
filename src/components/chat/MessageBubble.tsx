@@ -3,7 +3,7 @@ import Avatar from './Avatar';
 import UserDisplayName from './UserDisplayName';
 import SpecialBadgeInline from './SpecialBadgeInline';
 import SafeMessageContent from './SafeMessageContent';
-import { useUser, usePreferences, useMuteBlock, useNotifications } from '@/lib/contexts';
+import { useUser, usePreferences, useMuteBlock, useNotifications, useUI } from '@/lib/contexts';
 import { useModeration } from '@/lib/contexts';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { Smile, Trash2, Flag, UserX, Pin, Pencil, Reply, Bookmark } from 'lucide-react';
@@ -46,6 +46,7 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
   const { reportMessage } = useModeration();
   const { blockUser } = useMuteBlock();
   const { addNotification } = useNotifications();
+  const { openUserProfile } = useUI();
   const { can, isAdmin } = usePermissions();
   const [canDeleteAny, setCanDeleteAny] = useState(false);
   const [bookmarked, setBookmarked] = useState(() => isBookmarked(user?.name, message.id));
@@ -135,7 +136,8 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
         className={`${compactMode ? 'mt-0' : 'mt-0.5'} shrink-0 transition-transform duration-200 hover:scale-110 cursor-pointer`} 
         onClick={(e) => {
           e.stopPropagation();
-          onViewProfile?.(message.author_name);
+          if (onViewProfile) onViewProfile(message.author_name);
+          else openUserProfile(message.author_name);
         }}
         aria-label={`Voir le profil de ${message.author_name}`}
         title={`Voir le profil de ${message.author_name}`}>
@@ -154,7 +156,8 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
             nameClassName={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline transition-colors ${isOwn ? 'text-emerald-700 dark:text-emerald-400' : 'text-purple-700 dark:text-purple-300'}`}
             onClick={(e) => {
               e.stopPropagation();
-              onViewProfile?.(message.author_name);
+              if (onViewProfile) onViewProfile(message.author_name);
+              else openUserProfile(message.author_name);
             }}
             id={`message-author-${message.id}`}
             aria-label={`Message de ${message.author_name}`}

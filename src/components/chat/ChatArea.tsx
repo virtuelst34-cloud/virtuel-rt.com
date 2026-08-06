@@ -76,6 +76,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const { can, isAdmin, isFounder } = usePermissions();
   const { getMessages, addMessage, deleteMessage, pinMessage, updateMessage, updateReaction, setCurrentSalonId, loadMoreMessages, isLoadingHistory } = useMessages();
   const { addNotification } = useNotifications();
+  const { openUserProfile } = useUI();
 
   const scrollRef                           = useRef<HTMLDivElement>(null);
   const messagesEndRef                      = useRef<HTMLDivElement>(null);
@@ -93,7 +94,6 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const [showMembers, setShowMembers]       = useState(false);
   const [joinToast, setJoinToast]           = useState<string | null>(null);
   const [typing, setTypingLocal]                 = useState<string[]>([]);
-  const [viewProfile, setViewProfile]       = useState<string | null>(null);
   const [replyTo, setReplyTo]               = useState<any>(null);
   const [isAtBottom, setIsAtBottom]         = useState(true);
   const [unreadNew, setUnreadNew]           = useState(0);
@@ -216,6 +216,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   }, [currentSalon]);
 
   useEffect(() => {
+    // Hash / URL first — never restore from lastSalon storage on load
     const hash = window.location.hash.replace('#', '');
     if (hash.startsWith('salon/')) {
       const id = hash.replace('salon/', '');
@@ -489,7 +490,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     deleteMessage(currentSalon, msgId);
   }, [currentSalon, deleteMessage, getMessages, user, isAdmin, can, addNotification]);
   const handlePin         = useCallback((msgId: string) => { if (currentSalon) pinMessage(currentSalon, msgId); }, [currentSalon, pinMessage]);
-  const handleViewProfile = useCallback((name: string) => { if (name !== user?.name) setViewProfile(name); }, [user]);
+  const handleViewProfile = useCallback((name: string) => { openUserProfile(name); }, [openUserProfile]);
   const handleReply       = useCallback((msg: any) => setReplyTo(msg), []);
   const handleReport      = useCallback((targetId: string, targetType: 'message' | 'user', targetName?: string, targetContent?: string) => {
     setReportTarget({ id: targetId, type: targetType, name: targetName, content: targetContent });
@@ -805,13 +806,6 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
         />
       )}
 
-      {viewProfile && (
-        <UserProfileView
-          targetName={viewProfile}
-          onClose={() => setViewProfile(null)}
-          onOpenDM={(name) => { setViewProfile(null); onOpenDM?.(name); }}
-        />
-      )}
     </div>
   );
 }

@@ -6,7 +6,6 @@ import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
 import UserDisplayName from './UserDisplayName';
 import SpecialBadgeInline from './SpecialBadgeInline';
-import UserProfileView from './UserProfileView';
 import { SupabaseLogin } from '../auth/SupabaseLogin';
 import { MessageSquare, Hand, Lock, X, Trophy, Flame, Mail, LogOut, Users, Scale, ShieldAlert, Star, Radio, Activity } from 'lucide-react';
 import { presenceService } from '@/lib/presenceService';
@@ -73,14 +72,13 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
   const { addNotification } = useNotifications();
   const { xpProgress, xpForLevel, monthlyXP } = useXP();
   const { isMuted, isBlocked } = useMuteBlock();
-  const { openAdmin } = useUI();
+  const { openAdmin, openUserProfile } = useUI();
   const { getUnreadCount } = useDM();
   const { settings, refresh: refreshSettings } = useGlobalSettings();
   const canModerate = hasAdminAccess(user) || hasStaffAccess(user);
   const unreadDMs = user ? getUnreadCount(user.name) : 0;
   const [waved, setWaved]             = useState<Record<string, boolean>>({});
   const [filter, setFilter]           = useState('all');
-  const [viewProfile, setViewProfile] = useState<string | null>(null);
   const [passwordPrompt, setPasswordPrompt] = useState<Salon | null>(null);
   const [passwordError, setPasswordError] = useState('');
   const [showSupabaseLogin, setShowSupabaseLogin] = useState(false);
@@ -501,7 +499,7 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
                     >
                       <button
                         type="button"
-                        onClick={() => setViewProfile(u.name)}
+                        onClick={() => openUserProfile(u.name)}
                         className="flex flex-col items-center gap-1.5 w-full touch-target"
                         title={`Profil de ${u.name}`}
                       >
@@ -520,7 +518,7 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
                       <div className="flex items-center gap-1 w-full mt-0.5">
                         <button
                           type="button"
-                          onClick={() => setViewProfile(u.name)}
+                          onClick={() => openUserProfile(u.name)}
                           className="flex-1 py-1 rounded-lg text-[9px] font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-white/5 touch-target"
                         >
                           Profil
@@ -635,9 +633,16 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
           ) : monthlyRanked.slice(0, 5).map((r, i) => {
             const isMe = r.name === user?.name;
             return (
-              <div key={r.name} className={`flex items-center gap-1.5 py-1 px-1 rounded-lg mb-0.5 ${isMe ? 'bg-yellow-500/8 border border-yellow-500/18' : ''}`}>
+              <div
+                key={r.name}
+                role="button"
+                tabIndex={0}
+                onClick={() => openUserProfile(r.name)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openUserProfile(r.name); }}
+                className={`flex items-center gap-1.5 py-1 px-1 rounded-lg mb-0.5 cursor-pointer hover:bg-white/[0.04] ${isMe ? 'bg-yellow-500/8 border border-yellow-500/18' : ''}`}
+              >
                 <span className="text-[10px] w-4 text-center shrink-0">{['🥇','🥈','🥉','4','5'][i] || i+1}</span>
-                <Avatar avatarClass={r.avatar || 'av1'} initials={r.initials || r.name?.slice(0,2).toUpperCase()} size="xs" />
+                <Avatar avatarClass={r.avatar || 'av1'} initials={r.initials || r.name?.slice(0,2).toUpperCase()} size="xs" profileName={r.name} openProfileOnClick />
                 <div className="flex-1 min-w-0">
                   <UserDisplayName
                     name={r.name}
@@ -665,9 +670,16 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
             : ranked.slice(0, 5).map((r, i) => {
               const isMe = r.name === user?.name;
               return (
-                <div key={r.name} className={`flex items-center gap-1 py-1 px-1 rounded-lg mb-0.5 ${isMe ? 'bg-purple-500/8 border border-purple-500/18' : ''}`}>
+                <div
+                  key={r.name}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openUserProfile(r.name)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openUserProfile(r.name); }}
+                  className={`flex items-center gap-1 py-1 px-1 rounded-lg mb-0.5 cursor-pointer hover:bg-white/[0.04] ${isMe ? 'bg-purple-500/8 border border-purple-500/18' : ''}`}
+                >
                   <span className="text-[9px] text-muted-foreground/40 w-4 text-center shrink-0">{i+1}</span>
-                  <Avatar avatarClass={r.avatar || 'av1'} initials={r.initials || r.name?.slice(0,2).toUpperCase()} size="xs" />
+                  <Avatar avatarClass={r.avatar || 'av1'} initials={r.initials || r.name?.slice(0,2).toUpperCase()} size="xs" profileName={r.name} openProfileOnClick />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 justify-between min-w-0">
                       <UserDisplayName
@@ -744,7 +756,7 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
                     <button
                       key={u.name}
                       type="button"
-                      onClick={() => setViewProfile(u.name)}
+                      onClick={() => openUserProfile(u.name)}
                       className="flex items-center gap-2 px-2 py-1.5 rounded-xl w-full text-left bg-secondary/20 border border-border/40 hover:bg-white/[0.04] hover:border-border transition-all"
                     >
                       <div className="relative shrink-0">
@@ -774,14 +786,6 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
           )}
         </div>
       </div>
-
-      {viewProfile && (
-        <UserProfileView
-          targetName={viewProfile}
-          onClose={() => setViewProfile(null)}
-          onOpenDM={(name) => { setViewProfile(null); onOpenDM?.(name); }}
-        />
-      )}
 
       {/* Modal de mot de passe */}
       {passwordPrompt && (

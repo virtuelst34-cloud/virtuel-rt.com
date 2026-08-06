@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Users } from 'lucide-react';
-import { ChatProvider, useUser } from '@/lib/contexts';
+import { ChatProvider, useUser, useUI } from '@/lib/contexts';
 import Avatar from '@/components/chat/Avatar';
 import SpecialBadgeInline from '@/components/chat/SpecialBadgeInline';
 import UserProfileView from '@/components/chat/UserProfileView';
+import UserDisplayName from '@/components/chat/UserDisplayName';
 import { getSpecialBadgeIdsForUser } from '@/lib/diamondBadges';
 import type { UserProfile } from '@/lib/contexts/UserContext';
 import { supabase } from '@/lib/supabase';
@@ -25,7 +26,7 @@ const ROLE_ORDER: TeamRole[] = ['Fondateur', 'Direction', 'Modération'];
 
 function EquipeContent() {
   const { profiles, setProfiles } = useUser();
-  const [viewProfile, setViewProfile] = useState<string | null>(null);
+  const { profileTarget, openUserProfile, closeUserProfile } = useUI();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -122,17 +123,26 @@ function EquipeContent() {
                       <li key={p.name}>
                         <button
                           type="button"
-                          onClick={() => setViewProfile(p.name)}
+                          onClick={() => openUserProfile(p.name)}
                           className="w-full flex items-center gap-3 rounded-xl border border-border/70 bg-card/60 px-3 py-3 text-left hover:bg-white/[0.04] hover:border-primary/30 transition-all touch-target"
                         >
                           <Avatar
                             avatarClass={p.avatar || 'av1'}
                             initials={p.initials || p.name.slice(0, 2).toUpperCase()}
                             size="md"
+                            profileName={p.name}
+                            openProfileOnClick
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-sm font-semibold text-foreground truncate">{p.name}</span>
+                              <UserDisplayName
+                                name={p.name}
+                                profile={p}
+                                size="sm"
+                                showLevelDiamond={false}
+                                showSpecialLabels={false}
+                                nameClassName="text-sm font-semibold text-foreground"
+                              />
                               <SpecialBadgeInline profile={p} size="sm" showLabels />
                             </div>
                             {p.bio && (
@@ -150,10 +160,10 @@ function EquipeContent() {
         )}
       </div>
 
-      {viewProfile && (
+      {profileTarget && (
         <UserProfileView
-          targetName={viewProfile}
-          onClose={() => setViewProfile(null)}
+          targetName={profileTarget}
+          onClose={closeUserProfile}
         />
       )}
     </div>

@@ -21,7 +21,7 @@ import { isOnboardingDone, onboardingUserKey } from '@/lib/onboarding';
 function ChatApp() {
   const { user } = useUser();
   const { currentSalon, setCurrentSalon } = useSalons();
-  const { showAdmin } = useUI();
+  const { showAdmin, profileTarget, openUserProfile, closeUserProfile } = useUI();
   const [micActive, setMicActive]       = useState<boolean>(false);
   const [micLevel,  setMicLevel]        = useState<number>(0);
   const [showDM,    setShowDM]          = useState<boolean>(false);
@@ -29,7 +29,6 @@ function ChatApp() {
   const [showNotif, setShowNotif]       = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [settingsTab, setSettingsTab]   = useState<string>('profile');
-  const [viewProfile, setViewProfile]   = useState<string | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<RemoteStreamInfo[]>([]);
   const [mobileSalonsOpen, setMobileSalonsOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -131,7 +130,7 @@ function ChatApp() {
           onClose={() => setShowNotif(false)}
           onOpenDM={openDM}
           onOpenSettings={openSettings}
-          onViewProfile={name => setViewProfile(name)}
+          onViewProfile={openUserProfile}
         />
       )}
       {showSettings && (
@@ -144,15 +143,18 @@ function ChatApp() {
           }}
           onViewProfile={name => {
             setShowSettings(false);
-            setViewProfile(name);
+            openUserProfile(name);
           }}
         />
       )}
-      {viewProfile && (
+      {profileTarget && (
         <UserProfileView
-          targetName={viewProfile}
-          onClose={() => setViewProfile(null)}
-          onOpenDM={openDM}
+          targetName={profileTarget}
+          onClose={closeUserProfile}
+          onOpenDM={(name) => {
+            closeUserProfile();
+            openDM(name);
+          }}
         />
       )}
     </div>

@@ -1,17 +1,32 @@
-import React, { useState } from 'react';
-import { useUser, useFriends, useMuteBlock, useNotifications } from '@/lib/contexts';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useUser, useFriends, useMuteBlock, useNotifications, useModeration } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
 import UserDisplayName from './UserDisplayName';
-import { getBadgeForLevel, getUnlockedBadges, getBadgeStats } from '@/lib/diamondBadges';
-import { X, MessageSquare, UserX, Flame, Calendar, VolumeX, UserCheck, UserPlus, UserMinus, Heart } from 'lucide-react';
+import { getBadgeForLevel, getUnlockedBadges, getBadgeStats, SPECIAL_BADGES } from '@/lib/diamondBadges';
+import {
+  X, MessageSquare, UserX, Flame, Calendar, VolumeX, UserCheck, UserPlus, UserMinus, Heart,
+  Shield, Ban, Star, Award, CheckCircle, Volume2,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { getMood, getSignature } from '@/lib/funFeatures';
 import { hasStaffAccess } from '@/lib/utils/founderCheck';
 import { supabaseDbService } from '@/lib/supabaseDb';
 import { moderationAlertService } from '@/lib/moderationAlertService';
+import { supabase } from '@/lib/supabase';
+import {
+  badgesFromProfile,
+  profileFlagsFromBadges,
+} from '@/lib/utils/profileBadges';
+import {
+  canUseStaffProfileAction,
+  loadStaffProfileActions,
+  staffRolesFromUser,
+  type StaffProfileActionsSettings,
+} from '@/lib/staffProfileActions';
+import { toast } from 'sonner';
 
 interface UserProfileViewProps {
   targetName: string;
@@ -21,14 +36,36 @@ interface UserProfileViewProps {
 
 const MERCI_GUEST_KEY = 'virtuel_rt_merci_modo_at';
 
-// Fiche profil en lecture seule d'un autre utilisateur
+function getBadgeIds(profile: Record<string, unknown> | object | null | undefined): string[] {
+  if (!profile) return [];
+  const p = profile as Record<string, unknown>;
+  const special = p.specialBadges as string[] | undefined;
+  if (Array.isArray(special) && special.length) return special;
+  return badgesFromProfile({
+    is_founder: p.isFounder as boolean | undefined,
+    is_direction: p.isDirection as boolean | undefined,
+    is_master_op: p.isMasterOp as boolean | undefined,
+    is_iridescent: p.isIridescent as boolean | undefined,
+    special_badges: special,
+  });
+}
+
+// Fiche profil en lecture seule d'un autre utilisateur (+ actions staff)
 export default function UserProfileView({ targetName, onClose, onOpenDM }: UserProfileViewProps) {
-  const { profiles, user, supabaseUser } = useUser();
+  const { profiles, setProfiles, user, supabaseUser } = useUser();
   const { addNotification } = useNotifications();
   const { isFriend, sendFriendRequest, acceptRequestFromSender, rejectRequestFromSender, cancelRequestToRecipient, removeFriend, pendingRequests, outgoingRequests } = useFriends();
   const { isMuted, isBlocked, muteUser, unmuteUser, blockUser, unblockUser } = useMuteBlock();
+  const { banUser, unbanUser, muteUser: staffMute, unmuteUser: staffUnmute, isUserBanned, isUserMuted } = useModeration();
   const target = profiles[targetName] || { name: targetName, avatar: 'av1', initials: targetName.slice(0, 2).toUpperCase(), level: 1, xp: 0 };
   const [merciBusy, setMerciBusy] = useState(false);
+  const [staffBusy, setStaffBusy] = useState<string | null>(null);
+  const [badgeMenuOpen, setBadgeMenuOpen] = useState(false);
+  const [staffSettings, setStaffSettings] = useState<StaffProfileActionsSettings>(() => loadStaffProfileActions());
+
+  useEffect(() => {
+    setStaffSettings(loadStaffProfileActions());
+  }, [targetName]);
 
   const lvl      = target.level || 1;
   const badge    = getBadgeForLevel(lvl);
@@ -41,6 +78,22 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
   const outgoingRequest = outgoingRequests.find(r => r.friend_id === targetName);
   const targetIsStaff = hasStaffAccess(target as typeof user);
   const canMerci = !!user && user.name !== targetName && targetIsStaff;
+  const isSelf = user?.name === targetName;
+
+  const viewerIsStaff = hasStaffAccess(user);
+  const viewerRoles = useMemo(() => staffRolesFromUser(user), [user]);
+  const staffBanned = isUserBanned(targetName) || !!(target as { isBanned?: boolean }).isBanned;
+  const staffMuted = isUserMuted(targetName) || !!(target as { isMuted?: boolean }).isMuted;
+  const badgeIds = getBadgeIds(target);
+  const isVip = badgeIds.includes('vip');
+  const isPremium = !!(target as { isPremium?: boolean }).isPremium;
+
+  const showVip = viewerIsStaff && !isSelf && canUseStaffProfileAction('grant_vip', viewerRoles, staffSettings);
+  const showPremium = viewerIsStaff && !isSelf && canUseStaffProfileAction('grant_premium', viewerRoles, staffSettings);
+  const showBadges = viewerIsStaff && !isSelf && canUseStaffProfileAction('assign_badges', viewerRoles, staffSettings);
+  const showStaffMute = viewerIsStaff && !isSelf && canUseStaffProfileAction('staff_mute', viewerRoles, staffSettings);
+  const showStaffBan = viewerIsStaff && !isSelf && canUseStaffProfileAction('staff_ban', viewerRoles, staffSettings);
+  const showStaffPanel = showVip || showPremium || showBadges || showStaffMute || showStaffBan;
 
   const handleBlock = async () => { 
     if (blocked) {
@@ -90,7 +143,6 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
       if (supabaseUser?.id) {
         await supabaseDbService.sendMerciModo(targetName);
       } else {
-        // Invité : rate-limit local + alerte staff
         const raw = localStorage.getItem(MERCI_GUEST_KEY);
         if (raw && Date.now() - Number(raw) < 60 * 60 * 1000) {
           throw new Error('Merci déjà envoyé récemment — réessayez dans une heure');
@@ -114,6 +166,125 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
     }
   };
 
+  const patchLocalProfile = (patch: Record<string, unknown>) => {
+    setProfiles((prev) => ({
+      ...prev,
+      [targetName]: { ...(prev[targetName] || target), ...patch },
+    }));
+  };
+
+  const toggleVip = async () => {
+    if (staffBusy) return;
+    setStaffBusy('vip');
+    try {
+      const current = getBadgeIds(profiles[targetName] || target);
+      const next = current.includes('vip')
+        ? current.filter((b) => b !== 'vip')
+        : [...current, 'vip'];
+      const flags = profileFlagsFromBadges(next);
+      const { error } = await supabase.from('profiles').update(flags).eq('name', targetName);
+      if (error) throw error;
+      patchLocalProfile({
+        ...flags,
+        specialBadges: next,
+        isFounder: next.includes('founder'),
+        isDirection: next.includes('direction'),
+        isMasterOp: next.includes('master_op'),
+        isIridescent: next.includes('iridescent'),
+      });
+      toast.success(next.includes('vip') ? `VIP accordé à ${targetName}` : `VIP retiré à ${targetName}`);
+    } catch {
+      toast.error('Impossible de modifier VIP');
+    } finally {
+      setStaffBusy(null);
+    }
+  };
+
+  const togglePremium = async () => {
+    if (staffBusy) return;
+    setStaffBusy('premium');
+    try {
+      const next = !isPremium;
+      await supabaseDbService.adminSetPremium(targetName, next);
+      patchLocalProfile({ isPremium: next });
+      toast.success(next ? `Premium accordé à ${targetName}` : `Premium retiré à ${targetName}`);
+    } catch {
+      toast.error('Impossible de modifier Premium');
+    } finally {
+      setStaffBusy(null);
+    }
+  };
+
+  const toggleSpecialBadge = async (badgeId: string) => {
+    if (staffBusy) return;
+    setStaffBusy(`badge-${badgeId}`);
+    try {
+      const current = getBadgeIds(profiles[targetName] || target);
+      const next = current.includes(badgeId)
+        ? current.filter((b) => b !== badgeId)
+        : [...current, badgeId];
+      const flags = profileFlagsFromBadges(next);
+      const { error } = await supabase.from('profiles').update(flags).eq('name', targetName);
+      if (error) throw error;
+      patchLocalProfile({
+        ...flags,
+        specialBadges: next,
+        isFounder: next.includes('founder'),
+        isDirection: next.includes('direction'),
+        isMasterOp: next.includes('master_op'),
+        isIridescent: next.includes('iridescent'),
+      });
+      const meta = SPECIAL_BADGES.find((b) => b.id === badgeId);
+      toast.success(
+        next.includes(badgeId)
+          ? `${meta?.label || badgeId} accordé à ${targetName}`
+          : `${meta?.label || badgeId} retiré à ${targetName}`,
+      );
+    } catch {
+      toast.error('Impossible de sauvegarder ce badge');
+    } finally {
+      setStaffBusy(null);
+    }
+  };
+
+  const handleStaffMute = async () => {
+    if (staffBusy) return;
+    setStaffBusy('mute');
+    try {
+      if (staffMuted) {
+        await staffUnmute(targetName);
+        toast.success(`${targetName} démuté`);
+      } else {
+        if (!confirm(`Muter ${targetName} (staff) ?`)) return;
+        await staffMute(targetName);
+        toast.success(`${targetName} muté`);
+      }
+    } catch {
+      toast.error('Action mute impossible');
+    } finally {
+      setStaffBusy(null);
+    }
+  };
+
+  const handleStaffBan = async () => {
+    if (staffBusy) return;
+    setStaffBusy('ban');
+    try {
+      if (staffBanned) {
+        await unbanUser(targetName);
+        toast.success(`${targetName} débanni`);
+      } else {
+        if (!confirm(`Bannir ${targetName} ?`)) return;
+        await banUser(targetName, 'Violation des règles');
+        toast.success(`${targetName} banni`);
+      }
+    } catch {
+      toast.error('Action ban impossible');
+    } finally {
+      setStaffBusy(null);
+    }
+  };
+
   return (
     <div 
       className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[2000] animate-in fade-in duration-300 p-4" 
@@ -122,7 +293,7 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
       aria-modal="true"
       aria-labelledby={`profile-title-${targetName}`}>
       <div 
-        className="bg-card border border-border/50 rounded-3xl w-full max-w-[380px] max-h-[90vh] overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300"
+        className="bg-card border border-border/50 rounded-3xl w-full max-w-[380px] max-h-[90vh] overflow-y-auto overflow-x-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300"
         onClick={e => e.stopPropagation()}
         role="document">
 
@@ -152,7 +323,7 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
               <GenderIcon gender={(target as any).gender} size={14} className="absolute -top-1 -right-1" />
             </div>
             <div className="flex gap-2 flex-wrap justify-end">
-              {user?.name !== targetName && (
+              {!isSelf && (
                 <>
                   <button 
                     onClick={handleDM}
@@ -209,6 +380,7 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
                 level={lvl}
                 size="sm"
                 showSpecialLabels
+                openProfileOnClick={false}
                 nameClassName="text-[17px] font-bold text-foreground"
                 id={`profile-title-${targetName}`}
               />
@@ -231,6 +403,112 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
               </div>
             )}
           </div>
+
+          {/* Actions staff */}
+          {showStaffPanel && (
+            <div className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 space-y-2">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-amber-400/90 font-semibold">
+                <Shield className="w-3.5 h-3.5" />
+                Actions staff
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {showVip && (
+                  <button
+                    type="button"
+                    disabled={!!staffBusy}
+                    onClick={() => void toggleVip()}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition-colors disabled:opacity-50 ${
+                      isVip
+                        ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
+                        : 'bg-white/5 border-border text-muted-foreground hover:bg-purple-500/10'
+                    }`}
+                  >
+                    <Award className="w-3 h-3" />
+                    {isVip ? 'Retirer VIP' : 'Donner VIP'}
+                  </button>
+                )}
+                {showPremium && (
+                  <button
+                    type="button"
+                    disabled={!!staffBusy}
+                    onClick={() => void togglePremium()}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition-colors disabled:opacity-50 ${
+                      isPremium
+                        ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300'
+                        : 'bg-white/5 border-border text-muted-foreground hover:bg-yellow-500/10'
+                    }`}
+                  >
+                    <Star className="w-3 h-3" />
+                    {isPremium ? 'Retirer Premium' : 'Premium'}
+                  </button>
+                )}
+                {showStaffMute && (
+                  <button
+                    type="button"
+                    disabled={!!staffBusy}
+                    onClick={() => void handleStaffMute()}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition-colors disabled:opacity-50 ${
+                      staffMuted
+                        ? 'bg-blue-500/15 border-blue-500/35 text-blue-300'
+                        : 'bg-amber-500/15 border-amber-500/35 text-amber-300'
+                    }`}
+                  >
+                    {staffMuted ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+                    {staffMuted ? 'Démuter' : 'Mute staff'}
+                  </button>
+                )}
+                {showStaffBan && (
+                  <button
+                    type="button"
+                    disabled={!!staffBusy}
+                    onClick={() => void handleStaffBan()}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition-colors disabled:opacity-50 ${
+                      staffBanned
+                        ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
+                        : 'bg-red-500/15 border-red-500/35 text-red-300'
+                    }`}
+                  >
+                    {staffBanned ? <CheckCircle className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
+                    {staffBanned ? 'Débannir' : 'Bannir'}
+                  </button>
+                )}
+                {showBadges && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      disabled={!!staffBusy}
+                      onClick={() => setBadgeMenuOpen((o) => !o)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border bg-white/5 text-[11px] font-medium text-muted-foreground hover:bg-white/10 disabled:opacity-50"
+                    >
+                      <Award className="w-3 h-3" />
+                      Badges
+                    </button>
+                    {badgeMenuOpen && (
+                      <div className="absolute left-0 top-full mt-1 z-30 min-w-[170px] rounded-lg border border-border bg-popover shadow-lg p-1 max-h-48 overflow-y-auto">
+                        {SPECIAL_BADGES.map((b) => {
+                          const has = badgeIds.includes(b.id);
+                          return (
+                            <button
+                              key={b.id}
+                              type="button"
+                              onClick={() => void toggleSpecialBadge(b.id)}
+                              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] text-left ${
+                                has ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:bg-white/5'
+                              }`}
+                            >
+                              <span>{b.icon}</span>
+                              <span className="flex-1">{b.label}</span>
+                              {has && <CheckCircle className="w-3 h-3 text-emerald-400" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Informations personnelles */}
           <div className="mb-4 grid grid-cols-3 gap-2">

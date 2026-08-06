@@ -1,5 +1,6 @@
 import React, { memo, useEffect } from 'react';
 import { useUser } from '@/lib/contexts';
+import { useUIOptional } from '@/lib/contexts/UIContext';
 import DiamondBadge from './DiamondBadge';
 import SpecialBadgeInline, { type SpecialBadgeProfile } from './SpecialBadgeInline';
 
@@ -17,6 +18,11 @@ interface UserDisplayNameProps {
   nameClassName?: string;
   className?: string;
   onClick?: (e: React.MouseEvent) => void;
+  /**
+   * Si true (défaut), le nom ouvre la fiche via `openUserProfile`.
+   * Ignoré si `onClick` est fourni. Mettre false pour un affichage non cliquable.
+   */
+  openProfileOnClick?: boolean;
   as?: 'span' | 'button';
   /** Charge le profil Supabase si absent du cache (badges des autres). */
   ensureFetch?: boolean;
@@ -36,6 +42,7 @@ const UserDisplayName = memo(function UserDisplayName({
   nameClassName = '',
   className = '',
   onClick,
+  openProfileOnClick = true,
   as,
   ensureFetch = true,
   title,
@@ -43,6 +50,7 @@ const UserDisplayName = memo(function UserDisplayName({
   'aria-label': ariaLabel,
 }: UserDisplayNameProps) {
   const { profiles, user, ensureProfiles } = useUser();
+  const ui = useUIOptional();
   const cached = profiles[name];
   const self = user?.name === name ? user : null;
   const profile = (profileProp || self || cached) as SpecialBadgeProfile | undefined;
@@ -54,17 +62,26 @@ const UserDisplayName = memo(function UserDisplayName({
     void ensureProfiles([name]);
   }, [ensureFetch, name, profileProp, self, cached, ensureProfiles]);
 
-  const Tag: 'span' | 'button' = as || (onClick ? 'button' : 'span');
+  const handleClick = onClick
+    ? onClick
+    : openProfileOnClick && ui
+      ? (e: React.MouseEvent) => {
+          e.stopPropagation();
+          ui.openUserProfile(name);
+        }
+      : undefined;
+
+  const Tag: 'span' | 'button' = as || (handleClick ? 'button' : 'span');
   const diamondSize = size === 'md' ? 'sm' : size;
 
   return (
     <Tag
       type={Tag === 'button' ? 'button' : undefined}
       id={id}
-      title={title}
+      title={title || (handleClick ? `Voir le profil de ${name}` : undefined)}
       aria-label={ariaLabel || name}
-      onClick={onClick}
-      className={`inline-flex items-center gap-1 min-w-0 max-w-full ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      onClick={handleClick}
+      className={`inline-flex items-center gap-1 min-w-0 max-w-full ${handleClick ? 'cursor-pointer hover:opacity-90' : ''} ${className}`}
     >
       <span className={`truncate font-semibold ${nameClassName || 'text-foreground'}`}>{name}</span>
       {showLevelDiamond && <DiamondBadge level={lvl || 1} size={diamondSize} />}

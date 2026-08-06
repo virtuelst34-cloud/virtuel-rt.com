@@ -167,7 +167,7 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
       const savedUnlocked = localStorage.getItem(UNLOCKED_SALONS_KEY);
       if (savedUnlocked) setUnlockedSalons(JSON.parse(savedUnlocked));
 
-      // Restaurer uniquement depuis l’URL — jamais depuis virtuel_rt_last_salon.
+      // Restaurer uniquement depuis l’URL — jamais depuis virtuel_rt_last_salon (Accueil reste Accueil).
       const hash = window.location.hash.replace('#', '');
       if (hash.startsWith('salon/')) {
         setCurrentSalonRaw(hash.replace('salon/', ''));

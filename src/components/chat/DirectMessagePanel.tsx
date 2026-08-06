@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, KeyboardEvent, useMemo } from 'react';
-import { useUser, useNotifications, useXP, useDM, useMuteBlock } from '@/lib/contexts';
+import { useUser, useNotifications, useXP, useDM, useMuteBlock, useUI } from '@/lib/contexts';
 import Avatar from './Avatar';
 import UserDisplayName from './UserDisplayName';
 import { Send, X, MessageSquare, Search, Mic, Video, PhoneOff, MicOff, VideoOff, Paperclip, FileText, ChevronLeft, Gamepad2 } from 'lucide-react';
@@ -38,6 +38,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
   const { user, supabaseUser, profiles } = useUser();
   const { addNotification } = useNotifications();
   const { isMuted, isBlocked } = useMuteBlock();
+  const { openUserProfile } = useUI();
   const { sounds } = useXP();
   const { conversations, sendDM, getConversation, markRead, getUnreadCount, loadConversation } = useDM();
 
@@ -481,7 +482,22 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                 <button key={u.name} onClick={() => setSelectedUser(u.name)}
                   className={`w-full flex items-center gap-2.5 px-3 py-3 sm:py-2.5 transition-all duration-200 text-left min-h-[52px] sm:min-h-0 ${selectedUser === u.name ? 'bg-primary/15 border-r-2 border-primary' : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:scale-[1.01]'} animate-slide-in-right`}
                   style={{ animationDelay: `${index * 30}ms` }}>
-                  <div className="relative shrink-0 transition-transform duration-200 hover:scale-110">
+                  <div
+                    className="relative shrink-0 transition-transform duration-200 hover:scale-110"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openUserProfile(u.name);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                        openUserProfile(u.name);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Voir le profil de ${u.name}`}
+                  >
                     <Avatar avatarClass={u.avatar || 'av1'} initials={u.initials || u.name.slice(0, 2).toUpperCase()} size="sm" />
                     {unread > 0 && (
                       <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">{unread}</span>
@@ -495,6 +511,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                         level={u.level || 1}
                         size="xs"
                         showSpecialLabels={false}
+                        openProfileOnClick={false}
                         nameClassName={`text-xs font-medium ${unread > 0 ? 'text-foreground' : 'text-muted-foreground/80'}`}
                         className="min-w-0 flex-1"
                       />
@@ -526,7 +543,14 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <Avatar avatarClass={contact.avatar || 'av1'} initials={contact.initials || contact.name.slice(0, 2).toUpperCase()} size="sm" />
+                <button
+                  type="button"
+                  onClick={() => selectedUser && openUserProfile(selectedUser)}
+                  className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  aria-label={`Voir le profil de ${contact.name}`}
+                >
+                  <Avatar avatarClass={contact.avatar || 'av1'} initials={contact.initials || contact.name.slice(0, 2).toUpperCase()} size="sm" />
+                </button>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 min-w-0">
                     <UserDisplayName

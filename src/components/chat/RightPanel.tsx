@@ -5,8 +5,7 @@ import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
 import UserDisplayName from './UserDisplayName';
 import SpecialBadgeInline from './SpecialBadgeInline';
-import UserProfileView from './UserProfileView';
-import { useUser, useXP } from '@/lib/contexts';
+import { useUser, useXP, useUI } from '@/lib/contexts';
 import { presenceService, OnlineUser } from '@/lib/presenceService';
 
 const MEDAL  = ['🥇', '🥈', '🥉'];
@@ -31,16 +30,15 @@ interface RightPanelProps {
 
 export default function RightPanel({ onOpenDM }: RightPanelProps) {
   const { user, profiles } = useUser();
+  const { openUserProfile } = useUI();
   const { xpProgress, xpForLevel, monthlyXP } = useXP();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
-  const [viewProfile, setViewProfile] = useState<string | null>(null);
 
   const lvl  = user?.level || 1;
   const xp   = user?.xp    || 0;
   const next = xpForLevel ? xpForLevel(lvl) : 500;
   const prog = user && xpProgress ? xpProgress(user) : 0;
 
-  // Charger les utilisateurs en ligne
   useEffect(() => {
     setOnlineUsers(presenceService.getOnlineUsers());
 
@@ -51,20 +49,17 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
     return unsubscribe;
   }, []);
 
-  // Classement mensuel (XP du mois > 0 uniquement)
   const monthlyRanked = Object.entries(monthlyXP || {})
     .filter(([, mxp]) => (mxp as number) > 0)
     .map(([name, mxp]) => ({ ...(profiles[name] || {}), name, mxp: mxp as number }))
     .sort((a, b) => b.mxp - a.mxp)
     .slice(0, 10);
 
-  // Classement global
   const ranked = Object.values(profiles)
     .sort((a, b) => (b.level || 1) - (a.level || 1) || (b.xp || 0) - (a.xp || 0))
     .slice(0, 10);
 
   return (
-    <>
       <div className="hidden lg:flex w-[220px] bg-card border-l border-border flex-col shrink-0 overflow-y-auto">
 
       {/* XP du joueur */}
@@ -98,9 +93,22 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
         ) : monthlyRanked.map((r, i) => {
           const isMe = r.name === user?.name;
           return (
-            <div key={r.name} className={`flex items-center gap-1.5 py-1.5 px-1 rounded-lg mb-0.5 ${isMe ? 'bg-yellow-500/8 border border-yellow-500/18' : ''}`}>
+            <div
+              key={r.name}
+              role="button"
+              tabIndex={0}
+              onClick={() => openUserProfile(r.name)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openUserProfile(r.name); }}
+              className={`flex items-center gap-1.5 py-1.5 px-1 rounded-lg mb-0.5 cursor-pointer hover:bg-white/[0.04] ${isMe ? 'bg-yellow-500/8 border border-yellow-500/18' : ''}`}
+            >
               <span className="text-[11px] w-4 text-center shrink-0">{MEDAL[i] || `${i+1}`}</span>
-              <Avatar avatarClass={r.avatar || 'av1'} initials={r.initials || r.name?.slice(0,2).toUpperCase()} size="xs" />
+              <Avatar
+                avatarClass={r.avatar || 'av1'}
+                initials={r.initials || r.name?.slice(0,2).toUpperCase()}
+                size="xs"
+                profileName={r.name}
+                openProfileOnClick
+              />
               <div className="flex-1 min-w-0">
                 <UserDisplayName
                   name={r.name}
@@ -128,9 +136,22 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
           : ranked.map((r, i) => {
             const isMe = r.name === user?.name;
             return (
-              <div key={r.name} className={`flex items-center gap-1.5 py-1.5 px-1 rounded-lg mb-0.5 ${isMe ? 'bg-purple-500/8 border border-purple-500/18' : ''}`}>
+              <div
+                key={r.name}
+                role="button"
+                tabIndex={0}
+                onClick={() => openUserProfile(r.name)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openUserProfile(r.name); }}
+                className={`flex items-center gap-1.5 py-1.5 px-1 rounded-lg mb-0.5 cursor-pointer hover:bg-white/[0.04] ${isMe ? 'bg-purple-500/8 border border-purple-500/18' : ''}`}
+              >
                 <span className="text-[10px] text-muted-foreground/40 w-4 text-center shrink-0">{i+1}</span>
-                <Avatar avatarClass={r.avatar || 'av1'} initials={r.initials || r.name?.slice(0,2).toUpperCase()} size="xs" />
+                <Avatar
+                  avatarClass={r.avatar || 'av1'}
+                  initials={r.initials || r.name?.slice(0,2).toUpperCase()}
+                  size="xs"
+                  profileName={r.name}
+                  openProfileOnClick
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 justify-between min-w-0">
                     <UserDisplayName
@@ -169,10 +190,20 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
             return (
               <div
                 key={onlineUser.userId}
+                role="button"
+                tabIndex={0}
+                onClick={() => openUserProfile(onlineUser.name)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openUserProfile(onlineUser.name); }}
                 className="flex items-start gap-2.5 py-2 px-1.5 rounded-lg hover:bg-white/[0.04] transition-colors group cursor-pointer"
               >
                 <div className="relative shrink-0 mt-0.5">
-                  <Avatar avatarClass={onlineUser.avatar} initials={onlineUser.initials} size="sm" />
+                  <Avatar
+                    avatarClass={onlineUser.avatar}
+                    initials={onlineUser.initials}
+                    size="sm"
+                    profileName={onlineUser.name}
+                    openProfileOnClick
+                  />
                   <span
                     className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card ${statusDot}`}
                     title={statusLabel}
@@ -216,7 +247,7 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
                   {onOpenDM && (
                     <button
-                      onClick={() => onOpenDM(onlineUser.name)}
+                      onClick={(e) => { e.stopPropagation(); onOpenDM(onlineUser.name); }}
                       className="p-1 rounded hover:bg-primary/20 text-primary/60 hover:text-primary transition-all active:scale-95 cursor-pointer"
                       title="Message"
                     >
@@ -224,7 +255,7 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
                     </button>
                   )}
                   <button
-                    onClick={() => setViewProfile(onlineUser.name)}
+                    onClick={(e) => { e.stopPropagation(); openUserProfile(onlineUser.name); }}
                     className="p-1 rounded hover:bg-primary/20 text-primary/60 hover:text-primary transition-all active:scale-95 cursor-pointer"
                     title="Profil"
                   >
@@ -237,9 +268,5 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
         )}
       </div>
     </div>
-    {viewProfile && (
-      <UserProfileView targetName={viewProfile} onClose={() => setViewProfile(null)} onOpenDM={onOpenDM} />
-    )}
-  </>
   );
 }

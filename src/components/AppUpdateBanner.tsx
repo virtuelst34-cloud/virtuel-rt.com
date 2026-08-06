@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react'
 import {
   applyAppUpdate,
   canAutoApplyUpdate,
+  dismissAppUpdate,
   subscribeAppUpdate,
 } from '@/lib/appUpdate'
 
@@ -54,10 +55,17 @@ export default function AppUpdateBanner({ autoApply = false }: AppUpdateBannerPr
       aria-live="polite"
       className="fixed top-0 inset-x-0 z-[3000] flex justify-center p-3 pointer-events-none safe-area-pad"
     >
-      <div className="pointer-events-auto flex items-center gap-3 max-w-lg w-full sm:w-auto rounded-2xl border border-primary/40 bg-card/95 backdrop-blur-md px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.45)] animate-in fade-in slide-in-from-top-2 duration-300">
+      <div className="pointer-events-auto flex items-center gap-2 sm:gap-3 max-w-lg w-full sm:w-auto rounded-2xl border border-primary/40 bg-card/95 backdrop-blur-md px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.45)] animate-in fade-in slide-in-from-top-2 duration-300">
         <p className="text-sm text-foreground flex-1 min-w-0">
           Une mise à jour est disponible
         </p>
+        <button
+          type="button"
+          onClick={() => dismissAppUpdate()}
+          className="shrink-0 rounded-xl px-2.5 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors touch-target"
+        >
+          Plus tard
+        </button>
         <button
           type="button"
           onClick={() => applyAppUpdate('user')}

@@ -311,16 +311,24 @@ export function UserProvider({ children }: { children: ReactNode }) {
       void presenceService.setOffline(presenceKey);
     };
 
-    // Presence touch fans out via postgres_changes to every client — keep sparse.
-    const heartbeat = window.setInterval(() => {
+    const beat = () => {
       void presenceService.touch(presenceKey, user?.status || 'online');
-    }, 90_000);
+    };
+
+    // ~60s : stale client = 4 min ≈ 3–4 heartbeats manqués (Accueil inclus, hors salon).
+    const heartbeat = window.setInterval(beat, presenceService.getHeartbeatIntervalMs());
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') beat();
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
     window.addEventListener('pagehide', markOffline);
     window.addEventListener('beforeunload', markOffline);
 
     return () => {
       window.clearInterval(heartbeat);
+      document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('pagehide', markOffline);
       window.removeEventListener('beforeunload', markOffline);
     };
@@ -329,7 +337,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     const presenceKey = user?.name;
     if (presenceKey) {
-      presenceService.setOffline(presenceKey);
+      await presenceService.setOffline(presenceKey);
+      presenceService.disconnect();
     }
 
     if (user && !supabaseUser) {

@@ -92,6 +92,7 @@ const MIGRATION_ORDER = [
   "gate_premium_coquin.sql",
   "tighten_user_presence_rls.sql",
   "fix_presence_actor_name_rls.sql",
+  "fix_presence_write_rpc_and_realtime.sql",
   "premium_codes.sql",
   "premium_codes_abuse_staff_merci.sql",
   "bienvenue_founder_only_and_purge.sql",

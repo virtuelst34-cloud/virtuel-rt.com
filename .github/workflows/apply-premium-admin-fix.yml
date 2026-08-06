@@ -1,0 +1,54 @@
+name: Apply Premium admin SQL
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'fix-premium-admin-rights.sql'
+      - 'supabase/migrations/20260807224500_fix_admin_premium_grant_rights.sql'
+      - '.github/workflows/apply-premium-admin-fix.yml'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install pg
+        run: npm install pg --no-save
+
+      - name: Apply fix-premium-admin-rights.sql
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Secret DATABASE_URL absent. Ajoute-le dans GitHub → Settings → Secrets (connection string Postgres Supabase), puis relance ce workflow."
+            exit 1
+          fi
+          node scripts/apply-one-sql.mjs fix-premium-admin-rights.sql
+
+      - name: Verify Createur flags
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          node <<'NODE'
+          import pg from 'pg';
+          const c = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+          await c.connect();
+          const r = await c.query(`
+            SELECT name, email, is_admin, is_founder, special_badges
+            FROM public.profiles
+            WHERE lower(name) IN ('createur','créateur')
+               OR lower(coalesce(email,'')) = 'virtuelst34@gmail.com'
+          `);
+          console.log(JSON.stringify(r.rows, null, 2));
+          const fn = await c.query(`SELECT proname FROM pg_proc WHERE proname = 'can_grant_premium'`);
+          console.log('can_grant_premium:', fn.rows.length > 0);
+          await c.end();
+          NODE

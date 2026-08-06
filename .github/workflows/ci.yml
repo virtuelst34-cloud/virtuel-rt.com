@@ -2,9 +2,9 @@ name: CI/CD
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
 
 # Cancel redundant PR runs; keep push runs (deploy concurrency is job-scoped below)
@@ -95,9 +95,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: [test, lint, build]
-    # Deploy on push to main/master (not PRs)
-    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name != 'pull_request'
-    # Serialize FTPS: parallel main+master deploys caused "Timeout (control socket)"
+    # Deploy on push to main (not PRs)
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # Serialize FTPS deploys (avoid Timeout / control socket)
     concurrency:
       group: hostinger-ftps-deploy
       cancel-in-progress: false

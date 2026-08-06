@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import Avatar from '../Avatar';
 import { SectionTitle } from './AdminComponents';
 import { supabaseDbService } from '@/lib/supabaseDb';
+import { rpcErrorMessage } from '@/lib/rpcError';
 
 interface ProfileHit {
   id: string;
@@ -91,8 +92,8 @@ export default function PremiumProfilesSection({ readOnly = false, canGrant = tr
           ? `Premium accordé à ${profile.name}`
           : `Premium retiré à ${profile.name}`,
       );
-    } catch {
-      toast.error('Impossible de modifier Premium (droits admin requis)');
+    } catch (e: unknown) {
+      toast.error(rpcErrorMessage(e, 'Impossible de modifier Premium (droits admin requis)'));
     } finally {
       setBusy(null);
     }

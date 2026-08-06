@@ -16,6 +16,7 @@ import { hasStaffAccess } from '@/lib/utils/founderCheck';
 import { supabaseDbService } from '@/lib/supabaseDb';
 import { moderationAlertService } from '@/lib/moderationAlertService';
 import { supabase } from '@/lib/supabase';
+import { rpcErrorMessage } from '@/lib/rpcError';
 import {
   badgesFromProfile,
   profileFlagsFromBadges,
@@ -208,8 +209,8 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
       await supabaseDbService.adminSetPremium(targetName, next);
       patchLocalProfile({ isPremium: next });
       toast.success(next ? `Premium accordé à ${targetName}` : `Premium retiré à ${targetName}`);
-    } catch {
-      toast.error('Impossible de modifier Premium');
+    } catch (e: unknown) {
+      toast.error(rpcErrorMessage(e, 'Impossible de modifier Premium'));
     } finally {
       setStaffBusy(null);
     }

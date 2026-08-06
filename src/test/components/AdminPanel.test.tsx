@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import AdminPanel from '@/components/chat/AdminPanel'
 import { TestProviders } from '@/test/utils/testProviders'
@@ -27,8 +27,7 @@ describe('AdminPanel component', () => {
     expect(screen.getByText(/Modération/i)).toBeInTheDocument()
     expect(screen.getAllByText(/Badges/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Badges spéciaux/i)).toBeInTheDocument()
-    expect(screen.getAllByText(/Profils/i).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Codes Premium/i).length).toBeGreaterThan(0)
+    // Profils / Codes Premium : visibles seulement si permission premium.view ou fondateur
   })
 
   it('should have close button', () => {

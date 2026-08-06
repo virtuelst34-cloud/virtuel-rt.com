@@ -345,15 +345,15 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
         </p>
 
         {/* Stats légères Accueil */}
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground/70">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5 tabular-nums">
-            <Activity className="w-3.5 h-3.5 text-emerald-400/80" />
-            <strong className="text-foreground/90 font-semibold">{activeSalonsCount}</strong> salon{activeSalonsCount !== 1 ? 's' : ''} actif{activeSalonsCount !== 1 ? 's' : ''}
+            <Activity className="w-3.5 h-3.5 text-emerald-400" />
+            <strong className="text-sm text-foreground font-semibold">{activeSalonsCount}</strong> salon{activeSalonsCount !== 1 ? 's' : ''} actif{activeSalonsCount !== 1 ? 's' : ''}
           </span>
-          <span className="w-px h-3 bg-border" aria-hidden />
+          <span className="w-px h-3.5 bg-border" aria-hidden />
           <span className="inline-flex items-center gap-1.5 tabular-nums">
-            <Users className="w-3.5 h-3.5 text-primary/80" />
-            <strong className="text-foreground/90 font-semibold">{onlineCount}</strong> en ligne
+            <Users className="w-3.5 h-3.5 text-primary" />
+            <strong className="text-sm text-foreground font-semibold">{onlineCount}</strong> en ligne
           </span>
         </div>
 
@@ -453,9 +453,6 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
           </div>
         )}
 
-        <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg px-4 py-2 mb-1">
-          <p className="text-sm font-semibold text-purple-700 dark:text-purple-300">🎉 Pour l&apos;ouverture, Premium offert en essai !</p>
-        </div>
         <DailySparkCard className="w-full max-w-sm" />
         <WeeklyChallengeCard className="w-full max-w-sm" />
 

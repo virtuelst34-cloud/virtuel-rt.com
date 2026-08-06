@@ -5,6 +5,17 @@ import { supabaseDbService, Salon as SupabaseSalon, SalonCategoryRow } from '../
 import { presenceService } from '../presenceService';
 import { supabase } from '../supabase';
 import { DEFAULT_SALON_CATEGORIES } from '../salonCategories';
+import { LAST_SALON_KEY } from '../onboarding';
+
+/** Keep `#salon/:id` in sync with UI. Accueil must clear the hash so hard refresh stays home. */
+function syncSalonHash(id: string | null) {
+  if (typeof window === 'undefined') return;
+  const base = `${window.location.pathname}${window.location.search}`;
+  const next = id ? `${base}#salon/${id}` : base;
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (current === next || (id === null && !window.location.hash)) return;
+  window.history.replaceState(null, '', next);
+}
 
 interface Salon {
   id: string;
@@ -126,9 +137,11 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
 
   const setCurrentSalon = useCallback((id: string | null) => {
     setCurrentSalonRaw(id);
+    // URL/hash wins on boot — sync here so Accueil clears `#salon/...` before ChatArea unmounts.
+    syncSalonHash(id);
     if (id) {
       try {
-        localStorage.setItem('virtuel_rt_last_salon', id);
+        localStorage.setItem(LAST_SALON_KEY, id);
       } catch {
         /* ignore */
       }
@@ -154,6 +167,7 @@ export function SalonsProvider({ children }: { children: ReactNode }) {
       const savedUnlocked = localStorage.getItem(UNLOCKED_SALONS_KEY);
       if (savedUnlocked) setUnlockedSalons(JSON.parse(savedUnlocked));
 
+      // Restaurer uniquement depuis l’URL — jamais depuis virtuel_rt_last_salon.
       const hash = window.location.hash.replace('#', '');
       if (hash.startsWith('salon/')) {
         setCurrentSalonRaw(hash.replace('salon/', ''));

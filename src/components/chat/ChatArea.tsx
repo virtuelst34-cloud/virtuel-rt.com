@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, ChangeEvent, KeyboardEvent } from 'react';
-import { useUser, useSalons, useXP, useModeration, useMessages, useNotifications, useMuteBlock, useTyping, usePreferences } from '@/lib/contexts';
+import { useUser, useSalons, useXP, useModeration, useMessages, useNotifications, useMuteBlock, useTyping, usePreferences, useUI } from '@/lib/contexts';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { SALONS } from '@/lib/chatConfig';
 import { Message } from '@/lib/searchUtils';
@@ -9,7 +9,6 @@ import ReactionPicker from './ReactionPicker';
 import LevelUpToast from './LevelUpToast';
 import ScenePanel from './ScenePanel';
 import QuizPanel from './QuizPanel';
-import UserProfileView from './UserProfileView';
 import { FilterPanel } from './FilterPanel';
 import { ExportPanel } from './ExportPanel';
 import { ReportPanel } from './ReportPanel';
@@ -197,9 +196,8 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
         : (remote?.active ? remote.level : 0),
     };
   });
-  useEffect(() => {
-    window.location.hash = currentSalon ? `salon/${currentSalon}` : '';
-  }, [currentSalon]);
+  // Hash `#salon/:id` est synchronisé dans SalonsContext.setCurrentSalon (pas ici :
+  // ChatArea est démonté sur Accueil et ne pourrait plus effacer le hash).
 
   // Synchroniser le salon actif avec MessagesContext pour charger/souscrire les messages
   useEffect(() => {

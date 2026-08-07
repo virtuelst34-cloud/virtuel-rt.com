@@ -13,6 +13,7 @@ import { rpcErrorMessage } from '@/lib/rpcError';
 import { SPECIAL_BADGES } from '@/lib/diamondBadges';
 import {
   badgesFromProfile,
+  badgesImplyPremium,
   profileFlagsFromBadges,
 } from '@/lib/utils/profileBadges';
 
@@ -134,6 +135,7 @@ export default function UsersSection({
       isDirection: newBadges.includes('direction'),
       isMasterOp: newBadges.includes('master_op'),
       isIridescent: newBadges.includes('iridescent'),
+      isPremium: badgesImplyPremium(newBadges) || !!profile.isPremium,
       isAdmin:
         newBadges.includes('founder') ||
         newBadges.includes('direction') ||

@@ -192,6 +192,7 @@ export default function UserProfileView({ targetName, onClose, onOpenDM }: UserP
         isDirection: next.includes('direction'),
         isMasterOp: next.includes('master_op'),
         isIridescent: next.includes('iridescent'),
+        isPremium: badgesImplyPremium(next) || isPremium,
       });
       toast.success(next.includes('vip') ? `VIP accordé à ${targetName}` : `VIP retiré à ${targetName}`);
     } catch {

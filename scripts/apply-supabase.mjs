@@ -99,6 +99,7 @@ const MIGRATION_ORDER = [
   "20260806220000_fix_premium_redeem_and_permissions.sql",
   "20260807224500_fix_admin_premium_grant_rights.sql",
   "20260807235200_fix_preferences_premium_upsert.sql",
+  "20260808001000_special_badges_imply_premium.sql",
 ];
 const SKIP_ERROR_CODES = new Set([
   "42P07", // duplicate_table

@@ -6,6 +6,7 @@ import { SectionTitle } from './AdminComponents';
 import { supabase } from '@/lib/supabase';
 import {
   badgesFromProfile,
+  badgesImplyPremium,
   mapSupabaseProfile,
   profileFlagsFromBadges,
 } from '@/lib/utils/profileBadges';
@@ -73,6 +74,8 @@ export default function SpecialBadgesSection({ readOnly = false, profiles, setPr
       isDirection: newBadges.includes('direction'),
       isMasterOp: newBadges.includes('master_op'),
       isIridescent: newBadges.includes('iridescent'),
+      // Badge spécial ⇒ Premium (sync SQL côté serveur)
+      isPremium: badgesImplyPremium(newBadges) || !!profile.isPremium,
       isAdmin:
         newBadges.includes('founder') ||
         newBadges.includes('direction') ||

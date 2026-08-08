@@ -4,6 +4,9 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify('test-shell'),
+  },
   test: {
     globals: true,
     environment: 'jsdom',
@@ -16,6 +19,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      'virtual:pwa-register': path.resolve(__dirname, './src/test/mocks/pwa-register.ts'),
     },
   },
 })

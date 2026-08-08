@@ -3,6 +3,14 @@ import { messageRateLimiter } from './rateLimiter';
 import { checkServerRateLimit, RateLimitAction } from './rateLimitService';
 import { getStoredGuestToken } from './guestAuthService';
 
+/** True when PostgREST has not loaded the RPC yet (migration pending). */
+function isMissingRpcError(error: unknown): boolean {
+  const e = error as { code?: string; message?: string } | null;
+  if (!e) return false;
+  if (e.code === 'PGRST202') return true;
+  return /could not find the function/i.test(e.message || '');
+}
+
 export interface Message {
   id: string;
   salon_id: string;
@@ -159,7 +167,19 @@ export const supabaseDbService = {
         p_guest_token: getStoredGuestToken(),
       });
 
-      if (error) throw error;
+      if (error) {
+        // Transition: until 20260808210000 is applied on the project
+        if (isMissingRpcError(error)) {
+          const { data: row, error: insertError } = await supabase
+            .from('messages')
+            .insert(message)
+            .select()
+            .maybeSingle();
+          if (insertError) throw insertError;
+          return row as Message | null;
+        }
+        throw error;
+      }
       return data as Message | null;
     } catch (error) {
       console.error('Erreur lors de l\'ajout du message:', error);
@@ -521,6 +541,9 @@ export const supabaseDbService = {
 
   async updatePreferences(userName: string, updates: Partial<Preferences>): Promise<void> {
     // Never send is_premium from client — RPC + trigger enforce actor + premium mirror
+    const { is_premium: _ignoredPremium, ...safeUpdates } = updates as Partial<Preferences> & {
+      is_premium?: boolean;
+    };
     const { error } = await supabase.rpc('upsert_own_preferences', {
       p_user_name: userName,
       p_theme: updates.theme ?? null,
@@ -530,7 +553,15 @@ export const supabaseDbService = {
       p_guest_token: getStoredGuestToken(),
     });
 
-    if (error) throw error;
+    if (error) {
+      if (!isMissingRpcError(error)) throw error;
+      // Transition: until harden_rls migration is applied
+      const { error: upsertError } = await supabase.from('preferences').upsert(
+        { user_name: userName, ...safeUpdates },
+        { onConflict: 'user_name' },
+      );
+      if (upsertError) throw upsertError;
+    }
   },
 
   // Badges personnalisés

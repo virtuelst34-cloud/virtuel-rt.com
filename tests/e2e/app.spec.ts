@@ -1,29 +1,35 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function guestIn(page: Page, pseudo: string) {
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/votre pseudo/i)).toBeVisible({ timeout: 15000 });
+  const age = page.getByRole('checkbox');
+  if (!(await age.isChecked())) await age.check();
+  await page.getByPlaceholder(/votre pseudo/i).fill(pseudo);
+  await page.getByRole('button', { name: /entrer en mode invité/i }).click();
+  await expect(page.getByPlaceholder(/votre pseudo/i)).toHaveCount(0, { timeout: 15000 });
+
+  const dialog = page.getByRole('dialog');
+  if (await dialog.isVisible({ timeout: 8000 }).catch(() => false)) {
+    await dialog.getByRole('button', { name: /^passer$/i }).last().click();
+    await expect(dialog).toHaveCount(0, { timeout: 10000 });
+  }
+}
 
 test.describe('Virtuel-RT — parcours invité', () => {
   test('Accueil et connexion invité', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByPlaceholder(/pseudo|nom/i).first()).toBeVisible({ timeout: 15000 });
-    const guestInput = page.getByPlaceholder(/pseudo|nom|3 caractères/i).first();
-    await guestInput.fill(`E2E_${Date.now().toString().slice(-6)}`);
-    await page.getByRole('button', { name: /invité|continuer|entrer/i }).first().click();
-    await expect(page.locator('[data-testid="welcome-screen"], .text-foreground').first()).toBeVisible({ timeout: 15000 });
+    await guestIn(page, `E2E_${Date.now().toString().slice(-6)}`);
+    await expect(page.getByRole('button', { name: /mon compte/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('Navigation vers un salon et saisie message', async ({ page }) => {
-    await page.goto('/');
-    const guestInput = page.getByPlaceholder(/pseudo|nom|3 caractères/i).first();
-    await guestInput.fill(`Msg_${Date.now().toString().slice(-6)}`);
-    await page.getByRole('button', { name: /invité|continuer|entrer/i }).first().click();
-
-    const salonButton = page.locator('button, a').filter({ hasText: /général|Général|quiz|Quiz/i }).first();
-    await salonButton.click({ timeout: 15000 });
-
-    const chatInput = page.locator('textarea').first();
+    await guestIn(page, `Msg_${Date.now().toString().slice(-6)}`);
+    await page.getByRole('button', { name: /salon général/i }).first().click({ timeout: 15000 });
+    const chatInput = page.getByRole('textbox', { name: /^message$/i });
     await expect(chatInput).toBeVisible({ timeout: 10000 });
     await chatInput.fill('Message E2E Playwright');
-    await page.getByRole('button', { name: /envoyer/i }).or(page.locator('button').filter({ has: page.locator('svg') }).last()).first().click();
-    await expect(page.getByText('Message E2E Playwright')).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: /envoyer le message/i }).click();
+    await expect(page.getByText('Message E2E Playwright').first()).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -32,7 +38,8 @@ test.describe('Admin (si accès)', () => {
 
   test('Panel admin accessible', async ({ page }) => {
     await page.goto('/');
-    // Connexion email si variables CI définies
+    const age = page.getByRole('checkbox');
+    if (!(await age.isChecked())) await age.check();
     await page.getByRole('button', { name: /compte|connexion|login/i }).first().click();
     await page.fill('input[type="email"]', process.env.E2E_ADMIN_EMAIL!);
     await page.fill('input[type="password"]', process.env.E2E_ADMIN_PASSWORD!);

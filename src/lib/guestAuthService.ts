@@ -87,27 +87,32 @@ export async function registerGuestSession(
 }
 
 export async function validateGuestSession(token: string): Promise<GuestSessionResult> {
-  const { data, error } = await supabase
-    .from('guest_sessions')
-    .select('guest_name, avatar, initials, expires_at, session_token')
-    .eq('session_token', token)
-    .maybeSingle();
+  // RPC only — direct SELECT on guest_sessions is locked (token leak risk)
+  const { data, error } = await supabase.rpc('validate_guest_session', { p_token: token });
 
-  if (error || !data) {
-    return { success: false, error: 'Session invité invalide' };
+  if (error) {
+    return { success: false, error: error.message || 'Session invité invalide' };
   }
 
-  if (new Date(data.expires_at).getTime() < Date.now()) {
-    clearGuestToken();
-    return { success: false, error: 'Session invité expirée' };
+  const result = data as GuestSessionResult & {
+    session_token?: string;
+    guest_name?: string;
+    expires_at?: string;
+    error?: string;
+  };
+
+  if (!result?.success) {
+    const err = result?.error || 'Session invité invalide';
+    if (/expir/i.test(err)) clearGuestToken();
+    return { success: false, error: err };
   }
 
   return {
     success: true,
-    sessionToken: data.session_token,
-    guestName: data.guest_name,
-    avatar: data.avatar,
-    initials: data.initials,
-    expiresAt: data.expires_at,
+    sessionToken: result.session_token || result.sessionToken || token,
+    guestName: result.guest_name || result.guestName,
+    avatar: result.avatar,
+    initials: result.initials,
+    expiresAt: result.expires_at || result.expiresAt,
   };
 }

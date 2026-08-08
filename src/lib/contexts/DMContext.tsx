@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import { checkServerRateLimit } from '../rateLimitService';
 import { supabase } from '../supabase';
-import { ensureGuestSessionContext } from '../guestAuthService';
+import { getStoredGuestToken } from '../guestAuthService';
 import { useUser } from './UserContext';
 import { useNotifications } from './NotificationsContext';
 import { supabaseDbService } from '../supabaseDb';
@@ -59,6 +59,11 @@ function normalizeName(name: string | undefined | null): string | null {
   return trimmed && trimmed.length >= 2 ? trimmed : null;
 }
 
+function asDmMessages(data: unknown): DMMessage[] {
+  if (!Array.isArray(data)) return [];
+  return data.filter((row): row is DMMessage => !!row && typeof row === 'object' && 'id' in row);
+}
+
 function toDisplayMessage(
   message: DMMessage,
   profiles: Record<string, { avatar: string; initials: string; name: string }>,
@@ -99,63 +104,56 @@ function DMProviderInner({ children }: { children: ReactNode }) {
     [profiles, supabaseUser?.name, user?.name],
   );
 
-  const withGuestContext = useCallback(async () => {
-    if (!supabaseUser) await ensureGuestSessionContext();
-  }, [supabaseUser]);
-
   const loadConversation = useCallback(
     async (userName1: string, userName2: string) => {
       const name1 = resolveName(userName1);
       const name2 = resolveName(userName2);
-      if (!name1 || !name2) return;
+      if (!name1 || !name2 || !currentUserName) return;
+
+      const self = resolveName(currentUserName);
+      if (!self || (name1 !== self && name2 !== self)) return;
+      const peer = name1 === self ? name2 : name1;
 
       try {
-        await withGuestContext();
-        const key = conversationKey(name1, name2);
-        const { data, error } = await supabase
-          .from('direct_messages')
-          .select('id, sender_id, receiver_id, text, image_url, read_at, created_at')
-          .or(
-            `and(sender_id.eq.${name1},receiver_id.eq.${name2}),and(sender_id.eq.${name2},receiver_id.eq.${name1})`,
-          )
-          .order('created_at', { ascending: false })
-          .limit(100);
-
+        const key = conversationKey(self, peer);
+        const { data, error } = await supabase.rpc('list_own_dms', {
+          p_actor: self,
+          p_peer: peer,
+          p_guest_token: getStoredGuestToken(),
+        });
         if (error) throw error;
-        setConversations(prev => ({ ...prev, [key]: (data || []).slice().reverse() }));
+        setConversations(prev => ({ ...prev, [key]: asDmMessages(data) }));
       } catch (error) {
         console.error('Erreur lors du chargement de la conversation:', error);
       }
     },
-    [resolveName, withGuestContext],
+    [resolveName, currentUserName],
   );
 
   const loadInbox = useCallback(async () => {
     if (!currentUserName) return;
+    const self = resolveName(currentUserName);
+    if (!self) return;
 
     try {
-      await withGuestContext();
-      const { data, error } = await supabase
-        .from('direct_messages')
-        .select('id, sender_id, receiver_id, text, image_url, read_at, created_at')
-        .or(`sender_id.eq.${currentUserName},receiver_id.eq.${currentUserName}`)
-        .order('created_at', { ascending: false })
-        .limit(150);
-
+      const { data, error } = await supabase.rpc('list_own_dm_inbox', {
+        p_actor: self,
+        p_guest_token: getStoredGuestToken(),
+      });
       if (error) throw error;
 
       const grouped: Record<string, DMMessage[]> = {};
-      // Newest-first fetch → reverse per conversation for chronological UI
-      for (const message of [...(data || [])].reverse()) {
+      // Newest-first fetch → reverse for chronological UI per conversation
+      for (const message of [...asDmMessages(data)].reverse()) {
         const key = conversationKey(message.sender_id, message.receiver_id);
         if (!grouped[key]) grouped[key] = [];
-        grouped[key].push(message as DMMessage);
+        grouped[key].push(message);
       }
       setConversations(prev => ({ ...prev, ...grouped }));
     } catch (error) {
       console.error('Erreur chargement inbox DM:', error);
     }
-  }, [currentUserName, withGuestContext]);
+  }, [currentUserName, resolveName]);
 
   useEffect(() => {
     if (currentUserName) void loadInbox();
@@ -236,18 +234,13 @@ function DMProviderInner({ children }: { children: ReactNode }) {
         throw new Error('Message vide');
       }
 
-      await withGuestContext();
-
-      const { data, error } = await supabase
-        .from('direct_messages')
-        .insert({
-          sender_id: senderName,
-          receiver_id: receiverName,
-          text: trimmed || (media ? '📎 Fichier' : ''),
-          image_url: media,
-        })
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('send_own_dm', {
+        p_sender_id: senderName,
+        p_receiver_id: receiverName,
+        p_text: trimmed || (media ? '📎 Fichier' : ''),
+        p_image_url: media,
+        p_guest_token: getStoredGuestToken(),
+      });
 
       if (error) throw error;
 
@@ -267,7 +260,7 @@ function DMProviderInner({ children }: { children: ReactNode }) {
         );
       }
     },
-    [resolveName, withGuestContext],
+    [resolveName],
   );
 
   const markRead = useCallback(
@@ -282,15 +275,15 @@ function DMProviderInner({ children }: { children: ReactNode }) {
       );
       if (unread.length === 0) return;
 
-      await withGuestContext();
       const readAt = new Date().toISOString();
-
-      for (const message of unread) {
-        const { error } = await supabase
-          .from('direct_messages')
-          .update({ read_at: readAt })
-          .eq('id', message.id);
-        if (error) console.error('Erreur marquage lu:', error);
+      const { error } = await supabase.rpc('mark_own_dms_read', {
+        p_actor: selfName,
+        p_peer: other,
+        p_guest_token: getStoredGuestToken(),
+      });
+      if (error) {
+        console.error('Erreur marquage lu:', error);
+        return;
       }
 
       setConversations(prev => ({
@@ -300,7 +293,7 @@ function DMProviderInner({ children }: { children: ReactNode }) {
         ),
       }));
     },
-    [conversations, resolveName, withGuestContext],
+    [conversations, resolveName],
   );
 
   const getConversation = useCallback(
@@ -319,15 +312,14 @@ function DMProviderInner({ children }: { children: ReactNode }) {
     (userName: string): number => {
       const selfName = resolveName(userName);
       if (!selfName) return 0;
-
-      return Object.values(conversations)
-        .flat()
-        .filter(m => m.receiver_id === selfName && !m.read_at).length;
+      return Object.values(conversations).reduce((total, messages) => {
+        return total + messages.filter(m => m.receiver_id === selfName && !m.read_at).length;
+      }, 0);
     },
     [conversations, resolveName],
   );
 
-  const value = useMemo<DMContextType>(
+  const value = useMemo(
     () => ({
       conversations,
       sendDM,

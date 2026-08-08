@@ -33,21 +33,35 @@ Migration: `supabase/migrations/20260808210000_harden_rls_actor_identity.sql`
 
 Client: `src/lib/supabaseDb.ts`, `src/lib/guestAuthService.ts`.
 
+## Follow-up shipped: guest DMs / friends RPCs
+
+Migration: `supabase/migrations/20260808223000_guest_dm_friends_rpc.sql`
+
+| Area | Change |
+|------|--------|
+| DMs read/send/read-mark | RPCs `list_own_dms`, `list_own_dm_inbox`, `send_own_dm`, `mark_own_dms_read` (+ `p_guest_token`) |
+| Friends | RPCs `list_own_friends`, `send_friend_request`, `accept_friend_request`, `delete_own_friend_relation`, `delete_own_friend_with` |
+| Client | `DMContext` / `FriendsContext` call RPCs only (no `ensureGuestSessionContext` + table REST for these paths) |
+
+Identity keys remain **display names** (`sender_id` / `user_id` TEXT). Full UUID migration is still deferred.
+
 ## Remaining risks (follow-up: UUID migration)
 
 1. **Canonical identity** — migrate `direct_messages`, `friends`, `blocked_users`, `muted_users`, `user_presence`, `preferences`, and message authorship to stable UUIDs (`auth.users.id` / guest session id), keep pseudo as display-only.
-2. **Guest GUC on DMs/friends/quiz** — port writes to SECURITY DEFINER RPCs that accept `p_guest_token` in the same transaction (mirror presence/messages).
+2. **Quiz guest GUC** — quiz writes may still rely on sticky `set_guest_session`; port if guests hit quiz failures.
 3. **Pseudo uniqueness & rename** — enforce global unique names across profiles + guests; on rename, rewrite or soft-map historical name keys (until UUID migration).
 4. **Reaction integrity** — RPC still replaces full JSON; ideally merge per-actor emoji sets server-side.
 5. **Quiz system author** — `author_name = 'Quiz'` remains a narrow exception; consider posting as the actor with a `is_system` / bot flag instead.
 6. **schema.sql drift** — root `supabase/schema.sql` still shows older open policies; treat migrations as source of truth until schema dump is regenerated.
+7. **Guest Realtime on DMs/friends** — `postgres_changes` still filters via SELECT RLS; guests without sticky GUC may need poll/reload (RPC loads cover open/inbox).
 
 ## Guest login compatibility
 
 - Guests still register via `register_guest_session` and resolve actor via token → `current_guest_name()` → `current_actor_name()`.
-- Message/presence/preferences writes that matter for guests now pass `p_guest_token` into RPCs (no reliance on sticky GUCs).
+- Message/presence/preferences/**DM/friends** writes that matter for guests now pass `p_guest_token` into RPCs (no reliance on sticky GUCs).
 - Mute/block for guests remains localStorage-only (unchanged).
 
 ## Apply status
 
-Migration `20260808210000_harden_rls_actor_identity.sql` is live on the project (PR #7 / Supabase Preview). Client uses RPCs only — no direct INSERT fallback.
+- `20260808210000_harden_rls_actor_identity.sql` — live (PR #7 / Supabase Preview).
+- `20260808223000_guest_dm_friends_rpc.sql` — apply via Supabase Preview on merge (or `npm run supabase:migrate` with `DATABASE_URL`).

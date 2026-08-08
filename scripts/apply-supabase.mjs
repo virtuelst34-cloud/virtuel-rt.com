@@ -102,6 +102,7 @@ const MIGRATION_ORDER = [
   "20260808001000_special_badges_imply_premium.sql",
   "20260808120000_cleanup_supabase_mess.sql",
   "20260808210000_harden_rls_actor_identity.sql",
+  "20260808223000_guest_dm_friends_rpc.sql",
 ];
 const SKIP_ERROR_CODES = new Set([
   "42P07", // duplicate_table

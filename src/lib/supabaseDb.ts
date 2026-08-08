@@ -3,14 +3,6 @@ import { messageRateLimiter } from './rateLimiter';
 import { checkServerRateLimit, RateLimitAction } from './rateLimitService';
 import { getStoredGuestToken } from './guestAuthService';
 
-/** True when PostgREST has not loaded the RPC yet (migration pending). */
-function isMissingRpcError(error: unknown): boolean {
-  const e = error as { code?: string; message?: string } | null;
-  if (!e) return false;
-  if (e.code === 'PGRST202') return true;
-  return /could not find the function/i.test(e.message || '');
-}
-
 export interface Message {
   id: string;
   salon_id: string;
@@ -35,6 +27,18 @@ export interface MessageEventHandlers {
   onUpdate: (message: Message) => void;
   onDelete: (messageId: string) => void;
 }
+
+const MESSAGE_COLUMNS =
+  'id, salon_id, author_name, author_avatar, author_initials, text, created_date, reactions, pinned, is_system, is_announcement, reply_to, image_url, edited, edited_at, created_at';
+
+const SALON_COLUMNS =
+  'id, name, type, icon, count, live, welcome, password, sort_order, description, created_by, category_id, subcategory, is_coquin, created_at';
+
+const SALON_CATEGORY_COLUMNS =
+  'id, name, emoji, description, sort_order, subcategories, is_coquin, created_at, updated_at';
+
+const PREFERENCES_COLUMNS =
+  'id, user_name, theme, party_mode, is_premium, accent_color, compact_mode, created_at, updated_at';
 
 export interface Salon {
   id: string;
@@ -126,14 +130,12 @@ async function enforceRateLimit(action: RateLimitAction, userId: string): Promis
 
 export const supabaseDbService = {
   // Messages
-  async getMessages(salonId: string, limit: number = 200, offset: number = 0): Promise<Message[]> {
+  async getMessages(salonId: string, limit: number = 50, offset: number = 0): Promise<Message[]> {
     try {
-      // Newest-first page, then reverse for chronological UI. Avoid select('*') bloat.
+      // Newest-first page, then reverse for chronological UI.
       const { data, error } = await supabase
         .from('messages')
-        .select(
-          'id, salon_id, author_name, author_avatar, author_initials, text, created_date, reactions, pinned, is_system, is_announcement, reply_to, image_url, edited, edited_at, created_at',
-        )
+        .select(MESSAGE_COLUMNS)
         .eq('salon_id', salonId)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
@@ -167,19 +169,7 @@ export const supabaseDbService = {
         p_guest_token: getStoredGuestToken(),
       });
 
-      if (error) {
-        // Transition: until 20260808210000 is applied on the project
-        if (isMissingRpcError(error)) {
-          const { data: row, error: insertError } = await supabase
-            .from('messages')
-            .insert(message)
-            .select()
-            .maybeSingle();
-          if (insertError) throw insertError;
-          return row as Message | null;
-        }
-        throw error;
-      }
+      if (error) throw error;
       return data as Message | null;
     } catch (error) {
       console.error('Erreur lors de l\'ajout du message:', error);
@@ -240,7 +230,7 @@ export const supabaseDbService = {
     try {
       const { data, error } = await supabase
         .from('salons')
-        .select('*')
+        .select(SALON_COLUMNS)
         .order('sort_order', { ascending: true });
       if (error) throw error;
       return data || [];
@@ -348,7 +338,7 @@ export const supabaseDbService = {
     try {
       const { data, error } = await supabase
         .from('salon_categories')
-        .select('*')
+        .select(SALON_CATEGORY_COLUMNS)
         .order('sort_order', { ascending: true });
       if (error) throw error;
       return (data || []).map((row: SalonCategoryRow & { subcategories?: string[] | null }) => ({
@@ -455,7 +445,7 @@ export const supabaseDbService = {
     try {
       let request = supabase
         .from('messages')
-        .select('*')
+        .select(MESSAGE_COLUMNS)
         .ilike('text', `%${trimmed}%`)
         .order('created_at', { ascending: false })
         .limit(options.limit ?? 100);
@@ -527,7 +517,7 @@ export const supabaseDbService = {
     try {
       const { data, error } = await supabase
         .from('preferences')
-        .select('*')
+        .select(PREFERENCES_COLUMNS)
         .eq('user_name', userName)
         .maybeSingle();
 
@@ -541,9 +531,6 @@ export const supabaseDbService = {
 
   async updatePreferences(userName: string, updates: Partial<Preferences>): Promise<void> {
     // Never send is_premium from client — RPC + trigger enforce actor + premium mirror
-    const { is_premium: _ignoredPremium, ...safeUpdates } = updates as Partial<Preferences> & {
-      is_premium?: boolean;
-    };
     const { error } = await supabase.rpc('upsert_own_preferences', {
       p_user_name: userName,
       p_theme: updates.theme ?? null,
@@ -553,21 +540,15 @@ export const supabaseDbService = {
       p_guest_token: getStoredGuestToken(),
     });
 
-    if (error) {
-      if (!isMissingRpcError(error)) throw error;
-      // Transition: until harden_rls migration is applied
-      const { error: upsertError } = await supabase.from('preferences').upsert(
-        { user_name: userName, ...safeUpdates },
-        { onConflict: 'user_name' },
-      );
-      if (upsertError) throw upsertError;
-    }
+    if (error) throw error;
   },
 
   // Badges personnalisés
   async getCustomBadges(): Promise<CustomBadge[]> {
     try {
-      const { data, error } = await supabase.from('custom_badges').select('*');
+      const { data, error } = await supabase
+        .from('custom_badges')
+        .select('id, name, icon, min_level, created_at');
       if (error) throw error;
       return data || [];
     } catch (error) {
@@ -648,24 +629,6 @@ export const supabaseDbService = {
         (payload) => {
           const oldRow = payload.old as { id?: string };
           if (oldRow.id) handlers.onDelete(oldRow.id);
-        }
-      )
-      .subscribe();
-  },
-
-  // Realtime subscription pour les profils utilisateurs
-  subscribeToProfiles(callback: (profile: any) => void) {
-    return supabase
-      .channel('profiles')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-        },
-        (payload) => {
-          callback(payload.new);
         }
       )
       .subscribe();

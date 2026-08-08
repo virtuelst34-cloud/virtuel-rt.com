@@ -1,4 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
+import { assertE2ELiveAllowed } from './liveGuard';
+
+test.beforeAll(() => {
+  assertE2ELiveAllowed();
+});
 
 async function enterAsGuest(page: Page, pseudo: string) {
   await page.goto('/');

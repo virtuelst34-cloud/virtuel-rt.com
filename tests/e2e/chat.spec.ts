@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { assertE2ELiveAllowed } from './liveGuard';
+
+test.beforeAll(() => {
+  assertE2ELiveAllowed();
+});
 
 test.describe('Chat E2E (aligné UX réelle)', () => {
   test('invité peut ouvrir un salon writable', async ({ page }) => {

@@ -1,8 +1,11 @@
 import { readFileSync } from 'fs';
+import { assertProbeAllowed } from './lib/probeGuard.mjs';
 
 const env = readFileSync('.env.local', 'utf8');
 const url = env.match(/VITE_SUPABASE_URL=(.+)/)?.[1]?.trim();
 const key = env.match(/VITE_SUPABASE_ANON_KEY=(.+)/)?.[1]?.trim();
+
+assertProbeAllowed(url, { label: 'test-rpc-http' });
 
 const rpcUrl = `${url}/rest/v1/rpc/update_message_reaction`;
 const res = await fetch(rpcUrl, {

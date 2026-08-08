@@ -230,22 +230,33 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [loadGuestSession, trackLogin]);
 
+  const selfNameLiveRef = useRef<string | null>(null);
+  selfNameLiveRef.current = user?.name ?? null;
+  const isLoggedIn = !!user;
+
+  // One profiles channel for the whole session (not recreated on every name tweak).
+  // Only apply rows we already track (or self) to avoid global re-renders on idle traffic.
   useEffect(() => {
-    const currentName = user?.name;
+    if (!isLoggedIn) return;
+
     const channel = supabase
       .channel('profiles_changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'profiles' },
-        async (payload) => {
-          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-            const updatedProfile = payload.new as SupabaseUserProfile;
-            const mappedProfile = mapSupabaseProfile(updatedProfile);
-            setProfiles(prev => ({ ...prev, [mappedProfile.name]: mappedProfile }));
-            if (currentName && currentName === mappedProfile.name) {
-              setUser(mappedProfile);
-            }
-          }
+        (payload) => {
+          if (typeof document !== 'undefined' && document.hidden) return;
+          if (payload.eventType !== 'UPDATE' && payload.eventType !== 'INSERT') return;
+
+          const updatedProfile = payload.new as SupabaseUserProfile;
+          const mappedProfile = mapSupabaseProfile(updatedProfile);
+          const isSelf = selfNameLiveRef.current === mappedProfile.name;
+
+          setProfiles((prev) => {
+            if (!isSelf && !prev[mappedProfile.name]) return prev;
+            return { ...prev, [mappedProfile.name]: { ...prev[mappedProfile.name], ...mappedProfile } };
+          });
+          if (isSelf) setUser(mappedProfile);
         },
       )
       .subscribe();
@@ -253,7 +264,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.name]);
+  }, [isLoggedIn]);
 
   const login = useCallback(async (name: string, avatar: string, initials: string) => {
     const trimmed = name.trim();
@@ -430,7 +441,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(
+          'id, name, avatar, initials, bio, status, status_text, level, xp, is_premium, premium_until, is_admin, is_founder, is_direction, is_master_op, is_iridescent, special_badges, age, city, gender, email, email_confirmed_at, created_at, updated_at',
+        )
         .in('name', toFetch);
 
       if (error) throw error;

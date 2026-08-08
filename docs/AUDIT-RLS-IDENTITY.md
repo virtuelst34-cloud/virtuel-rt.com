@@ -48,6 +48,6 @@ Client: `src/lib/supabaseDb.ts`, `src/lib/guestAuthService.ts`.
 - Message/presence/preferences writes that matter for guests now pass `p_guest_token` into RPCs (no reliance on sticky GUCs).
 - Mute/block for guests remains localStorage-only (unchanged).
 
-## Apply before relying on hard RLS
+## Apply status
 
-Migration `20260808210000_harden_rls_actor_identity.sql` must be applied on the Supabase project (Preview merge / `npm run supabase:migrate` with `DATABASE_URL`). Until then the client falls back to direct `messages`/`preferences` writes when PostgREST returns `PGRST202` (RPC missing) — messaging keeps working, but **spoofing remains possible until the SQL is live**.
+Migration `20260808210000_harden_rls_actor_identity.sql` is live on the project (PR #7 / Supabase Preview). Client uses RPCs only — no direct INSERT fallback.

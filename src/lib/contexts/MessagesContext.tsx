@@ -44,7 +44,8 @@ const MessagesStateContext = createContext<MessagesState | null>(null);
 const MessagesActionsContext = createContext<MessagesActions | null>(null);
 
 const MAX_PER_SALON = 200;
-const PAGE_SIZE = 50;
+/** Page initiale / load-more — assez pour le viewport, léger sur mobile. */
+const PAGE_SIZE = 40;
 
 function mergeIncomingMessage(existing: Message[], incoming: Message): Message[] {
   const resolved = resolveReplyReferences([...existing, incoming]);

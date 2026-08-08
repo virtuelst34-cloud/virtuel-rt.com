@@ -9,8 +9,11 @@ export interface UserModerationRecord {
   updated_at?: string;
 }
 
+const MODERATION_COLUMNS =
+  'user_name, is_banned, is_muted, ban_reason, moderated_by, updated_at';
+
 export async function fetchAllModeration(): Promise<UserModerationRecord[]> {
-  const { data, error } = await supabase.from('user_moderation').select('*');
+  const { data, error } = await supabase.from('user_moderation').select(MODERATION_COLUMNS);
   if (error) {
     console.error('Erreur chargement modération:', error);
     return [];
@@ -21,7 +24,7 @@ export async function fetchAllModeration(): Promise<UserModerationRecord[]> {
 export async function fetchUserModeration(userName: string): Promise<UserModerationRecord | null> {
   const { data, error } = await supabase
     .from('user_moderation')
-    .select('*')
+    .select(MODERATION_COLUMNS)
     .eq('user_name', userName)
     .maybeSingle();
   if (error) {
@@ -42,7 +45,7 @@ export async function upsertUserModeration(
       ...updates,
       updated_at: new Date().toISOString(),
     })
-    .select()
+    .select(MODERATION_COLUMNS)
     .maybeSingle();
 
   if (error) {

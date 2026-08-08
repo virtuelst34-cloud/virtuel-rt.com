@@ -22,6 +22,9 @@ dist-ssr
 # Coverage / test artifacts
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
+playwright/.cache/
 
 # Legacy pre-src trees (app lives in src/)
 /components/

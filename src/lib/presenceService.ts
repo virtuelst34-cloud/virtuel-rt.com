@@ -39,7 +39,8 @@ class PresenceService {
 
   /** Heartbeat client ~60s → hors ligne après ~3–4 battements manqués */
   private readonly CLEANUP_INTERVAL_MS = 60_000;
-  private readonly REFRESH_INTERVAL_MS = 45_000;
+  /** REST reconciliation — Realtime is primary; keep this sparse to avoid flicker/load. */
+  private readonly REFRESH_INTERVAL_MS = 150_000;
   private readonly OFFLINE_THRESHOLD_MS = 240_000; // 4 minutes
   private readonly HEARTBEAT_HINT_MS = 60_000;
 
@@ -146,9 +147,11 @@ class PresenceService {
   /** Recharge depuis la DB (guerit Realtime manqué / fantômes). */
   private async loadInitialPresence(): Promise<void> {
     try {
+      const freshSince = new Date(Date.now() - this.OFFLINE_THRESHOLD_MS).toISOString();
       const { data, error } = await supabase
         .from('user_presence')
-        .select('user_id, name, avatar, initials, status, current_salon_id, last_seen');
+        .select('user_id, name, avatar, initials, status, current_salon_id, last_seen')
+        .gte('last_seen', freshSince);
 
       if (error) {
         console.error('[PresenceService] Erreur lors du chargement de la présence:', error);
@@ -475,9 +478,19 @@ class PresenceService {
     }
 
     this.refreshInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       void this.loadInitialPresence();
     }, this.REFRESH_INTERVAL_MS);
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.onVisibilityRefresh);
+    }
   }
+
+  private onVisibilityRefresh = (): void => {
+    if (typeof document === 'undefined' || document.hidden) return;
+    void this.loadInitialPresence();
+  };
 
   private stopCleanup(): void {
     if (this.cleanupInterval) {
@@ -487,6 +500,9 @@ class PresenceService {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
+    }
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.onVisibilityRefresh);
     }
   }
 

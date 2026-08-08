@@ -56,7 +56,7 @@ export default function ScenePanel({
 
   return (
     <div
-      className="border-b border-border bg-card/60 px-3 sm:px-4 py-2 sm:py-3 shrink-0 max-h-[22vh] sm:max-h-[40vh] overflow-y-auto overscroll-contain"
+      className="border-b border-border bg-card/60 px-2.5 sm:px-4 py-1.5 sm:py-3 shrink-0 max-h-[16vh] sm:max-h-[40vh] overflow-y-auto overscroll-contain"
       role="region"
       aria-label="Participants sur scène">
       <div className="text-[9.5px] text-muted-foreground/50 uppercase tracking-widest mb-1.5 sm:mb-2.5 flex items-center gap-1.5">

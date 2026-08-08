@@ -18,6 +18,7 @@ import AppUpdateBanner from '@/components/AppUpdateBanner';
 import OnboardingWizard from '@/components/chat/OnboardingWizard';
 import { isOnboardingDone, onboardingUserKey } from '@/lib/onboarding';
 import { useIsPhone } from '@/hooks/use-mobile';
+import { useVisualViewportHeight } from '@/hooks/useVisualViewportHeight';
 import type { MobileSurface } from '@/lib/mobileShell';
 
 function ChatApp() {
@@ -25,6 +26,7 @@ function ChatApp() {
   const { currentSalon, setCurrentSalon } = useSalons();
   const { showAdmin, profileTarget, openUserProfile, closeUserProfile } = useUI();
   const isPhone = useIsPhone();
+  useVisualViewportHeight(isPhone);
 
   const [micActive, setMicActive] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
@@ -178,9 +180,17 @@ function ChatApp() {
         {currentSalon ? (
           <>
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-              <ChatArea micActive={micActive} micLevel={micLevel} onOpenDM={openDM} />
-              <WebRtcRemotePanel streams={remoteStreams} />
-              <MediaBar onMicChange={handleMicChange} onRemoteStreams={setRemoteStreams} />
+              <ChatArea
+                micActive={micActive}
+                micLevel={micLevel}
+                onOpenDM={openDM}
+                composerExtras={
+                  <>
+                    <WebRtcRemotePanel streams={remoteStreams} />
+                    <MediaBar onMicChange={handleMicChange} onRemoteStreams={setRemoteStreams} />
+                  </>
+                }
+              />
             </div>
             {/* Desktop only — déjà hidden lg:flex dans le composant */}
             <RightPanel onOpenDM={openDM} />

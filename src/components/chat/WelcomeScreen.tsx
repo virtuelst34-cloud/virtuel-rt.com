@@ -41,6 +41,8 @@ interface WelcomeScreenProps {
   onOpenDM?: (name?: string) => void;
   mobileSalonsOpen?: boolean;
   onMobileSalonsOpenChange?: (open: boolean) => void;
+  /** Téléphone : liste salons en plein écran (chantier shell 1 job). */
+  salonsFullScreen?: boolean;
 }
 
 // Emoji par salon
@@ -65,7 +67,12 @@ function PulseDot({ color = 'bg-emerald-500' }: { color?: string }) {
   );
 }
 
-export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalonsOpenChange }: WelcomeScreenProps) {
+export default function WelcomeScreen({
+  onOpenDM,
+  mobileSalonsOpen,
+  onMobileSalonsOpenChange,
+  salonsFullScreen = false,
+}: WelcomeScreenProps) {
   const { setCurrentSalon, customSalons, hiddenSalons, displayOrder, categories, isSalonLocked, verifySalonPassword } = useSalons();
   const { coquinMode } = usePreferences();
   const { user, profiles, loginWithSupabase, logout } = useUser();
@@ -268,8 +275,8 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden relative">
 
-      {/* ── Colonne gauche : liste des salons (drawer mobile) ── */}
-      {salonsDrawerOpen && (
+      {/* ── Colonne gauche : liste des salons (plein écran téléphone / rail desktop) ── */}
+      {salonsDrawerOpen && !salonsFullScreen && (
         <button
           type="button"
           className="md:hidden absolute inset-0 bg-black/50 z-30"
@@ -277,12 +284,18 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
           onClick={() => setSalonsDrawerOpen(false)}
         />
       )}
-      <div className={`
+      <div
+        className={`
         absolute md:relative inset-y-0 left-0 z-40 md:z-auto
-        w-[min(100%,300px)] md:w-[260px] border-r border-border flex flex-col shrink-0 bg-card
+        border-r border-border flex flex-col shrink-0 bg-card
         transition-transform duration-200 ease-out
+        ${salonsFullScreen ? 'w-full md:w-[260px]' : 'w-[min(100%,300px)] md:w-[260px]'}
         ${salonsDrawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `}>
+      `}
+        role={salonsFullScreen && salonsDrawerOpen ? 'dialog' : undefined}
+        aria-modal={salonsFullScreen && salonsDrawerOpen ? true : undefined}
+        aria-label={salonsFullScreen ? 'Liste des salons' : undefined}
+      >
         <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
           <h3 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Salons</h3>
           <button
@@ -318,8 +331,12 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
         />
       </div>
 
-      {/* ── Centre : épuré ── */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 sm:gap-4 text-center px-4 sm:px-8 select-none overflow-y-auto min-w-0 py-6">
+      {/* ── Centre : épuré (masqué sur téléphone quand liste salons plein écran) ── */}
+      <div
+        className={`flex-1 flex flex-col items-center justify-center gap-3 sm:gap-4 text-center px-4 sm:px-8 select-none overflow-y-auto min-w-0 py-6 ${
+          salonsFullScreen && salonsDrawerOpen ? 'hidden md:flex' : ''
+        }`}
+      >
         <button
           type="button"
           onClick={() => setSalonsDrawerOpen(true)}

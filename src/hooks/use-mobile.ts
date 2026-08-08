@@ -1,15 +1,33 @@
 import * as React from "react"
 
+/** Aligné Tailwind `md` — usages génériques (drawers, etc.). */
 const MOBILE_BREAKPOINT = 768
 
-export function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+/**
+ * Aligné Tailwind `sm` + MobileBottomNav (`sm:hidden`) / Sidebar (`hidden sm:flex`).
+ * Utiliser pour le shell « 1 écran = 1 job » téléphone.
+ */
+const PHONE_BREAKPOINT = 640
+
+function useMatchMaxWidth(maxExclusive: number): boolean {
+  const [matches, setMatches] = React.useState<boolean | undefined>(undefined)
   React.useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
-    const onChange = () => { setIsMobile(window.innerWidth < MOBILE_BREAKPOINT) }
+    const mql = window.matchMedia(`(max-width: ${maxExclusive - 1}px)`)
+    const onChange = () => {
+      setMatches(window.innerWidth < maxExclusive)
+    }
     mql.addEventListener("change", onChange)
-    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    setMatches(window.innerWidth < maxExclusive)
     return () => mql.removeEventListener("change", onChange)
-  }, [])
-  return !!isMobile
+  }, [maxExclusive])
+  return !!matches
+}
+
+export function useIsMobile(): boolean {
+  return useMatchMaxWidth(MOBILE_BREAKPOINT)
+}
+
+/** Téléphone étroit : nav bas visible, sidebar desktop masquée. */
+export function useIsPhone(): boolean {
+  return useMatchMaxWidth(PHONE_BREAKPOINT)
 }

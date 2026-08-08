@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
-import { useIsMobile } from '@/hooks/use-mobile'
+import { renderHook, waitFor } from '@testing-library/react'
+import { useIsMobile, useIsPhone } from '@/hooks/use-mobile'
 
-describe('useIsMobile', () => {
+describe('useIsMobile / useIsPhone', () => {
   let originalInnerWidth: number
 
   beforeEach(() => {
@@ -13,27 +13,33 @@ describe('useIsMobile', () => {
     window.innerWidth = originalInnerWidth
   })
 
-  it('should return false for desktop screens', () => {
+  it('useIsMobile: false on desktop', async () => {
     window.innerWidth = 1024
     const { result } = renderHook(() => useIsMobile())
-    expect(result.current).toBe(false)
+    await waitFor(() => expect(result.current).toBe(false))
   })
 
-  it('should return true for mobile screens', () => {
+  it('useIsMobile: true below md', async () => {
     window.innerWidth = 375
     const { result } = renderHook(() => useIsMobile())
-    expect(result.current).toBe(true)
+    await waitFor(() => expect(result.current).toBe(true))
   })
 
-  it('should return false at breakpoint', () => {
+  it('useIsMobile: false at 768', async () => {
     window.innerWidth = 768
     const { result } = renderHook(() => useIsMobile())
-    expect(result.current).toBe(false)
+    await waitFor(() => expect(result.current).toBe(false))
   })
 
-  it('should return true just below breakpoint', () => {
-    window.innerWidth = 767
-    const { result } = renderHook(() => useIsMobile())
-    expect(result.current).toBe(true)
+  it('useIsPhone: true only below sm (640)', async () => {
+    window.innerWidth = 639
+    const { result } = renderHook(() => useIsPhone())
+    await waitFor(() => expect(result.current).toBe(true))
+  })
+
+  it('useIsPhone: false at 640 (sidebar desktop)', async () => {
+    window.innerWidth = 640
+    const { result } = renderHook(() => useIsPhone())
+    await waitFor(() => expect(result.current).toBe(false))
   })
 })

@@ -56,13 +56,13 @@ export default function ScenePanel({
 
   return (
     <div
-      className="border-b border-border bg-card/60 px-4 py-3 shrink-0"
+      className="border-b border-border bg-card/60 px-3 sm:px-4 py-2 sm:py-3 shrink-0 max-h-[22vh] sm:max-h-[40vh] overflow-y-auto overscroll-contain"
       role="region"
       aria-label="Participants sur scène">
-      <div className="text-[9.5px] text-muted-foreground/50 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
+      <div className="text-[9.5px] text-muted-foreground/50 uppercase tracking-widest mb-1.5 sm:mb-2.5 flex items-center gap-1.5">
         <Mic className="w-3 h-3" aria-hidden="true" /> Sur scène ({allMembers.length})
       </div>
-      <div className="flex gap-3 flex-wrap" role="list" aria-label="Liste des participants">
+      <div className="flex gap-2 sm:gap-3 flex-wrap" role="list" aria-label="Liste des participants">
         {allMembers.map((m, i) => {
           const interactive = !m.isMe && (!!onViewProfile || !!onOpenDM);
           return (

@@ -613,6 +613,12 @@ html, body, #root {
     height: 100dvh;
     max-height: 100dvh;
   }
+
+  /* Composeur toujours au-dessus du chrome mobile (nav / home indicator) */
+  .chat-mobile-shell [aria-label="Zone de saisie de message"] {
+    position: relative;
+    z-index: 30;
+  }
 }
 
 /* ── Light theme: contraste lisible (overlays / texte atténué) ── */

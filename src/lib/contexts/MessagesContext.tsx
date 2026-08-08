@@ -46,12 +46,22 @@ const MessagesActionsContext = createContext<MessagesActions | null>(null);
 const MAX_PER_SALON = 200;
 /** Page initiale / load-more — assez pour le viewport, léger sur mobile. */
 const PAGE_SIZE = 40;
+/**
+ * Reconcile REST périodique : la présence a déjà un heal (150s), les messages
+ * ne comptaient que sur le realtime — d’où « EN LIGNE OK, message invisible ».
+ */
+const RECONCILE_INTERVAL_MS = 45_000;
 
 function mergeIncomingMessage(existing: Message[], incoming: Message): Message[] {
   const resolved = resolveReplyReferences([...existing, incoming]);
   const incomingResolved = resolved[resolved.length - 1];
   if (existing.some(m => m.id === incomingResolved.id)) return existing;
   return [...existing, incomingResolved].slice(-MAX_PER_SALON);
+}
+
+function capSalonMessages(messages: Message[]): Message[] {
+  // Chronologique (vieux → récent) : garder les plus récents
+  return messages.length > MAX_PER_SALON ? messages.slice(-MAX_PER_SALON) : messages;
 }
 
 export function MessagesProvider({ children }: { children: ReactNode }) {
@@ -61,8 +71,12 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const loadingHistoryRef = useRef(false);
   const historyExhaustedRef = useRef<Record<string, boolean>>({});
+  /** Ignore les réponses REST périmées (changement de salon / double load). */
+  const loadGenerationRef = useRef(0);
   const salonMessagesRef = useRef(salonMessages);
   salonMessagesRef.current = salonMessages;
+  const currentSalonIdRef = useRef(currentSalonId);
+  currentSalonIdRef.current = currentSalonId;
 
   useEffect(() => {
     offlineModeService.setSyncHandler(async (action) => {
@@ -73,7 +87,19 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     return () => offlineModeService.setSyncHandler(null);
   }, []);
 
-  const applyLoadedMessages = useCallback((salonId: string, rawMessages: ReturnType<typeof convertSupabaseMessage>[], offset: number) => {
+  const applyLoadedMessages = useCallback((
+    salonId: string,
+    rawMessages: ReturnType<typeof convertSupabaseMessage>[],
+    offset: number,
+    generation: number,
+  ) => {
+    // Réponse obsolète (salon changé ou nouveau load lancé) → ignorer
+    if (generation !== loadGenerationRef.current) return;
+    if (currentSalonIdRef.current && currentSalonIdRef.current !== salonId && offset === 0) {
+      // Load initial pour un salon qu’on a déjà quitté
+      return;
+    }
+
     const resolved = resolveReplyReferences(rawMessages);
     const sorted = dedupeAndSortMessages(resolved);
 
@@ -82,13 +108,11 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
 
     setSalonMessages(prev => {
-      if (offset === 0) {
-        return { ...prev, [salonId]: sorted.slice(0, MAX_PER_SALON) };
-      }
-
       const existing = prev[salonId] || [];
+      // Toujours merger (jamais replace) : un INSERT realtime pendant le fetch
+      // ne doit pas disparaître quand le REST revient.
       const combined = dedupeAndSortMessages([...sorted, ...existing]);
-      return { ...prev, [salonId]: combined.slice(0, MAX_PER_SALON) };
+      return { ...prev, [salonId]: capSalonMessages(combined) };
     });
 
     if (offset === 0) {
@@ -106,13 +130,24 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const loadMessages = useCallback(async (salonId: string, limit: number = PAGE_SIZE, offset: number = 0) => {
+  const loadMessages = useCallback(async (
+    salonId: string,
+    limit: number = PAGE_SIZE,
+    offset: number = 0,
+    options?: { bumpGeneration?: boolean },
+  ) => {
+    const generation =
+      options?.bumpGeneration === false
+        ? loadGenerationRef.current
+        : (offset === 0 ? ++loadGenerationRef.current : loadGenerationRef.current);
+
     try {
       const messages = await supabaseDbService.getMessages(salonId, limit, offset);
       const converted = messages.map(convertSupabaseMessage);
-      applyLoadedMessages(salonId, converted, offset);
+      applyLoadedMessages(salonId, converted, offset, generation);
     } catch (error) {
       console.error('Erreur lors du chargement des messages:', error);
+      if (generation !== loadGenerationRef.current) return;
       const cached = offlineModeService.getCachedMessages(salonId, MAX_PER_SALON);
       if (cached.length > 0) {
         const fromCache: Message[] = cached.map(c => ({
@@ -123,10 +158,20 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           text: c.text,
           created_date: c.timestamp.toISOString(),
         }));
-        setSalonMessages(prev => ({ ...prev, [salonId]: fromCache.reverse() }));
+        setSalonMessages(prev => {
+          const existing = prev[salonId] || [];
+          const combined = dedupeAndSortMessages([...fromCache.reverse(), ...existing]);
+          return { ...prev, [salonId]: capSalonMessages(combined) };
+        });
       }
     }
   }, [applyLoadedMessages]);
+
+  /** Heal REST : récupère la page la plus récente sans invalider le realtime. */
+  const reconcileSalonMessages = useCallback(async (salonId: string) => {
+    if (!salonId || !navigator.onLine) return;
+    await loadMessages(salonId, PAGE_SIZE, 0, { bumpGeneration: false });
+  }, [loadMessages]);
 
   const loadMoreMessages = useCallback(async (salonId: string) => {
     if (loadingHistoryRef.current || historyExhaustedRef.current[salonId]) return;
@@ -135,7 +180,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     setIsLoadingHistory(true);
     try {
       const existing = salonMessagesRef.current[salonId] || [];
-      await loadMessages(salonId, PAGE_SIZE, existing.length);
+      await loadMessages(salonId, PAGE_SIZE, existing.length, { bumpGeneration: false });
     } finally {
       loadingHistoryRef.current = false;
       setIsLoadingHistory(false);
@@ -151,7 +196,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
 
     historyExhaustedRef.current[currentSalonId] = false;
-    loadMessages(currentSalonId);
+    void loadMessages(currentSalonId);
 
     const channel = supabaseDbService.subscribeToMessages(currentSalonId, {
       onInsert: (message) => {
@@ -179,13 +224,29 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
     subscriptionRef.current = channel;
 
+    // Heal périodique + au retour d’onglet (même logique que la présence)
+    const intervalId = window.setInterval(() => {
+      void reconcileSalonMessages(currentSalonId);
+    }, RECONCILE_INTERVAL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void reconcileSalonMessages(currentSalonId);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
     return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
       if (subscriptionRef.current) {
         supabase.removeChannel(subscriptionRef.current);
         subscriptionRef.current = null;
       }
     };
-  }, [currentSalonId, loadMessages]);
+  }, [currentSalonId, loadMessages, reconcileSalonMessages]);
 
   const addMessage = useCallback(async (salonId: string, message: Message) => {
     const tempId = message.id || `temp-${Date.now()}-${Math.random()}`;
@@ -228,7 +289,17 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     try {
       const result = await supabaseDbService.addMessage(supabaseMessage);
 
-      if (result && result.id !== tempId) {
+      if (!result) {
+        // Échec silencieux (RPC) : retirer la bulle fantôme côté expéditeur
+        setSalonMessages(prev => ({
+          ...prev,
+          [salonId]: (prev[salonId] || []).filter(m => m.id !== tempId),
+        }));
+        console.error('Envoi message échoué (aucune ligne renvoyée)');
+        return;
+      }
+
+      if (result.id !== tempId) {
         setSalonMessages(prev => {
           const existing = prev[salonId] || [];
           const withoutTemp = existing.filter(m => m.id !== tempId);
@@ -238,7 +309,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       }
 
       offlineModeService.cacheMessage({
-        id: result?.id || tempId,
+        id: result.id,
         salonId,
         author: message.author_name,
         text: message.text,

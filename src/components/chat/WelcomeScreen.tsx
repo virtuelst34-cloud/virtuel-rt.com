@@ -41,6 +41,8 @@ interface WelcomeScreenProps {
   onOpenDM?: (name?: string) => void;
   mobileSalonsOpen?: boolean;
   onMobileSalonsOpenChange?: (open: boolean) => void;
+  /** Téléphone : liste salons en plein écran (chantier shell 1 job). */
+  salonsFullScreen?: boolean;
 }
 
 // Emoji par salon
@@ -65,7 +67,12 @@ function PulseDot({ color = 'bg-emerald-500' }: { color?: string }) {
   );
 }
 
-export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalonsOpenChange }: WelcomeScreenProps) {
+export default function WelcomeScreen({
+  onOpenDM,
+  mobileSalonsOpen,
+  onMobileSalonsOpenChange,
+  salonsFullScreen = false,
+}: WelcomeScreenProps) {
   const { setCurrentSalon, customSalons, hiddenSalons, displayOrder, categories, isSalonLocked, verifySalonPassword } = useSalons();
   const { coquinMode } = usePreferences();
   const { user, profiles, loginWithSupabase, logout } = useUser();
@@ -268,8 +275,8 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden relative">
 
-      {/* ── Colonne gauche : liste des salons (drawer mobile) ── */}
-      {salonsDrawerOpen && (
+      {/* ── Colonne gauche : liste des salons (plein écran téléphone / rail desktop) ── */}
+      {salonsDrawerOpen && !salonsFullScreen && (
         <button
           type="button"
           className="md:hidden absolute inset-0 bg-black/50 z-30"
@@ -277,12 +284,18 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
           onClick={() => setSalonsDrawerOpen(false)}
         />
       )}
-      <div className={`
+      <div
+        className={`
         absolute md:relative inset-y-0 left-0 z-40 md:z-auto
-        w-[min(100%,300px)] md:w-[260px] border-r border-border flex flex-col shrink-0 bg-card
+        border-r border-border flex flex-col shrink-0 bg-card
         transition-transform duration-200 ease-out
+        ${salonsFullScreen ? 'w-full md:w-[260px]' : 'w-[min(100%,300px)] md:w-[260px]'}
         ${salonsDrawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `}>
+      `}
+        role={salonsFullScreen && salonsDrawerOpen ? 'dialog' : undefined}
+        aria-modal={salonsFullScreen && salonsDrawerOpen ? true : undefined}
+        aria-label={salonsFullScreen ? 'Liste des salons' : undefined}
+      >
         <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
           <h3 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Salons</h3>
           <button
@@ -318,8 +331,12 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
         />
       </div>
 
-      {/* ── Centre : épuré ── */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 sm:gap-4 text-center px-4 sm:px-8 select-none overflow-y-auto min-w-0 py-6">
+      {/* ── Centre : épuré (masqué sur téléphone quand liste salons plein écran) ── */}
+      <div
+        className={`flex-1 flex flex-col items-center justify-center gap-3 sm:gap-4 text-center px-4 sm:px-8 select-none overflow-y-auto min-w-0 py-6 ${
+          salonsFullScreen && salonsDrawerOpen ? 'hidden md:flex' : ''
+        }`}
+      >
         <button
           type="button"
           onClick={() => setSalonsDrawerOpen(true)}
@@ -395,12 +412,12 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
           </div>
         )}
 
-        {/* Salon du moment */}
+        {/* Salon du moment — desktop/tablette (Accueil téléphone reste léger) */}
         {featuredSalon && (
           <button
             type="button"
             onClick={() => handleSalonClick(featuredSalon.salon)}
-            className="w-full max-w-sm text-left rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 hover:bg-primary/15 transition-all touch-target"
+            className="hidden sm:block w-full max-w-sm text-left rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 hover:bg-primary/15 transition-all touch-target"
           >
             <div className="flex items-center gap-2 mb-1">
               <Flame className="w-3.5 h-3.5 text-primary" />
@@ -424,7 +441,7 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
         )}
 
         {canModerate && (
-          <div className="w-full max-w-sm flex flex-wrap gap-2 justify-center text-[10px]">
+          <div className="hidden sm:flex w-full max-w-sm flex-wrap gap-2 justify-center text-[10px]">
             {featuredSalon?.reason === 'pin' ? (
               <button
                 type="button"
@@ -461,8 +478,22 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
           <Users className="w-3.5 h-3.5" /> Voir l’équipe
         </Link>
 
-        {/* En ligne — visible sur mobile / tablette (colonne droite masquée sous lg) */}
-        <div className="lg:hidden w-full max-w-sm text-left">
+        {/* Téléphone : chip En ligne (pas le carrousel dense) */}
+        <button
+          type="button"
+          onClick={() => setShowMembersPanel(true)}
+          className="sm:hidden w-full max-w-sm flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-border bg-secondary/50 text-left touch-target"
+        >
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-foreground">
+            <PulseDot /> En ligne
+          </span>
+          <span className="text-[10px] text-emerald-400 tabular-nums">
+            {onlineUsers.length + (user ? 1 : 0)} · Voir
+          </span>
+        </button>
+
+        {/* Tablette : carrousel (colonne droite absente sous lg) */}
+        <div className="hidden sm:block lg:hidden w-full max-w-sm text-left">
           <div className="flex items-center justify-between mb-2 px-0.5">
             <h3 className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5">
               <PulseDot /> En ligne
@@ -547,10 +578,11 @@ export default function WelcomeScreen({ onOpenDM, mobileSalonsOpen, onMobileSalo
             className="w-full max-w-sm flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/35 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/20 transition-colors touch-target"
           >
             <ShieldAlert className="w-4 h-4 shrink-0" />
-            Centre de modération
+            <span className="sm:hidden">Admin / Modo</span>
+            <span className="hidden sm:inline">Centre de modération</span>
           </button>
         )}
-        <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
+        <p className="hidden sm:block text-sm text-muted-foreground max-w-xs leading-relaxed">
           Choisissez un salon pour rejoindre une discussion,
           ou envoyez un message privé à quelqu'un.
         </p>

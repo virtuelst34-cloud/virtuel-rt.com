@@ -351,7 +351,7 @@ export default function StaffChatPanel({ onClose }: Props) {
 
   const panel = (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[1900] p-3 sm:p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[1900] p-0 sm:p-4 safe-area-pad"
       role="dialog"
       aria-modal="true"
       aria-labelledby="staff-panel-title"
@@ -359,7 +359,7 @@ export default function StaffChatPanel({ onClose }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-card border border-red-500/30 rounded-2xl w-full max-w-lg h-[min(80vh,640px)] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className="bg-card border border-red-500/30 rounded-t-3xl sm:rounded-2xl w-full max-w-lg h-[min(100dvh,100%)] sm:h-[min(80vh,640px)] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
         <div className="px-4 py-3 border-b border-border flex items-center gap-2 bg-red-500/[0.06] shrink-0">
           <ShieldAlert className="w-4 h-4 text-red-400" />
           <h2 id="staff-panel-title" className="text-sm font-semibold text-foreground flex-1">
@@ -372,6 +372,13 @@ export default function StaffChatPanel({ onClose }: Props) {
                 : pendingReports.length + pendingAlerts.length}
             </span>
           )}
+          <button
+            type="button"
+            onClick={openFullModeration}
+            className="sm:hidden text-[10px] font-semibold px-2 py-1 rounded-lg border border-red-500/35 bg-red-500/10 text-red-400 touch-target"
+          >
+            Admin
+          </button>
           <button
             type="button"
             onClick={onClose}

@@ -20,14 +20,14 @@ describe('AdminPanel component', () => {
 
   it('should render tabs', () => {
     render(<AdminPanel />, { wrapper })
+    // Hub téléphone + rail desktop peuvent coexister en DOM (CSS sm:)
     expect(screen.getAllByText(/Tableau de bord/i).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Statistiques/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Statistiques/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Salons/i).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Utilisateurs/i)).toBeInTheDocument()
-    expect(screen.getByText(/Modération/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Utilisateurs/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Modération/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Badges/i).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Badges spéciaux/i)).toBeInTheDocument()
-    // Profils / Codes Premium : visibles seulement si permission premium.view ou fondateur
+    expect(screen.getAllByText(/Badges spéciaux/i).length).toBeGreaterThan(0)
   })
 
   it('should have close button', () => {

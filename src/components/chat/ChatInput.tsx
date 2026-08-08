@@ -246,7 +246,7 @@ export default function ChatInput({ onSend, onTyping, disabled = false, disabled
   }, [replyTo]);
 
   return (
-    <div className="border-t border-border bg-card px-3 sm:px-4 py-2 sm:py-2.5 shrink-0 relative sm:safe-area-pb" role="region" aria-label="Zone de saisie de message">
+    <div className="border-t border-border bg-card px-3 sm:px-4 py-2 sm:py-2.5 shrink-0 relative" role="region" aria-label="Zone de saisie de message">
 
       {/* Suggestions @ */}
       {mentions.length > 0 && (

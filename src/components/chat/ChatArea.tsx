@@ -22,7 +22,7 @@ import { recordMessageSent, recordReaction, recordMention } from '@/lib/userActi
 import { uploadChatMedia, uploadChatFile } from '@/lib/storageService';
 import { supabaseDbService } from '@/lib/supabaseDb';
 import { mediaBroadcastService } from '@/lib/mediaBroadcastService';
-import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown, Filter as FilterIcon, Download, PartyPopper, Zap } from 'lucide-react';
+import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown, Filter as FilterIcon, Download, PartyPopper, Zap, MoreHorizontal } from 'lucide-react';
 import { APPLAUSE_EVENT, broadcastApplause, isSalonMuted, REACTION_RAIN_EVENT, type ApplauseDetail, type ReactionRainDetail } from '@/lib/funFeatures';
 import DailySparkCard from './DailySparkCard';
 import WelcomeGuideCard from './WelcomeGuideCard';
@@ -63,9 +63,11 @@ interface ChatAreaProps {
   micActive: boolean;
   micLevel: number;
   onOpenDM?: (name: string) => void;
+  /** Media / WebRTC au-dessus du composer (pas sous la zone d’écriture). */
+  composerExtras?: React.ReactNode;
 }
 
-export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProps) {
+export default function ChatArea({ micActive, micLevel, onOpenDM, composerExtras }: ChatAreaProps) {
   const { user, profiles } = useUser();
   const { currentSalon, setCurrentSalon, customSalons, hiddenSalons, displayOrder } = useSalons();
   const { coquinMode, isPremium } = usePreferences();
@@ -98,6 +100,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const [isAtBottom, setIsAtBottom]         = useState(true);
   const [unreadNew, setUnreadNew]           = useState(0);
   const [showFilter, setShowFilter]         = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [filteredMessages, setFilteredMessages] = useState<Message[] | null>(null);
   const [showExport, setShowExport]         = useState(false);
   const [showReport, setShowReport]         = useState(false);
@@ -570,8 +573,8 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
         />
       )}
 
-      {/* Header */}
-      <div className="px-2 sm:px-4 py-2 sm:py-2.5 border-b border-border flex items-center gap-1.5 sm:gap-2.5 shrink-0 bg-card min-w-0">
+      {/* Header — allégé sur téléphone (⋯ pour le secondaire) */}
+      <div className="px-2 sm:px-4 py-2 sm:py-2.5 border-b border-border flex items-center gap-1.5 sm:gap-2.5 shrink-0 bg-card min-w-0 relative">
         <button onClick={() => setCurrentSalon(null)}
           className="p-2 sm:p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 hover:text-foreground transition-colors shrink-0 touch-target" title="Retour à l'accueil (Étincelle du jour)">
           <ArrowLeft className="w-4 h-4" />
@@ -588,9 +591,16 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
             <span className="hidden sm:inline shrink-0">{allMembers.length} membres</span>
           </div>
         </div>
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-wrap justify-end max-w-[55%] sm:max-w-none">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 justify-end">
+          <button onClick={() => setShowMembers(o => !o)}
+            className={`p-2 sm:p-1.5 rounded-lg border transition-colors touch-target ${showMembers ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+            title="Membres" aria-label="Voir les membres du salon">
+            <Users className="w-4 h-4" />
+          </button>
+
+          {/* Desktop : outils visibles */}
           <button onClick={() => setSearchOpen(o => !o)}
-            className={`p-2 sm:p-1.5 rounded-lg border transition-colors touch-target ${searchOpen ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+            className={`hidden sm:flex p-1.5 rounded-lg border transition-colors ${searchOpen ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
             title="Rechercher" aria-label="Rechercher dans le salon">
             <Search className="w-4 h-4" />
           </button>
@@ -607,7 +617,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
           <button
             type="button"
             onClick={() => setShowTools(o => !o)}
-            className={`p-2 sm:p-1.5 rounded-lg border transition-colors touch-target ${showTools ? 'border-purple-500/40 bg-purple-500/10 text-purple-300' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+            className={`hidden sm:flex p-1.5 rounded-lg border transition-colors ${showTools ? 'border-purple-500/40 bg-purple-500/10 text-purple-300' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
             title="Outils du salon"
             aria-label="Ouvrir les outils du salon">
             <Zap className="w-4 h-4" />
@@ -623,17 +633,67 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
               if (currentSalon && detail) mediaBroadcastService.broadcastApplause(currentSalon, detail);
               addNotification({ type: 'system', message: '👏 Applaudissements envoyés au salon !' });
             }}
-            className="flex items-center gap-1 sm:gap-1.5 p-2 sm:px-2.5 sm:py-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 hover:border-amber-500/50 transition-colors touch-target"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 hover:border-amber-500/50 transition-colors"
             title="Applaudissements — envoie une salve de 👏 visible dans le salon"
             aria-label="Applaudir le salon">
             <PartyPopper className="w-4 h-4" />
             <span className="text-[11px] font-medium whitespace-nowrap hidden md:inline">Applaudir</span>
           </button>
-          <button onClick={() => setShowMembers(o => !o)}
-            className={`p-2 sm:p-1.5 rounded-lg border transition-colors touch-target ${showMembers ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
-            title="Membres" aria-label="Voir les membres du salon">
-            <Users className="w-4 h-4" />
-          </button>
+
+          {/* Mobile : menu secondaire */}
+          <div className="relative sm:hidden">
+            <button
+              type="button"
+              onClick={() => setHeaderMenuOpen((o) => !o)}
+              className={`p-2 rounded-lg border transition-colors touch-target ${headerMenuOpen ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60'}`}
+              aria-label="Plus d'actions"
+              aria-expanded={headerMenuOpen}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            {headerMenuOpen && (
+              <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-40"
+                  aria-label="Fermer le menu"
+                  onClick={() => setHeaderMenuOpen(false)}
+                />
+                <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border border-border bg-card shadow-xl py-1 animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs text-foreground hover:bg-white/5 touch-target"
+                    onClick={() => { setSearchOpen((o) => !o); setHeaderMenuOpen(false); }}
+                  >
+                    <Search className="w-3.5 h-3.5 text-muted-foreground" /> Rechercher
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs text-foreground hover:bg-white/5 touch-target"
+                    onClick={() => { setShowTools((o) => !o); setHeaderMenuOpen(false); }}
+                  >
+                    <Zap className="w-3.5 h-3.5 text-purple-300" /> Outils
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs text-foreground hover:bg-white/5 touch-target"
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      if (!user?.name) {
+                        addNotification({ type: 'system', message: 'Connectez-vous pour applaudir.' });
+                        return;
+                      }
+                      const detail = broadcastApplause(user.name);
+                      if (currentSalon && detail) mediaBroadcastService.broadcastApplause(currentSalon, detail);
+                      addNotification({ type: 'system', message: '👏 Applaudissements envoyés au salon !' });
+                    }}
+                  >
+                    <PartyPopper className="w-3.5 h-3.5 text-amber-300" /> Applaudir
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -769,8 +829,9 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
 
           <TypingIndicator />
 
-          {/* shrink-0 + z-index : toujours visible au-dessus de la nav mobile / MediaBar */}
-          <div className="shrink-0 z-20 bg-card">
+          {/* Dock composer : média/WebRTC au-dessus de l’écriture, collé en bas du salon */}
+          <div className="chat-composer-dock shrink-0 z-20 bg-card border-t border-border/60">
+            {composerExtras}
             <ChatInput
               onSend={handleSend}
               onTyping={handleTyping}

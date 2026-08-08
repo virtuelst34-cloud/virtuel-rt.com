@@ -610,14 +610,21 @@ html, body, #root {
 /* Empêche le double-scroll / contenu coupé sur petits écrans */
 @media (max-width: 639px) {
   .chat-mobile-shell {
-    height: 100dvh;
-    max-height: 100dvh;
+    /* visualViewport quand le clavier s’ouvre (hook useVisualViewportHeight) */
+    height: var(--vv-height, 100dvh);
+    max-height: var(--vv-height, 100dvh);
   }
 
-  /* Composeur toujours au-dessus du chrome mobile (nav / home indicator) */
-  .chat-mobile-shell [aria-label="Zone de saisie de message"] {
+  /* Dock : média + saisie collés au-dessus de la nav bas */
+  .chat-mobile-shell .chat-composer-dock {
     position: relative;
     z-index: 30;
+    box-shadow: 0 -8px 24px hsl(var(--background) / 0.55);
+  }
+
+  .chat-mobile-shell [aria-label="Zone de saisie de message"] {
+    position: relative;
+    z-index: 31;
   }
 }
 

@@ -1,26 +1,33 @@
 import React from 'react';
 import { Home, MessageSquare, Bell, Settings, Menu, ShieldAlert } from 'lucide-react';
-import { useUser, useSalons, useNotifications, useDM, useUI, useGlobalSettings } from '@/lib/contexts';
+import { useUser, useNotifications, useDM, useUI, useGlobalSettings } from '@/lib/contexts';
 import { hasStaffAccess } from '@/lib/utils/founderCheck';
 import Avatar from './Avatar';
+import type { MobileSurface } from '@/lib/mobileShell';
 
 interface MobileBottomNavProps {
+  surface?: MobileSurface;
+  onGoHome: () => void;
   onOpenDM: () => void;
   onOpenNotifications: () => void;
   onOpenSettings: (tab?: string) => void;
   onOpenSalons?: () => void;
+  /** Ferme les autres overlays avant Staff / Admin. */
+  onExclusiveNavigate?: () => void;
   showSalonsButton?: boolean;
 }
 
 export default function MobileBottomNav({
+  surface = 'home',
+  onGoHome,
   onOpenDM,
   onOpenNotifications,
   onOpenSettings,
   onOpenSalons,
+  onExclusiveNavigate,
   showSalonsButton = true,
 }: MobileBottomNavProps) {
   const { user } = useUser();
-  const { setCurrentSalon, currentSalon } = useSalons();
   const { unreadCount, staffUnreadCount } = useNotifications();
   const { getUnreadCount } = useDM();
   const { openAdmin, openStaffChat } = useUI();
@@ -36,13 +43,14 @@ export default function MobileBottomNav({
       <div className="flex items-stretch justify-around px-1 pt-1.5 pb-1 gap-0.5">
         <NavBtn
           label="Accueil"
-          active={!currentSalon}
-          onClick={() => setCurrentSalon(null)}
+          active={surface === 'home'}
+          onClick={onGoHome}
           icon={<Home className="w-5 h-5" />}
         />
         {showSalonsButton && onOpenSalons && (
           <NavBtn
             label="Salons"
+            active={surface === 'salons' || surface === 'salon'}
             onClick={onOpenSalons}
             icon={<Menu className="w-5 h-5" />}
           />
@@ -50,6 +58,7 @@ export default function MobileBottomNav({
         {settings.enable_dm && (
           <NavBtn
             label="MP"
+            active={surface === 'dm'}
             onClick={onOpenDM}
             badge={dmUnread > 0 ? dmUnread : null}
             icon={<MessageSquare className="w-5 h-5" />}
@@ -58,6 +67,7 @@ export default function MobileBottomNav({
         {settings.enable_notifications && (
           <NavBtn
             label="Alertes"
+            active={surface === 'notifs'}
             onClick={onOpenNotifications}
             badge={unreadCount > 0 ? unreadCount : null}
             icon={<Bell className="w-5 h-5" />}
@@ -66,19 +76,25 @@ export default function MobileBottomNav({
         {isStaff && (
           <NavBtn
             label="Staff"
-            onClick={() =>
+            title="Espace staff · maintien = Admin complet"
+            onClick={() => {
+              onExclusiveNavigate?.();
               openStaffChat(
                 user,
                 staffUnreadCount > 0 ? { tab: 'notifications' } : { tab: 'chat' },
-              )
-            }
+              );
+            }}
             badge={staffUnreadCount > 0 ? staffUnreadCount : null}
             icon={<ShieldAlert className="w-5 h-5" />}
-            onLongPress={() => openAdmin(user)}
+            onLongPress={() => {
+              onExclusiveNavigate?.();
+              openAdmin(user);
+            }}
           />
         )}
         <NavBtn
           label="Réglages"
+          active={surface === 'settings'}
           onClick={() => onOpenSettings('profile')}
           icon={
             user ? (
@@ -100,6 +116,7 @@ function NavBtn({
   badge,
   active,
   onLongPress,
+  title,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -107,16 +124,19 @@ function NavBtn({
   badge?: number | null;
   active?: boolean;
   onLongPress?: () => void;
+  title?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={title || label}
       onContextMenu={(e) => {
         if (!onLongPress) return;
         e.preventDefault();
         onLongPress();
       }}
+      aria-current={active ? 'page' : undefined}
       className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] rounded-xl transition-colors ${
         active ? 'text-primary bg-primary/10' : 'text-muted-foreground/70 active:bg-white/5'
       }`}

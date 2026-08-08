@@ -72,7 +72,7 @@ function ChatApp() {
   }, [user?.id, user?.name]);
 
   return (
-    <div className="flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-background safe-area-pad">
+    <div className="chat-mobile-shell flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-background safe-area-pad">
       <AppUpdateBanner autoApply={!currentSalon} />
       {!user && <UsernameModal />}
       {user && showOnboarding && (

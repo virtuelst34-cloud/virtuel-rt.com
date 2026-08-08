@@ -504,10 +504,24 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
 
   const typingUsers = currentSalon ? getTypingUsers(currentSalon) : [];
 
-  if (!salon) return null;
-
   const banned = user && isUserBanned(user.name);
   const muted  = user && isUserMuted(user.name);
+
+  // Salon introuvable / filtré (coquin, masqué…) : ne pas laisser une colonne vide sans barre d’écriture
+  if (!salon) {
+    return (
+      <div className="flex-1 flex flex-col min-h-0 items-center justify-center gap-3 px-6 text-center">
+        <p className="text-sm text-muted-foreground">Ce salon n’est plus disponible.</p>
+        <button
+          type="button"
+          onClick={() => setCurrentSalon(null)}
+          className="px-4 py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold"
+        >
+          Retour à l’accueil
+        </button>
+      </div>
+    );
+  }
 
   const visibleMessages = (filteredMessages || messages).filter(msg => {
     if (msg.is_system) return true;
@@ -685,6 +699,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
       <div className="flex flex-1 min-h-0">
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
 
+          {/* Scène plafonnée sur mobile pour ne jamais pousser la barre d’écriture hors écran */}
           {hasScene && (
             <ScenePanel
               salonId={currentSalon || ''}
@@ -696,12 +711,14 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
             />
           )}
           {currentSalon === 'quiz' && (
-            <QuizPanel salonId={currentSalon} onAnswerPosted={handleQuizAnswerPosted} />
+            <div className="shrink-0 max-h-[28vh] sm:max-h-none overflow-y-auto overscroll-contain">
+              <QuizPanel salonId={currentSalon} onAnswerPosted={handleQuizAnswerPosted} />
+            </div>
           )}
 
           {/* Zone messages avec scroll intelligent */}
           <div ref={scrollRef} onScroll={handleScroll}
-            className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-0.5 relative overscroll-contain">
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-0.5 relative overscroll-contain">
             <ReactionRainOverlay burst={reactionRain} />
             {!searchQuery && currentSalon === 'bienvenue' && (
               <div className="sticky top-0 z-[5] -mx-1 px-1 pb-1 bg-background/95 backdrop-blur-sm">
@@ -752,19 +769,22 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
 
           <TypingIndicator />
 
-          <ChatInput
-            onSend={handleSend}
-            onTyping={handleTyping}
-            disabled={banned || muted || (currentSalon === 'bienvenue' && !isFounder) || undefined}
-            disabledPlaceholder={
-              currentSalon === 'bienvenue' && !isFounder
-                ? 'Salon Bienvenue — annonces du fondateur uniquement (lecture seule).'
-                : undefined
-            }
-            replyTo={replyTo}
-            onCancelReply={() => setReplyTo(null)}
-            members={allMembers}
-          />
+          {/* shrink-0 + z-index : toujours visible au-dessus de la nav mobile / MediaBar */}
+          <div className="shrink-0 z-20 bg-card">
+            <ChatInput
+              onSend={handleSend}
+              onTyping={handleTyping}
+              disabled={banned || muted || (currentSalon === 'bienvenue' && !isFounder) || undefined}
+              disabledPlaceholder={
+                currentSalon === 'bienvenue' && !isFounder
+                  ? 'Salon Bienvenue — annonces du fondateur uniquement (lecture seule).'
+                  : undefined
+              }
+              replyTo={replyTo}
+              onCancelReply={() => setReplyTo(null)}
+              members={allMembers}
+            />
+          </div>
         </div>
 
         {/* Panneau membres */}

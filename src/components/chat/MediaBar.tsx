@@ -253,9 +253,12 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
   }, [stopVU]);
 
   if (!currentSalon) return null;
+  // Salons texte : pas de barre média (le retour se fait via le header).
+  // Évite de pousser la zone d’écriture hors écran sur téléphone.
+  if (!mediaSalon) return null;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-card border-t border-border shrink-0" data-testid="media-bar">
+    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 sm:py-2 bg-card border-t border-border shrink-0" data-testid="media-bar">
       <button
         type="button"
         onClick={toggleMic}

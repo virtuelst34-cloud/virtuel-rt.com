@@ -7,18 +7,20 @@ import { fileURLToPath } from 'node:url'
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url))
 
+/** Même id dans le bundle (import.meta.env.VITE_APP_VERSION) et dans dist/version.json. */
+const APP_BUILD_VERSION =
+  process.env.GITHUB_SHA?.slice(0, 12) ||
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ||
+  `${Date.now().toString(36)}`
+
 /** Écrit dist/version.json à chaque build (détection de déploiement côté client). */
 function versionJsonPlugin() {
   return {
     name: 'virtuel-rt-version-json',
     apply: 'build',
     closeBundle() {
-      const version =
-        process.env.GITHUB_SHA?.slice(0, 12) ||
-        process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ||
-        `${Date.now().toString(36)}`
       const payload = {
-        version,
+        version: APP_BUILD_VERSION,
         builtAt: new Date().toISOString(),
       }
       writeFileSync(resolve(rootDir, 'dist/version.json'), JSON.stringify(payload))
@@ -28,6 +30,11 @@ function versionJsonPlugin() {
 
 export default defineConfig({
   logLevel: 'error',
+  define: {
+    // Ancre la version dans le JS servi — pas dans version.json réseau seul
+    // (sinon un vieux SW + nouveau version.json masque la bannière « Mise à jour »).
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(APP_BUILD_VERSION),
+  },
   plugins: [
     react(),
     versionJsonPlugin(),
@@ -69,13 +76,13 @@ export default defineConfig({
             },
           },
           {
-            // Fichiers hashés immuables
+            // Fichiers hashés immuables (status 200 only — évite de figer des fallbacks opaques)
             urlPattern: /\/(?:chunks\/)?[^/?]+\.[A-Za-z0-9_-]+\.(?:js|css)$/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'static-hashed',
               expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
+              cacheableResponse: { statuses: [200] },
             },
           },
           {

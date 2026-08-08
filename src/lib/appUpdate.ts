@@ -1,10 +1,9 @@
 /**
  * Détection des mises à jour après déploiement (PWA + version.json).
- * - SW en mode « prompt » : skipWaiting au clic / auto-reload (accueil, 1× max)
- * - Contrôle périodique + focus / visibility
- * - version.json en secours si le SW ne signale pas encore
- * - Garde anti-boucle (Firefox : controllerchange / waiting SW flaky)
- * - Après apply : mémorise la version pour ne pas réafficher la bannière
+ * - Version du shell = VITE_APP_VERSION (injectée au build dans le JS)
+ * - version.json réseau = version déployée
+ * - Bannière si remote !== shell (évite le faux « déjà à jour » quand le SW sert un vieux index)
+ * - Actualiser : skipWaiting + purge caches + navigation cache-bust
  */
 
 type NeedRefreshListener = (needRefresh: boolean) => void
@@ -13,17 +12,20 @@ const CHECK_INTERVAL_MS = 5 * 60 * 1000
 const APPLY_FALLBACK_MS = 1200
 const AUTO_RELOAD_SESSION_KEY = 'virtuel-rt-auto-reload'
 const AUTO_RELOAD_VERSION_KEY = 'virtuel-rt-auto-reload-ver'
-/** Version déjà appliquée (ou en cours d’apply) — ne pas re-proposer. */
+/** Version déjà appliquée avec succès (shell === remote). */
 const APPLIED_VERSION_KEY = 'virtuel-rt-applied-ver'
-/** Apply en cours / juste fait avant que version.json soit connu. */
+/** Apply en cours — vérifié au boot suivant. */
 const PENDING_APPLY_KEY = 'virtuel-rt-pending-apply'
 /** Dismiss temporaire (« Plus tard ») pour une version.json donnée. */
 const DISMISSED_VERSION_KEY = 'virtuel-rt-dismissed-ver'
 
 let needRefresh = false
-/** Version du shell au premier check réussi (ou après apply réussi). */
-let bootVersion: string | null = null
-/** Dernière version vue sur le réseau (peut différer de bootVersion). */
+/** Version du JS réellement chargé (bundle). */
+let shellVersion: string | null =
+  typeof import.meta.env.VITE_APP_VERSION === 'string' && import.meta.env.VITE_APP_VERSION
+    ? import.meta.env.VITE_APP_VERSION
+    : null
+/** Dernière version vue sur le réseau (version.json). */
 let remoteVersion: string | null = null
 let updateSW: ((reloadPage?: boolean) => Promise<void>) | undefined
 let initialized = false
@@ -64,13 +66,16 @@ function sessionRemove(key: string): void {
   }
 }
 
-function rememberedVersion(): string | null {
-  return remoteVersion || bootVersion
+function targetVersion(): string | null {
+  return remoteVersion || shellVersion
 }
 
 function isVersionHandled(version: string | null | undefined): boolean {
-  if (sessionGet(PENDING_APPLY_KEY) === '1') return true
   if (!version) return false
+  // Un apply en cours ne bloque la bannière QUE si le shell a déjà rattrapé
+  if (sessionGet(PENDING_APPLY_KEY) === '1' && shellVersion && version === shellVersion) {
+    return true
+  }
   return (
     sessionGet(APPLIED_VERSION_KEY) === version ||
     sessionGet(DISMISSED_VERSION_KEY) === version
@@ -78,8 +83,12 @@ function isVersionHandled(version: string | null | undefined): boolean {
 }
 
 function markNeedRefresh() {
-  const target = rememberedVersion()
+  const target = targetVersion()
   if (isVersionHandled(target)) {
+    notify(false)
+    return
+  }
+  if (remoteVersion && shellVersion && remoteVersion === shellVersion) {
     notify(false)
     return
   }
@@ -91,28 +100,28 @@ export function canAutoApplyUpdate(): boolean {
   // Jamais d’auto-reload en DEV (évite boucles SW / HMR / banner)
   if (import.meta.env.DEV) return false
   if (sessionGet(AUTO_RELOAD_SESSION_KEY) === '1') return false
-  if (bootVersion && sessionGet(AUTO_RELOAD_VERSION_KEY) === bootVersion) return false
-  if (isVersionHandled(rememberedVersion())) return false
+  const target = targetVersion()
+  if (target && sessionGet(AUTO_RELOAD_VERSION_KEY) === target) return false
+  if (isVersionHandled(target)) return false
   return true
 }
 
 function markAutoApplied(): void {
   sessionSet(AUTO_RELOAD_SESSION_KEY, '1')
-  const ver = rememberedVersion()
+  const ver = targetVersion()
   if (ver) sessionSet(AUTO_RELOAD_VERSION_KEY, ver)
 }
 
-function rememberAppliedVersion(): void {
+function rememberPendingApply(): void {
   sessionSet(PENDING_APPLY_KEY, '1')
-  const ver = rememberedVersion()
+  const ver = targetVersion()
   if (ver) {
-    sessionSet(APPLIED_VERSION_KEY, ver)
+    // Ne pas marquer APPLIED tant que le shell n’a pas confirmé
     sessionRemove(DISMISSED_VERSION_KEY)
   }
 }
 
 function adoptRemoteAsApplied(version: string): void {
-  bootVersion = version
   remoteVersion = version
   sessionSet(APPLIED_VERSION_KEY, version)
   sessionRemove(PENDING_APPLY_KEY)
@@ -147,6 +156,17 @@ async function activateWaitingWorker(): Promise<boolean> {
   }
 }
 
+/** Purge les caches Workbox pour que le prochain index.html / chunks viennent du réseau. */
+async function clearAppCaches(): Promise<void> {
+  if (!('caches' in window)) return
+  try {
+    const keys = await caches.keys()
+    await Promise.all(keys.map((key) => caches.delete(key)))
+  } catch {
+    // ignore
+  }
+}
+
 async function checkVersionFile() {
   if (!navigator.onLine) return
   try {
@@ -157,31 +177,38 @@ async function checkVersionFile() {
 
     remoteVersion = data.version
 
-    // Juste après un Actualiser : adopter la version réseau, ne jamais re-banner
+    // Après Actualiser : succès seulement si le JS chargé = version déployée
     if (sessionGet(PENDING_APPLY_KEY) === '1') {
-      adoptRemoteAsApplied(data.version)
+      if (shellVersion && data.version === shellVersion) {
+        adoptRemoteAsApplied(data.version)
+        return
+      }
+      // Échec soft-update : encore l’ancien shell → re-proposer la bannière
+      sessionRemove(PENDING_APPLY_KEY)
+      sessionRemove(APPLIED_VERSION_KEY)
+      markNeedRefresh()
       return
     }
 
-    if (!bootVersion) {
-      bootVersion = data.version
+    if (!shellVersion) {
+      // Build sans VITE_APP_VERSION (tests / edge) — fallback historique
+      shellVersion = data.version
+      if (sessionGet(APPLIED_VERSION_KEY) === data.version) notify(false)
+      return
+    }
+
+    if (data.version === shellVersion) {
       if (sessionGet(APPLIED_VERSION_KEY) === data.version) {
+        notify(false)
+      } else {
+        // À jour : mémoriser pour ne pas flasher la bannière au prochain focus
+        sessionSet(APPLIED_VERSION_KEY, data.version)
         notify(false)
       }
       return
     }
 
-    if (data.version === bootVersion) {
-      if (sessionGet(APPLIED_VERSION_KEY) === data.version) notify(false)
-      return
-    }
-
-    // Nouvelle version réseau
-    if (sessionGet(APPLIED_VERSION_KEY) === data.version) {
-      adoptRemoteAsApplied(data.version)
-      return
-    }
-
+    // remote !== shell → vraie mise à jour disponible
     if (sessionGet(DISMISSED_VERSION_KEY) === data.version) {
       notify(false)
       return
@@ -218,7 +245,7 @@ export function getAppUpdateNeeded(): boolean {
 
 /** Masque la bannière pour la version courante jusqu’à une nouvelle build. */
 export function dismissAppUpdate(): void {
-  const ver = rememberedVersion()
+  const ver = targetVersion()
   if (ver) sessionSet(DISMISSED_VERSION_KEY, ver)
   notify(false)
 }
@@ -226,7 +253,7 @@ export function dismissAppUpdate(): void {
 export type ApplyAppUpdateSource = 'user' | 'auto'
 
 /**
- * Applique la mise à jour (skipWaiting + reload, ou hard navigate).
+ * Applique la mise à jour (skipWaiting + purge caches + reload).
  * @returns false si auto-reload refusé (garde anti-boucle) — afficher la bannière.
  */
 export function applyAppUpdate(source: ApplyAppUpdateSource = 'user'): boolean {
@@ -252,14 +279,16 @@ export function applyAppUpdate(source: ApplyAppUpdateSource = 'user'): boolean {
 
   applying = true
   intentionalApply = true
-  rememberAppliedVersion()
+  rememberPendingApply()
   // Bannière disparait immédiatement (avant reload)
   notify(false)
 
   clearApplyFallback()
   applyFallbackTimer = window.setTimeout(() => {
     applyFallbackTimer = null
-    hardNavigateFresh()
+    void clearAppCaches().finally(() => {
+      hardNavigateFresh()
+    })
   }, APPLY_FALLBACK_MS)
 
   void (async () => {
@@ -268,11 +297,13 @@ export function applyAppUpdate(source: ApplyAppUpdateSource = 'user'): boolean {
       if (updateSW) {
         await Promise.resolve(updateSW(true))
         // updateSW(true) peut résoudre sans controllerchange (pas de SW waiting) :
-        // le timeout hard-navigate s’occupe du reste.
+        // le timeout hard-navigate (+ purge caches) s’occupe du reste.
         return
       }
+      await clearAppCaches()
       hardNavigateFresh()
     } catch {
+      await clearAppCaches()
       hardNavigateFresh()
     }
   })()
@@ -296,7 +327,9 @@ export async function initAppUpdate(): Promise<void> {
       if (refreshing) return
       refreshing = true
       // Une seule navigation après apply intentionnel (annule le fallback)
-      hardNavigateFresh()
+      void clearAppCaches().finally(() => {
+        hardNavigateFresh()
+      })
     })
   }
 
@@ -306,7 +339,7 @@ export async function initAppUpdate(): Promise<void> {
       immediate: true,
       onNeedRefresh() {
         // Ne pas re-proposer une version déjà appliquée / dismissée
-        if (isVersionHandled(rememberedVersion())) {
+        if (isVersionHandled(targetVersion())) {
           notify(false)
           return
         }
@@ -348,4 +381,29 @@ export async function initAppUpdate(): Promise<void> {
   window.addEventListener('focus', () => {
     void checkVersionFile()
   })
+}
+
+/** @internal tests */
+export function __resetAppUpdateForTests(options?: {
+  shellVersion?: string | null
+}): void {
+  needRefresh = false
+  shellVersion =
+    options?.shellVersion !== undefined
+      ? options.shellVersion
+      : typeof import.meta.env.VITE_APP_VERSION === 'string' && import.meta.env.VITE_APP_VERSION
+        ? import.meta.env.VITE_APP_VERSION
+        : null
+  remoteVersion = null
+  updateSW = undefined
+  initialized = false
+  applying = false
+  intentionalApply = false
+  clearApplyFallback()
+  listeners.clear()
+}
+
+/** @internal tests — expose check for unit tests */
+export async function __checkVersionFileForTests(): Promise<void> {
+  await checkVersionFile()
 }

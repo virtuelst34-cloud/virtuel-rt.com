@@ -52,28 +52,36 @@ describe('guestAuthService', () => {
     expect(result.error).toMatch(/déjà pris/i);
   });
 
-  it('validateGuestSession détecte une session expirée', async () => {
+  it('validateGuestSession utilise le RPC (pas de SELECT table)', async () => {
     storeGuestToken('expired-token');
-    fromMock.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue({
-            data: {
-              guest_name: 'OldGuest',
-              avatar: 'av1',
-              initials: 'OG',
-              expires_at: new Date(Date.now() - 60_000).toISOString(),
-              session_token: 'expired-token',
-            },
-            error: null,
-          }),
-        }),
-      }),
+    rpcMock.mockResolvedValue({
+      data: { success: false, error: 'Session invité expirée' },
+      error: null,
     });
 
     const result = await validateGuestSession('expired-token');
+    expect(rpcMock).toHaveBeenCalledWith('validate_guest_session', { p_token: 'expired-token' });
+    expect(fromMock).not.toHaveBeenCalled();
     expect(result.success).toBe(false);
     expect(getStoredGuestToken()).toBeNull();
+  });
+
+  it('validateGuestSession retourne la session si valide', async () => {
+    rpcMock.mockResolvedValue({
+      data: {
+        success: true,
+        session_token: 'tok',
+        guest_name: 'Guest1',
+        avatar: 'av1',
+        initials: 'GU',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      },
+      error: null,
+    });
+
+    const result = await validateGuestSession('tok');
+    expect(result.success).toBe(true);
+    expect(result.guestName).toBe('Guest1');
   });
 
   it('clearGuestToken supprime le token', () => {

@@ -1,6 +1,7 @@
 import { supabase, Database } from './supabase';
 import { messageRateLimiter } from './rateLimiter';
 import { checkServerRateLimit, RateLimitAction } from './rateLimitService';
+import { getStoredGuestToken } from './guestAuthService';
 
 export interface Message {
   id: string;
@@ -141,14 +142,25 @@ export const supabaseDbService = {
     await enforceRateLimit('message', message.author_name);
 
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .insert(message)
-        .select()
-        .maybeSingle();
+      // RPC forces author_name = current_actor_name (guest token in same TX)
+      const { data, error } = await supabase.rpc('insert_own_message', {
+        p_salon_id: message.salon_id,
+        p_author_name: message.author_name,
+        p_author_avatar: message.author_avatar,
+        p_author_initials: message.author_initials,
+        p_text: message.text,
+        p_created_date: message.created_date,
+        p_reactions: message.reactions ?? {},
+        p_pinned: message.pinned ?? false,
+        p_is_system: message.is_system ?? false,
+        p_is_announcement: message.is_announcement ?? false,
+        p_reply_to: message.reply_to ?? null,
+        p_image_url: message.image_url ?? null,
+        p_guest_token: getStoredGuestToken(),
+      });
 
       if (error) throw error;
-      return data;
+      return data as Message | null;
     } catch (error) {
       console.error('Erreur lors de l\'ajout du message:', error);
       return null;
@@ -157,7 +169,11 @@ export const supabaseDbService = {
 
   async deleteMessage(messageId: string): Promise<void> {
     try {
-      await supabase.from('messages').delete().eq('id', messageId);
+      const { error } = await supabase.rpc('delete_own_message', {
+        p_message_id: messageId,
+        p_guest_token: getStoredGuestToken(),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Erreur lors de la suppression du message:', error);
     }
@@ -169,12 +185,22 @@ export const supabaseDbService = {
     }
 
     try {
-      const { reactions, ...otherUpdates } = updates;
+      const { reactions, pinned, ...otherUpdates } = updates;
 
       if (reactions) {
         const { error } = await supabase.rpc('update_message_reaction', {
           message_id: messageId,
           new_reactions: reactions,
+          p_guest_token: getStoredGuestToken(),
+        });
+        if (error) throw error;
+      }
+
+      if (pinned !== undefined) {
+        const { error } = await supabase.rpc('set_message_pinned', {
+          p_message_id: messageId,
+          p_pinned: !!pinned,
+          p_guest_token: getStoredGuestToken(),
         });
         if (error) throw error;
       }
@@ -494,12 +520,15 @@ export const supabaseDbService = {
   },
 
   async updatePreferences(userName: string, updates: Partial<Preferences>): Promise<void> {
-    const { error } = await supabase
-      .from('preferences')
-      .upsert(
-        { user_name: userName, ...updates },
-        { onConflict: 'user_name' },
-      );
+    // Never send is_premium from client — RPC + trigger enforce actor + premium mirror
+    const { error } = await supabase.rpc('upsert_own_preferences', {
+      p_user_name: userName,
+      p_theme: updates.theme ?? null,
+      p_party_mode: updates.party_mode ?? null,
+      p_accent_color: updates.accent_color ?? null,
+      p_compact_mode: updates.compact_mode ?? null,
+      p_guest_token: getStoredGuestToken(),
+    });
 
     if (error) throw error;
   },

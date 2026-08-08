@@ -201,9 +201,9 @@ export default function NotificationsPanel({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-start justify-end z-[1500] pt-14 pr-4 animate-in fade-in duration-300"
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end sm:items-start justify-center sm:justify-end z-[1500] p-0 sm:pt-14 sm:pr-4 animate-in fade-in duration-300 safe-area-pad"
       onClick={onClose}>
-      <div className="bg-card border border-border/50 rounded-3xl w-full max-w-[380px] max-h-[80vh] flex flex-col overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5)] animate-in slide-in-from-right duration-300"
+      <div className="bg-card border border-border/50 rounded-t-3xl sm:rounded-3xl w-full max-w-[380px] h-[min(92dvh,100%)] sm:h-auto sm:max-h-[80vh] flex flex-col overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom sm:slide-in-from-right duration-300"
         onClick={e => e.stopPropagation()}>
 
         <div className="px-4 py-3 border-b border-border flex items-center gap-2 shrink-0">

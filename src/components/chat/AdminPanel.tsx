@@ -52,6 +52,15 @@ const ALL_TABS: Tab[] = [
   { id: 'logs',        label: 'Logs',             icon: Activity },
 ];
 
+/** Hub téléphone — groupes courts au lieu du rail desktop écrasé. */
+const PHONE_HUB_GROUPS: { id: string; label: string; description: string; tabIds: string[]; icon: LucideIcon }[] = [
+  { id: 'overview', label: 'Vue d’ensemble', description: 'Tableau de bord & stats', tabIds: ['dashboard', 'stats'], icon: LayoutDashboard },
+  { id: 'community', label: 'Communauté', description: 'Salons, users, Premium', tabIds: ['salons', 'categories', 'users', 'premiumprofiles', 'premiumcodes'], icon: Users },
+  { id: 'moderation', label: 'Modération', description: 'Centre modo & sanctions', tabIds: ['modhub', 'moderation'], icon: Siren },
+  { id: 'identity', label: 'Identité', description: 'Badges, droits, actions', tabIds: ['badges', 'special', 'permissions', 'staffprofile'], icon: Award },
+  { id: 'config', label: 'Configuration', description: 'Réglages & sécurité', tabIds: ['settings', 'notifications', 'messages', 'security', 'content', 'logs'], icon: Settings },
+];
+
 export default function AdminPanel() {
   const { setShowAdmin, adminInitialTab, setAdminInitialTab } = useUI();
   const { user, supabaseUser, profiles, setProfiles } = useUser();
@@ -70,6 +79,8 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState(() =>
     adminInitialTab && ALL_TABS.some((t) => t.id === adminInitialTab) ? adminInitialTab : 'dashboard',
   );
+  /** Téléphone : hub groupes → section (évite le rail horizontal dense). */
+  const [phoneHub, setPhoneHub] = useState(() => !adminInitialTab);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const firstTabRef = useRef<HTMLButtonElement>(null);
@@ -119,9 +130,24 @@ export default function AdminPanel() {
   useEffect(() => {
     if (adminInitialTab && TABS.some((t) => t.id === adminInitialTab)) {
       setActiveTab(adminInitialTab);
+      setPhoneHub(false);
       setAdminInitialTab(null);
     }
   }, [adminInitialTab, setAdminInitialTab, TABS]);
+
+  const phoneHubGroups = useMemo(
+    () =>
+      PHONE_HUB_GROUPS.map((g) => ({
+        ...g,
+        tabs: g.tabIds.map((id) => TABS.find((t) => t.id === id)).filter(Boolean) as Tab[],
+      })).filter((g) => g.tabs.length > 0),
+    [TABS],
+  );
+
+  const openPhoneSection = (tabId: string) => {
+    setActiveTab(tabId);
+    setPhoneHub(false);
+  };
 
   useEffect(() => {
     if (!TABS.some((t) => t.id === activeTab) && TABS.length > 0) {
@@ -200,10 +226,63 @@ export default function AdminPanel() {
           </div>
         )}
 
-        <div className="flex overflow-hidden flex-1 flex-col sm:flex-row min-h-0">
-          {/* Sidebar tabs */}
+        {/* Hub téléphone */}
+        {phoneHub && (
+          <div className="sm:hidden flex-1 overflow-y-auto p-3 min-h-0 space-y-2">
+            <p className="text-[11px] text-muted-foreground/70 px-1 mb-1">
+              Choisissez une section — même données qu’au bureau, parcours plus court.
+            </p>
+            {phoneHubGroups.map((group) => {
+              const Icon = group.icon;
+              return (
+                <div key={group.id} className="rounded-xl border border-border bg-secondary/40 overflow-hidden">
+                  <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-border/60">
+                    <Icon className="w-4 h-4 text-red-400 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-semibold text-foreground">{group.label}</div>
+                      <div className="text-[10px] text-muted-foreground/60 truncate">{group.description}</div>
+                    </div>
+                  </div>
+                  <div className="p-1.5 flex flex-col gap-0.5">
+                    {group.tabs.map((tab) => {
+                      const TabIcon = tab.icon;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => openPhoneSection(tab.id)}
+                          className="flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-xs text-foreground hover:bg-red-500/10 touch-target text-left"
+                        >
+                          <TabIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className={`overflow-hidden flex-1 flex-col sm:flex-row min-h-0 ${phoneHub ? 'hidden sm:flex' : 'flex'}`}>
+          {/* Retour hub (téléphone) */}
+          <div className="sm:hidden flex items-center gap-2 px-3 py-2 border-b border-border shrink-0 bg-secondary/50">
+            <button
+              type="button"
+              onClick={() => setPhoneHub(true)}
+              className="text-xs text-primary font-medium touch-target px-2 py-1.5 rounded-lg hover:bg-primary/10"
+            >
+              ← Sections
+            </button>
+            <span className="text-[11px] text-muted-foreground truncate">
+              {TABS.find((t) => t.id === activeTab)?.label}
+            </span>
+          </div>
+
+          {/* Sidebar tabs — desktop / tablette */}
           <div
-            className="w-full sm:w-[170px] bg-secondary border-b sm:border-b-0 sm:border-r border-border p-1.5 flex flex-row sm:flex-col gap-0.5 shrink-0 overflow-x-auto sm:overflow-x-visible sm:overflow-y-auto"
+            className="hidden sm:flex w-[170px] bg-secondary border-r border-border p-1.5 flex-col gap-0.5 shrink-0 overflow-y-auto"
             role="tablist"
             aria-label="Onglets d'administration"
           >
@@ -227,11 +306,31 @@ export default function AdminPanel() {
                   }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
-                  <span className="text-[11px] sm:text-xs">{tab.label}</span>
+                  <span className="text-xs">{tab.label}</span>
                 </button>
               );
             })}
           </div>
+
+          {/* Sélecteur d’onglet frère (téléphone, dans la section) */}
+          {!phoneHub && (
+            <div className="sm:hidden flex gap-1 px-2 py-1.5 border-b border-border overflow-x-auto shrink-0">
+              {(phoneHubGroups.find((g) => g.tabs.some((t) => t.id === activeTab))?.tabs || TABS).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] border whitespace-nowrap ${
+                    activeTab === tab.id
+                      ? 'bg-red-500/12 border-red-500/25 text-red-400'
+                      : 'border-border text-muted-foreground'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-5 min-h-0" role="tabpanel" aria-live="polite">

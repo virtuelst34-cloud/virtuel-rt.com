@@ -76,6 +76,7 @@ export default function MobileBottomNav({
         {isStaff && (
           <NavBtn
             label="Staff"
+            title="Espace staff · maintien = Admin complet"
             onClick={() => {
               onExclusiveNavigate?.();
               openStaffChat(
@@ -115,6 +116,7 @@ function NavBtn({
   badge,
   active,
   onLongPress,
+  title,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -122,11 +124,13 @@ function NavBtn({
   badge?: number | null;
   active?: boolean;
   onLongPress?: () => void;
+  title?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={title || label}
       onContextMenu={(e) => {
         if (!onLongPress) return;
         e.preventDefault();

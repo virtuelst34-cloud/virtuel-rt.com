@@ -179,7 +179,7 @@ function MemberItem({
         </div>
       </button>
 
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <button type="button" onClick={onViewProfile} className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-primary hover:bg-primary/10" title="Profil" aria-label={`Voir ${member.name}`}>
           <Eye className="w-3.5 h-3.5" />
         </button>

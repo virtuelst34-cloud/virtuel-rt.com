@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Target, X } from 'lucide-react';
+import { ChevronDown, Target, X } from 'lucide-react';
 import {
   dismissWeeklyChallenge,
   getWeeklyChallenge,
@@ -13,19 +13,18 @@ interface WeeklyChallengeCardProps {
   className?: string;
 }
 
-/** Carte défi de la semaine — optionnelle, dismissible. */
+/** Carte défi de la semaine — chip compact sur téléphone, carte complète dès sm. */
 export default function WeeklyChallengeCard({ className = '' }: WeeklyChallengeCardProps) {
   const { addNotification } = useNotifications();
   const [challenge] = useState(() => getWeeklyChallenge());
   const [dismissed, setDismissed] = useState(() => isWeeklyChallengeDismissed(challenge.key));
   const [done, setDone] = useState(() => isWeeklyChallengeDone(challenge.key));
+  const [expanded, setExpanded] = useState(false);
 
   if (dismissed) return null;
 
-  return (
-    <div
-      className={`relative rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-left ${className}`}
-    >
+  const body = (
+    <>
       <button
         type="button"
         onClick={() => {
@@ -66,6 +65,34 @@ export default function WeeklyChallengeCard({ className = '' }: WeeklyChallengeC
       >
         {done ? 'Fait cette semaine ✓' : 'Je m’y mets'}
       </button>
+    </>
+  );
+
+  return (
+    <div className={className}>
+      {/* Téléphone : chip repliable */}
+      <div className="sm:hidden">
+        {!expanded ? (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-sky-500/25 bg-sky-500/10 text-left touch-target"
+          >
+            <Target className="w-3.5 h-3.5 text-sky-300 shrink-0" />
+            <span className="flex-1 text-[11px] font-medium text-foreground truncate">{challenge.title}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          </button>
+        ) : (
+          <div className="relative rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-left">
+            {body}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop / tablette : carte complète */}
+      <div className="hidden sm:block relative rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-left">
+        {body}
+      </div>
     </div>
   );
 }

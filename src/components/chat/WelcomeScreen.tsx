@@ -412,12 +412,12 @@ export default function WelcomeScreen({
           </div>
         )}
 
-        {/* Salon du moment */}
+        {/* Salon du moment — desktop/tablette (Accueil téléphone reste léger) */}
         {featuredSalon && (
           <button
             type="button"
             onClick={() => handleSalonClick(featuredSalon.salon)}
-            className="w-full max-w-sm text-left rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 hover:bg-primary/15 transition-all touch-target"
+            className="hidden sm:block w-full max-w-sm text-left rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 hover:bg-primary/15 transition-all touch-target"
           >
             <div className="flex items-center gap-2 mb-1">
               <Flame className="w-3.5 h-3.5 text-primary" />
@@ -441,7 +441,7 @@ export default function WelcomeScreen({
         )}
 
         {canModerate && (
-          <div className="w-full max-w-sm flex flex-wrap gap-2 justify-center text-[10px]">
+          <div className="hidden sm:flex w-full max-w-sm flex-wrap gap-2 justify-center text-[10px]">
             {featuredSalon?.reason === 'pin' ? (
               <button
                 type="button"
@@ -478,8 +478,22 @@ export default function WelcomeScreen({
           <Users className="w-3.5 h-3.5" /> Voir l’équipe
         </Link>
 
-        {/* En ligne — visible sur mobile / tablette (colonne droite masquée sous lg) */}
-        <div className="lg:hidden w-full max-w-sm text-left">
+        {/* Téléphone : chip En ligne (pas le carrousel dense) */}
+        <button
+          type="button"
+          onClick={() => setShowMembersPanel(true)}
+          className="sm:hidden w-full max-w-sm flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-border bg-secondary/50 text-left touch-target"
+        >
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-foreground">
+            <PulseDot /> En ligne
+          </span>
+          <span className="text-[10px] text-emerald-400 tabular-nums">
+            {onlineUsers.length + (user ? 1 : 0)} · Voir
+          </span>
+        </button>
+
+        {/* Tablette : carrousel (colonne droite absente sous lg) */}
+        <div className="hidden sm:block lg:hidden w-full max-w-sm text-left">
           <div className="flex items-center justify-between mb-2 px-0.5">
             <h3 className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5">
               <PulseDot /> En ligne
@@ -564,10 +578,11 @@ export default function WelcomeScreen({
             className="w-full max-w-sm flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/35 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/20 transition-colors touch-target"
           >
             <ShieldAlert className="w-4 h-4 shrink-0" />
-            Centre de modération
+            <span className="sm:hidden">Admin / Modo</span>
+            <span className="hidden sm:inline">Centre de modération</span>
           </button>
         )}
-        <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
+        <p className="hidden sm:block text-sm text-muted-foreground max-w-xs leading-relaxed">
           Choisissez un salon pour rejoindre une discussion,
           ou envoyez un message privé à quelqu'un.
         </p>

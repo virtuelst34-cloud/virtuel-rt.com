@@ -43,11 +43,17 @@ if ($LASTEXITCODE -ne 0) {
 $repo = "virtuelst34-cloud/virtuel-rt.com"
 Write-Host "Configuration des secrets pour $repo..." -ForegroundColor Cyan
 
-& $ghCmd secret set VITE_SUPABASE_URL --body $vars["VITE_SUPABASE_URL"] -R $repo
-& $ghCmd secret set VITE_SUPABASE_ANON_KEY --body $vars["VITE_SUPABASE_ANON_KEY"] -R $repo
+function Set-GhSecret {
+  param([string]$Name, [string]$Value)
+  # Passe la valeur via stdin pour éviter l'expansion PowerShell des $ dans les mots de passe
+  $Value | & $ghCmd secret set $Name -R $repo --body -
+}
+
+Set-GhSecret "VITE_SUPABASE_URL" $vars["VITE_SUPABASE_URL"]
+Set-GhSecret "VITE_SUPABASE_ANON_KEY" $vars["VITE_SUPABASE_ANON_KEY"]
 
 if ($vars["VITE_SENTRY_DSN"]) {
-  & $ghCmd secret set VITE_SENTRY_DSN --body $vars["VITE_SENTRY_DSN"] -R $repo
+  Set-GhSecret "VITE_SENTRY_DSN" $vars["VITE_SENTRY_DSN"]
 }
 
 # Secrets FTP Hostinger (ajoutez-les dans .env.local)
@@ -68,11 +74,11 @@ if ($ftpMissing.Count -gt 0) {
   Write-Host ""
   Write-Host "Trouvez-les dans hPanel > Fichiers > Comptes FTP" -ForegroundColor Yellow
 } else {
-  & $ghCmd secret set FTP_SERVER --body $vars["FTP_SERVER"] -R $repo
-  & $ghCmd secret set FTP_USERNAME --body $vars["FTP_USERNAME"] -R $repo
-  & $ghCmd secret set FTP_PASSWORD --body $vars["FTP_PASSWORD"] -R $repo
+  Set-GhSecret "FTP_SERVER" $vars["FTP_SERVER"]
+  Set-GhSecret "FTP_USERNAME" $vars["FTP_USERNAME"]
+  Set-GhSecret "FTP_PASSWORD" $vars["FTP_PASSWORD"]
   if ($vars["FTP_SERVER_DIR"]) {
-    & $ghCmd secret set FTP_SERVER_DIR --body $vars["FTP_SERVER_DIR"] -R $repo
+    Set-GhSecret "FTP_SERVER_DIR" $vars["FTP_SERVER_DIR"]
   }
   Write-Host "Secrets FTP configures." -ForegroundColor Green
 }

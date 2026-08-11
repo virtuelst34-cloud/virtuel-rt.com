@@ -84,9 +84,11 @@ if ($ftpMissing.Count -gt 0) {
   Write-Host "Secrets FTP configures." -ForegroundColor Green
 }
 
+$ErrorActionPreference = "Continue"
 @("VITE_BASE44_APP_ID", "VITE_BASE44_APP_BASE_URL", "VITE_BASE44_API_KEY") | ForEach-Object {
   & $ghCmd secret delete $_ -R $repo 2>$null | Out-Null
 }
+$ErrorActionPreference = "Stop"
 
 Write-Host "`nSecrets actifs :" -ForegroundColor Green
 & $ghCmd secret list -R $repo

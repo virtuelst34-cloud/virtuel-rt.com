@@ -125,7 +125,7 @@ jobs:
           protocol: ftps
           port: 21
           local-dir: ./dist/
-          server-dir: ${{ secrets.FTP_SERVER_DIR || '/domains/virtuel-rt.com/public_html/' }}
+          server-dir: /domains/virtuel-rt.com/public_html/
           log-level: verbose
           dangerous-clean-slate: true
           exclude: |

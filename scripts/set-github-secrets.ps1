@@ -46,7 +46,7 @@ Write-Host "Configuration des secrets pour $repo..." -ForegroundColor Cyan
 function Set-GhSecret {
   param([string]$Name, [string]$Value)
   # Passe la valeur via stdin pour éviter l'expansion PowerShell des $ dans les mots de passe
-  $Value | & $ghCmd secret set $Name -R $repo --body -
+  $Value.Trim() | & $ghCmd secret set $Name -R $repo --body -
 }
 
 Set-GhSecret "VITE_SUPABASE_URL" $vars["VITE_SUPABASE_URL"]
@@ -77,9 +77,10 @@ if ($ftpMissing.Count -gt 0) {
   Set-GhSecret "FTP_SERVER" $vars["FTP_SERVER"]
   Set-GhSecret "FTP_USERNAME" $vars["FTP_USERNAME"]
   Set-GhSecret "FTP_PASSWORD" $vars["FTP_PASSWORD"]
-  if ($vars["FTP_SERVER_DIR"]) {
-    Set-GhSecret "FTP_SERVER_DIR" $vars["FTP_SERVER_DIR"]
-  }
+  $serverDir = ($vars["FTP_SERVER_DIR"].Trim())
+  if (-not $serverDir) { $serverDir = "/domains/virtuel-rt.com/public_html/" }
+  if (-not $serverDir.EndsWith("/")) { $serverDir += "/" }
+  Set-GhSecret "FTP_SERVER_DIR" $serverDir
   Write-Host "Secrets FTP configures." -ForegroundColor Green
 }
 

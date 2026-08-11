@@ -119,11 +119,13 @@ jobs:
       - name: Deploy to Hostinger via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          # IP de ftp.virtuel-rt.com — évite ENOTFOUND si le secret DNS est corrompu
+          server: 145.79.20.138
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
           port: 21
+          security: loose
           local-dir: ./dist/
           server-dir: /domains/virtuel-rt.com/public_html/
           log-level: verbose

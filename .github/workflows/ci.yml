@@ -136,7 +136,7 @@ jobs:
           security: loose
           timeout: 180000
           local-dir: ./dist/
-          server-dir: /domains/virtuel-rt.com/public_html/
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
           log-level: verbose
           dangerous-clean-slate: true
           exclude: |
@@ -160,7 +160,7 @@ jobs:
           security: loose
           timeout: 300000
           local-dir: ./dist/
-          server-dir: /domains/virtuel-rt.com/public_html/
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
           log-level: verbose
           dangerous-clean-slate: true
           exclude: |

@@ -85,7 +85,7 @@ if ($ftpMissing.Count -gt 0) {
 }
 
 @("VITE_BASE44_APP_ID", "VITE_BASE44_APP_BASE_URL", "VITE_BASE44_API_KEY") | ForEach-Object {
-  & $ghCmd secret delete $_ -R $repo 2>$null
+  & $ghCmd secret delete $_ -R $repo 2>$null | Out-Null
 }
 
 Write-Host "`nSecrets actifs :" -ForegroundColor Green

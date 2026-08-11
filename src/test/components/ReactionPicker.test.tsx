@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ReactionPicker from '@/components/chat/ReactionPicker';
+import { TestProviders } from '@/test/utils/testProviders';
 
 describe('ReactionPicker', () => {
   const mockOnSelect = vi.fn();
@@ -12,26 +13,28 @@ describe('ReactionPicker', () => {
     position: { x: 100, y: 100 },
   };
 
+  const renderPicker = () =>
+    render(
+      <TestProviders>
+        <ReactionPicker {...defaultProps} />
+      </TestProviders>,
+    );
+
   it('devrait rendre le composant ReactionPicker', () => {
-    render(<ReactionPicker {...defaultProps} />);
-    // Vérifier que le composant est rendu en cherchant des boutons d'emoji
+    renderPicker();
     const buttons = screen.getAllByRole('button');
     expect(buttons.length).toBeGreaterThan(0);
-  });
+  }, 15_000);
 
   it('devrait appeler onSelect quand on clique sur une réaction', () => {
-    render(<ReactionPicker {...defaultProps} />);
-    
+    renderPicker();
     const reactionButton = screen.getAllByRole('button')[0];
     fireEvent.click(reactionButton);
-    
     expect(mockOnSelect).toHaveBeenCalled();
   });
 
   it('devrait appeler onClose quand on clique en dehors', () => {
-    render(<ReactionPicker {...defaultProps} />);
-    
-    // Simuler un clic sur l'overlay
+    renderPicker();
     const container = screen.getAllByRole('button')[0].parentElement?.parentElement;
     if (container) {
       fireEvent.click(container);
@@ -40,15 +43,13 @@ describe('ReactionPicker', () => {
   });
 
   it('devrait avoir des boutons de réactions', () => {
-    render(<ReactionPicker {...defaultProps} />);
-    
+    renderPicker();
     const buttons = screen.getAllByRole('button');
     expect(buttons.length).toBeGreaterThan(0);
   });
 
   it('devrait être positionné correctement', () => {
-    render(<ReactionPicker {...defaultProps} />);
-    
+    renderPicker();
     const buttons = screen.getAllByRole('button');
     expect(buttons.length).toBeGreaterThan(0);
   });

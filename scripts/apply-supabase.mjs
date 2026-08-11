@@ -1,7 +1,7 @@
-/**
+﻿/**
  * Applique schema.sql + migrations sur la base Supabase distante.
- * Charge automatiquement DATABASE_URL depuis .env.local si présent.
- * Ignore les migrations déjà enregistrées dans schema_migrations.
+ * Charge automatiquement DATABASE_URL depuis .env.local si prÃ©sent.
+ * Ignore les migrations dÃ©jÃ  enregistrÃ©es dans schema_migrations.
  *
  * Usage :
  *   npm run supabase:migrate
@@ -83,8 +83,27 @@ const MIGRATION_ORDER = [
   "enable_salons_rls.sql",
   "fix_friends_rls_and_realtime.sql",
   "enable_guest_friends_rls.sql",
+  "add_salons_sort_order_and_meta.sql",
+  "create_moderation_alerts_system.sql",
+  "add_salon_categories.sql",
+  "reorganize_salon_categories.sql",
+  "add_staff_messages_files_reactions.sql",
+  "add_staff_notifications.sql",
+  "gate_premium_coquin.sql",
+  "tighten_user_presence_rls.sql",
+  "fix_presence_actor_name_rls.sql",
+  "fix_presence_write_rpc_and_realtime.sql",
+  "premium_codes.sql",
+  "premium_codes_abuse_staff_merci.sql",
+  "bienvenue_founder_only_and_purge.sql",
+  "20260806220000_fix_premium_redeem_and_permissions.sql",
+  "20260807224500_fix_admin_premium_grant_rights.sql",
+  "20260807235200_fix_preferences_premium_upsert.sql",
+  "20260808001000_special_badges_imply_premium.sql",
+  "20260808120000_cleanup_supabase_mess.sql",
+  "20260808210000_harden_rls_actor_identity.sql",
+  "20260808223000_guest_dm_friends_rpc.sql",
 ];
-
 const SKIP_ERROR_CODES = new Set([
   "42P07", // duplicate_table
   "42710", // duplicate_object
@@ -129,7 +148,7 @@ async function markApplied(client, filename) {
 async function main() {
   if (!DATABASE_URL) {
     console.error(`
-❌ DATABASE_URL (ou SUPABASE_DB_URL) non défini.
+âŒ DATABASE_URL (ou SUPABASE_DB_URL) non dÃ©fini.
 
 Ajoutez dans .env.local :
   DATABASE_URL=postgresql://postgres:...@db.mqghveoldsidfxgvefts.supabase.co:5432/postgres
@@ -143,7 +162,7 @@ Puis : npm run supabase:migrate
   try {
     pg = await import("pg");
   } catch {
-    console.error("❌ Installez pg : npm install --save-dev pg");
+    console.error("âŒ Installez pg : npm install --save-dev pg");
     process.exit(1);
   }
 
@@ -153,7 +172,7 @@ Puis : npm run supabase:migrate
   });
 
   await client.connect();
-  console.log("✅ Connecté à Supabase PostgreSQL\n");
+  console.log("âœ… ConnectÃ© Ã  Supabase PostgreSQL\n");
   await ensureMigrationTable(client);
 
   const startFrom = process.env.APPLY_FROM;
@@ -168,7 +187,7 @@ Puis : npm run supabase:migrate
     }
 
     if (await isApplied(client, file)) {
-      console.log(`⏭  ${file} (déjà appliquée)`);
+      console.log(`â­  ${file} (dÃ©jÃ  appliquÃ©e)`);
       skipped++;
       continue;
     }
@@ -179,12 +198,12 @@ Puis : npm run supabase:migrate
       : join(root, "supabase", "migrations", file);
 
     if (!existsSync(path)) {
-      console.warn(`⚠️  Ignoré (absent) : ${file}`);
+      console.warn(`âš ï¸  IgnorÃ© (absent) : ${file}`);
       continue;
     }
 
     const sql = readFileSync(path, "utf8");
-    process.stdout.write(`▶ ${file} ... `);
+    process.stdout.write(`â–¶ ${file} ... `);
     try {
       await client.query(sql);
       await markApplied(client, file);
@@ -205,7 +224,7 @@ Puis : npm run supabase:migrate
   }
 
   await client.end();
-  console.log(`\n✅ Terminé : ${applied} appliquée(s), ${skipped} ignorée(s).`);
+  console.log(`\nâœ… TerminÃ© : ${applied} appliquÃ©e(s), ${skipped} ignorÃ©e(s).`);
 }
 
 main().catch((err) => {

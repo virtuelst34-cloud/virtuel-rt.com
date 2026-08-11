@@ -117,6 +117,37 @@ export const DEFAULT_BANNED_WORDS: string[] = [
   'attentat',
   'djihad',
   'rejoindre daesh',
+  // Mineurs / exploitation sexuelle (soft filter — contenu interdit)
+  'pédophile',
+  'pedophile',
+  'pédophilie',
+  'pedophilie',
+  'pedo',
+  'pédo',
+  'child porn',
+  'childporn',
+  'porno enfant',
+  'porn enfant',
+  'pornographie enfant',
+  'pornographie infantile',
+  'pornographie mineur',
+  'sexe avec mineur',
+  'sexe mineur',
+  'nude mineur',
+  'nu mineur',
+  'mineur nu',
+  'mineure nue',
+  'exploitation mineur',
+  'exploitation sexuelle mineur',
+  'lolicon',
+  'shotacon',
+  'jailbait',
+  'underage porn',
+  'underage sex',
+  'cp pack',
+  'pack cp',
+  'preteen',
+  'préteen',
 ];
 
 /** Fusionne la liste sauvegardée avec les nouveaux mots par défaut (sans doublon). */
@@ -131,4 +162,28 @@ export function mergeBannedWords(existing: string[] | null | undefined): string[
     }
   }
   return merged;
+}
+
+/** Retourne le premier mot interdit trouvé dans le texte, ou null. */
+export function findBannedWord(
+  text: string,
+  words: string[] = DEFAULT_BANNED_WORDS,
+): string | null {
+  const normalized = text.toLowerCase();
+  for (const word of words) {
+    const w = word.trim().toLowerCase();
+    if (!w) continue;
+    if (w.includes(' ')) {
+      if (normalized.includes(w)) return word;
+      continue;
+    }
+    // Mot entier (évite de bloquer « chat » dans « achat »)
+    const re = new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escapeRegExp(w)}(?:$|[^\\p{L}\\p{N}_])`, 'iu');
+    if (re.test(text)) return word;
+  }
+  return null;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

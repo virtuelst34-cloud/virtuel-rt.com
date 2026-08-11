@@ -26,7 +26,13 @@ export function createLazyComponent<T extends ComponentType<any>>(
 ): ComponentType<React.ComponentProps<T>> {
   const LazyComponent = lazy(async () => {
     const module = await importFunc();
-    return componentName === 'default' ? module : { default: module[componentName as keyof typeof module] as T };
+    if (componentName === 'default') {
+      if (module && typeof module === 'object' && 'default' in module && module.default) {
+        return module;
+      }
+      return { default: module as unknown as T };
+    }
+    return { default: module[componentName as keyof typeof module] as T };
   });
 
   return function LazyComponentWrapper(props: React.ComponentProps<T>) {

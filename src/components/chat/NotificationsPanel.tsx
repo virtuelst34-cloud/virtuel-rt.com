@@ -1,7 +1,15 @@
 import React from 'react';
-import { useNotifications, useFriends } from '@/lib/contexts';
-import { parseNotificationTarget, formatSupabaseError } from '@/lib/utils/notificationNavigation';
-import { X, Bell, CheckCheck, Trash2, Star, Zap, Shield, MessageSquare, AlertTriangle, UserCheck, LucideIcon } from 'lucide-react';
+import { useNotifications, useFriends, useUI, useUser, useSalons } from '@/lib/contexts';
+import {
+  parseNotificationTarget,
+  isNavigableNotification,
+  formatSupabaseError,
+} from '@/lib/utils/notificationNavigation';
+import { isStaffNotificationType } from '@/lib/utils/staffNotifications';
+import {
+  X, Bell, CheckCheck, Trash2, Star, Zap, Shield, MessageSquare,
+  AlertTriangle, UserCheck, MessagesSquare, Flag, ChevronRight, LucideIcon,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -45,6 +53,11 @@ const TYPE_CONFIG: Record<string, { icon: LucideIcon; color: string; bg: string 
   mod:            { icon: Shield,         color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/25' },
   block:          { icon: AlertTriangle,  color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/25' },
   report:         { icon: AlertTriangle,  color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/25' },
+  moderation_alert: { icon: Shield,       color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/25' },
+  staff_message:  { icon: MessagesSquare, color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/25' },
+  staff_ban:      { icon: Shield,         color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/25' },
+  staff_report:   { icon: Flag,           color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/25' },
+  staff_alert:    { icon: AlertTriangle,  color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/25' },
   default:        { icon: Bell,           color: 'text-purple-400',  bg: 'bg-purple-500/10 border-purple-500/25' },
 };
 
@@ -54,8 +67,18 @@ export default function NotificationsPanel({
   onOpenSettings,
   onViewProfile,
 }: NotificationsPanelProps) {
-  const { notifications, markAllRead, clearNotifications, removeNotification, markNotificationRead, addNotification } = useNotifications();
+  const {
+    notifications,
+    markAllRead,
+    clearNotifications,
+    removeNotification,
+    markNotificationRead,
+    addNotification,
+  } = useNotifications();
   const { acceptRequestFromSender, rejectRequestFromSender, reloadFriends } = useFriends();
+  const { openStaffChat, openAdmin } = useUI();
+  const { user } = useUser();
+  const { setCurrentSalon } = useSalons();
 
   const handleNotificationClick = (notif: AppNotification) => {
     void markNotificationRead?.(notif.id);
@@ -83,14 +106,44 @@ export default function NotificationsPanel({
         if (target.userName) {
           onClose();
           onViewProfile?.(target.userName);
+        } else {
+          onClose();
+          onOpenSettings?.('friends');
         }
         break;
       case 'mention':
         onClose();
+        if (target.salonId) {
+          setCurrentSalon(target.salonId);
+        }
         break;
       case 'settings_friends':
         onClose();
         onOpenSettings?.('friends');
+        break;
+      case 'settings_profile':
+        onClose();
+        onOpenSettings?.('profile');
+        break;
+      case 'settings_premium':
+        onClose();
+        onOpenSettings?.('premium');
+        break;
+      case 'staff_chat':
+        onClose();
+        openStaffChat(user, { tab: 'chat', messageId: target.messageId || null });
+        break;
+      case 'staff_tools':
+        onClose();
+        openStaffChat(user, { tab: 'tools', targetUser: target.userName || null });
+        break;
+      case 'staff_moderation':
+        onClose();
+        openStaffChat(user, { tab: 'tools', targetUser: target.userName || null });
+        break;
+      case 'staff_modhub':
+        onClose();
+        openAdmin(user, 'modhub');
         break;
       default:
         break;
@@ -148,19 +201,19 @@ export default function NotificationsPanel({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-start justify-end z-[1500] pt-14 pr-4 animate-in fade-in duration-300"
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end sm:items-start justify-center sm:justify-end z-[1500] p-0 sm:pt-14 sm:pr-4 animate-in fade-in duration-300 safe-area-pad"
       onClick={onClose}>
-      <div className="bg-card border border-border/50 rounded-3xl w-full max-w-[380px] max-h-[80vh] flex flex-col overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5)] animate-in slide-in-from-right duration-300"
+      <div className="bg-card border border-border/50 rounded-t-3xl sm:rounded-3xl w-full max-w-[380px] h-[min(92dvh,100%)] sm:h-auto sm:max-h-[80vh] flex flex-col overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom sm:slide-in-from-right duration-300"
         onClick={e => e.stopPropagation()}>
 
         <div className="px-4 py-3 border-b border-border flex items-center gap-2 shrink-0">
           <Bell className="w-4 h-4 text-purple-400 animate-pulse" />
           <span className="text-[13px] font-semibold text-foreground flex-1">Notifications</span>
-          <button onClick={markAllRead} title="Tout marquer comme lu"
+          <button onClick={() => void markAllRead()} title="Tout marquer comme lu"
             className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-all duration-200 hover:scale-110 active:scale-95">
             <CheckCheck className="w-3.5 h-3.5" />
           </button>
-          <button onClick={clearNotifications} title="Tout effacer"
+          <button onClick={() => void clearNotifications()} title="Tout effacer"
             className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 hover:scale-110 active:scale-95">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -171,19 +224,31 @@ export default function NotificationsPanel({
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground/40">
-              <Bell className="w-8 h-8 animate-float" />
-              <p className="text-xs">Aucune notification</p>
-            </div>
-          ) : (
-            (notifications as AppNotification[]).map((notif, index) => {
+          {(() => {
+            // Système B uniquement — les alertes staff (Système A) restent sur Espace staff
+            const generalNotifs = (notifications as AppNotification[]).filter(
+              (n) => !isStaffNotificationType(n.type),
+            );
+            if (generalNotifs.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground/40">
+                  <Bell className="w-8 h-8 animate-float" />
+                  <p className="text-xs">Aucune notification</p>
+                </div>
+              );
+            }
+            return generalNotifs.map((notif, index) => {
               const cfg = TYPE_CONFIG[notif.type] || TYPE_CONFIG.default;
-              const Icon = cfg.icon;
+              const Icon = cfg.icon || Bell;
               const actions = resolveActions(notif);
               const hasActions = actions.length > 0;
               const groupCount = notif.groupCount;
-              const isClickable = notif.type === 'dm' || notif.type === 'friend_request' || notif.type === 'friend_accepted' || notif.type === 'mention';
+              const isClickable = isNavigableNotification(
+                notif.type,
+                notif.groupKey,
+                notif.message,
+                notif.metadata,
+              );
 
               return (
                 <div key={notif.id}
@@ -238,7 +303,10 @@ export default function NotificationsPanel({
                       </div>
                     )}
                   </div>
-                  {!notif.read && (
+                  {isClickable && (
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0 mt-1.5" aria-hidden />
+                  )}
+                  {!notif.read && !isClickable && (
                     <button
                       onClick={e => {
                         e.stopPropagation();
@@ -252,8 +320,8 @@ export default function NotificationsPanel({
                   )}
                 </div>
               );
-            })
-          )}
+            });
+          })()}
         </div>
       </div>
     </div>

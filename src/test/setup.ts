@@ -57,13 +57,16 @@ vi.mock('@/lib/presenceService', () => ({
     setOnline: vi.fn().mockResolvedValue(undefined),
     setOffline: vi.fn().mockResolvedValue(undefined),
     updateUserSalon: vi.fn().mockResolvedValue(undefined),
+    updateCurrentSalon: vi.fn().mockResolvedValue(undefined),
     updateStatus: vi.fn().mockResolvedValue(undefined),
+    touch: vi.fn().mockResolvedValue(undefined),
     disconnect: vi.fn(),
     subscribe: vi.fn(() => vi.fn()),
     getOnlineUsers: vi.fn(() => []),
     getOnlineUsersInSalon: vi.fn(() => []),
     getOnlineCountInSalon: vi.fn(() => 0),
     getAllSalonPresence: vi.fn(() => new Map()),
+    getHeartbeatIntervalMs: vi.fn(() => 60_000),
   },
 }))
 

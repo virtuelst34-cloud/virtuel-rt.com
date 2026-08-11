@@ -29,7 +29,7 @@ describe('storageService', () => {
     expect(uploadMock).toHaveBeenCalledWith(
       expect.stringContaining('GuestUser/'),
       file,
-      expect.objectContaining({ upsert: false }),
+      expect.objectContaining({ upsert: false, cacheControl: '31536000' }),
     );
   });
 

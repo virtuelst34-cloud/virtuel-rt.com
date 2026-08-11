@@ -3,7 +3,6 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 import { FriendsProvider, useFriends } from '@/lib/contexts/FriendsContext'
 import { NotificationsProvider } from '@/lib/contexts/NotificationsContext'
 import { UserProvider } from '@/lib/contexts/UserContext'
-import { supabase } from '@/lib/supabase'
 import type { ReactNode } from 'react'
 
 vi.mock('@/lib/supabaseDb', () => ({
@@ -48,13 +47,13 @@ describe('FriendsContext', () => {
     })
   })
 
-  it('ne plante pas si supabase.from est appelé via reloadFriends sans session', async () => {
+  it('ne plante pas si reloadFriends est appelé sans session', async () => {
     const { result } = renderHook(() => useFriends(), { wrapper })
 
     await act(async () => {
-      await result.current.reloadFriends()
+      await expect(result.current.reloadFriends()).resolves.toBeUndefined()
     })
 
-    expect(supabase.from).toBeDefined()
+    expect(result.current.friends).toEqual([])
   })
 })

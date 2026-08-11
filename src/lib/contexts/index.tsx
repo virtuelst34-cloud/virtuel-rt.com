@@ -1,6 +1,12 @@
 import React, { ReactNode, useMemo } from 'react';
 import { UserProvider, useUser } from './UserContext';
-import { MessagesProvider, useMessages } from './MessagesContext';
+import {
+  MessagesProvider,
+  useMessages,
+  useMessagesState,
+  useMessagesActions,
+  useSalonMessages,
+} from './MessagesContext';
 import { ModerationProvider, useModeration } from './ModerationContext';
 import { NotificationsProvider, useNotifications } from './NotificationsContext';
 import { PreferencesProvider, usePreferences } from './PreferencesContext';
@@ -58,7 +64,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
 // Réexporter tous les hooks pour un accès facile
 export { useUser, UserProvider };
-export { useMessages, MessagesProvider };
+export { useMessages, useMessagesState, useMessagesActions, useSalonMessages, MessagesProvider };
 export { useModeration, ModerationProvider };
 export { useNotifications, NotificationsProvider };
 export { usePreferences, PreferencesProvider };
@@ -82,7 +88,7 @@ export { useGlobalSettings, GlobalSettingsProvider };
  *   NotificationsCtx : notifications, addNotification, markAllRead, clearNotifications, unreadCount
  *   PreferencesCtx   : theme, accentColor, toggleTheme, partyMode, togglePartyMode, isPremium, setPremium, compactMode, toggleCompactMode
  *   SalonsContext    : customSalons, currentSalon, addSalon, removeSalon, updateSalon, isSalonLocked, setCurrentSalon
- *   UIContext        : showAdmin, showProfile, openAdmin, closeAdmin, openProfile, closeProfile
+ *   UIContext        : showAdmin, profileTarget, openUserProfile, closeUserProfile, openAdmin, openStaffChat
  *   XPContext        : monthlyXP, awardXP, sounds, getTopUsers
  *   BadgesContext    : customBadges, addBadge, removeBadge, updateBadge
  *   DMContext        : (dm state & actions)

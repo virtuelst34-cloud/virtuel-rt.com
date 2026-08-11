@@ -22,7 +22,7 @@ export function hasFounderAccess(user: UserProfile | null | undefined): boolean 
 }
 
 /**
- * Accès modification panneau admin (fondateur, direction, master OP, modérateur admin…)
+ * Accès modification panneau admin (fondateur, direction, master OP, admin…)
  */
 export function hasAdminAccess(
   user: UserProfile | null | undefined,
@@ -39,4 +39,14 @@ export function hasAdminAccess(
     badges.includes('direction') ||
     badges.includes('master_op')
   );
+}
+
+/**
+ * Accès staff (alertes, signalements, chat direction) — inclut les modérateurs.
+ */
+export function hasStaffAccess(user: UserProfile | null | undefined): boolean {
+  if (!user) return false;
+  if (hasAdminAccess(user)) return true;
+  const badges = user.specialBadges || [];
+  return badges.includes('moderator') || badges.includes('direction') || badges.includes('master_op') || badges.includes('founder');
 }

@@ -1,12 +1,14 @@
 import React, { useState, useRef, memo, RefObject, useCallback, useMemo, useEffect } from 'react';
 import Avatar from './Avatar';
-import DiamondBadge from './DiamondBadge';
+import UserDisplayName from './UserDisplayName';
+import SpecialBadgeInline from './SpecialBadgeInline';
 import SafeMessageContent from './SafeMessageContent';
-import { useUser, usePreferences, useMuteBlock } from '@/lib/contexts';
+import { useUser, usePreferences, useMuteBlock, useNotifications, useUI } from '@/lib/contexts';
 import { useModeration } from '@/lib/contexts';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { Smile, Trash2, Flag, UserX, Pin, Pencil, Reply } from 'lucide-react';
+import { Smile, Trash2, Flag, UserX, Pin, Pencil, Reply, Bookmark } from 'lucide-react';
 import { format } from 'date-fns';
+import { getMood, getSignature, SIGNATURE_EVENT, isBookmarked, toggleBookmark } from '@/lib/funFeatures';
 
 interface Message {
   id: string;
@@ -34,26 +36,46 @@ interface MessageBubbleContentProps {
   onViewProfile?: (authorName: string) => void;
   onReply?: (message: Message) => void;
   onReport?: (messageId: string, authorName: string, text: string) => void;
+  salonId?: string;
+  salonName?: string;
 }
 
-const MessageBubbleContent = function MessageBubbleContent({ message, onReact, onDelete, onPin, onEdit, onViewProfile, onReply, onReport }: MessageBubbleContentProps) {
-  const { user } = useUser();
+const MessageBubbleContent = function MessageBubbleContent({ message, onReact, onDelete, onPin, onEdit, onViewProfile, onReply, onReport, salonId, salonName }: MessageBubbleContentProps) {
+  const { user, profiles } = useUser();
   const { compactMode } = usePreferences();
   const { reportMessage } = useModeration();
   const { blockUser } = useMuteBlock();
+  const { addNotification } = useNotifications();
+  const { openUserProfile } = useUI();
   const { can, isAdmin } = usePermissions();
   const [canDeleteAny, setCanDeleteAny] = useState(false);
+  const [bookmarked, setBookmarked] = useState(() => isBookmarked(user?.name, message.id));
+
+  useEffect(() => {
+    setBookmarked(isBookmarked(user?.name, message.id));
+  }, [user?.name, message.id]);
 
   useEffect(() => {
     void can('chat', 'delete_any').then(setCanDeleteAny);
   }, [can]);
 
   const isOwn = message.author_name === user?.name;
-  const showCreatorBadges =
-    isOwn &&
-    !!user &&
-    (user.isFounder || user.specialBadges?.includes('founder')) &&
-    (user.isIridescent || user.specialBadges?.includes('iridescent'));
+  const authorProfile = isOwn ? user : profiles[message.author_name];
+  const authorMood = getMood(message.author_name);
+  const [authorSignature, setAuthorSignature] = useState(() => getSignature(message.author_name));
+
+  useEffect(() => {
+    setAuthorSignature(getSignature(message.author_name));
+  }, [message.author_name]);
+
+  useEffect(() => {
+    const onSig = () => {
+      setAuthorSignature(getSignature(message.author_name));
+    };
+    window.addEventListener(SIGNATURE_EVENT, onSig);
+    return () => window.removeEventListener(SIGNATURE_EVENT, onSig);
+  }, [message.author_name]);
+
   const canDeleteMessage = isOwn || isAdmin || canDeleteAny;
   const [hovered, setHovered]       = useState(false);
   const [reported, setReported]     = useState(false);
@@ -114,35 +136,43 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
         className={`${compactMode ? 'mt-0' : 'mt-0.5'} shrink-0 transition-transform duration-200 hover:scale-110 cursor-pointer`} 
         onClick={(e) => {
           e.stopPropagation();
-          onViewProfile?.(message.author_name);
+          if (onViewProfile) onViewProfile(message.author_name);
+          else openUserProfile(message.author_name);
         }}
         aria-label={`Voir le profil de ${message.author_name}`}
         title={`Voir le profil de ${message.author_name}`}>
-        <Avatar avatarClass={message.author_avatar} initials={message.author_initials} size={compactMode ? 'sm' : 'md'} />
+        <Avatar avatarClass={message.author_avatar} initials={message.author_initials} size={compactMode ? 'sm' : 'md'} mood={authorMood} />
       </button>
 
       <div className={`max-w-[70%] flex flex-col ${compactMode ? 'gap-0.5' : 'gap-1'} ${isOwn ? 'items-end' : ''}`}>
         {/* Auteur + heure */}
-        <div className={`flex items-center gap-1.5 ${isOwn ? 'flex-row-reverse' : ''}`}>
-          <button 
-            className={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline transition-colors ${isOwn ? 'text-emerald-400' : 'text-purple-300'} cursor-pointer`}
+        <div className={`flex items-center gap-1.5 flex-wrap ${isOwn ? 'flex-row-reverse' : ''}`}>
+          <UserDisplayName
+            name={message.author_name}
+            profile={authorProfile}
+            level={authorProfile?.level}
+            size="xs"
+            showSpecialLabels={!compactMode}
+            nameClassName={`${compactMode ? 'text-[10px]' : 'text-xs'} font-semibold hover:underline transition-colors ${isOwn ? 'text-emerald-700 dark:text-emerald-400' : 'text-purple-700 dark:text-purple-300'}`}
             onClick={(e) => {
               e.stopPropagation();
-              onViewProfile?.(message.author_name);
+              if (onViewProfile) onViewProfile(message.author_name);
+              else openUserProfile(message.author_name);
             }}
             id={`message-author-${message.id}`}
-            aria-label={`Message de ${message.author_name}`}>
-            {message.author_name}
-          </button>
-          {showCreatorBadges && (
-            <span className={`inline-flex items-center gap-1 ${isOwn ? 'mr-1' : 'ml-1'}`} aria-label="Badges créateur">
-              <DiamondBadge level={1} size="xs" specialBadge="founder" />
-              <DiamondBadge level={1} size="xs" specialBadge="iridescent" />
-            </span>
-          )}
+            aria-label={`Message de ${message.author_name}`}
+          />
           <span className={`${compactMode ? 'text-[9px]' : 'text-[10px]'} text-muted-foreground/40`} aria-label={`Envoyé à ${time}`}>{time}</span>
           {message.pinned && <Pin className="w-3 h-3 text-amber-400 animate-bounce" aria-label="Message épinglé" />}
         </div>
+        {authorSignature && (
+          <span
+            className={`${compactMode ? 'text-[9px]' : 'text-[10px]'} text-muted-foreground/50 italic ${isOwn ? 'text-right' : ''} -mt-0.5 mb-0.5`}
+            title="Signature chat"
+          >
+            {authorSignature}
+          </span>
+        )}
 
         {/* Bulle + toolbar */}
         <div className="relative transition-all duration-300 hover:scale-[1.02]">
@@ -154,7 +184,14 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
               style={{ borderLeftColor: isOwn ? '#34d399' : '#a78bfa' }}
               role="complementary"
               aria-label={`Réponse à ${message.replyTo.author_name}`}>
-              <span className="font-semibold" style={{ color: isOwn ? '#34d399' : '#a78bfa' }}>@{message.replyTo.author_name}</span>
+              <span className="inline-flex items-center gap-1 font-semibold" style={{ color: isOwn ? '#34d399' : '#a78bfa' }}>
+                @{message.replyTo.author_name}
+                <SpecialBadgeInline
+                  profile={profiles[message.replyTo.author_name] || (message.replyTo.author_name === user?.name ? user : null)}
+                  size="xs"
+                  showLabels={false}
+                />
+              </span>
               {' '}{message.replyTo.text}
             </div>
           )}
@@ -162,8 +199,8 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
           <div 
             className={`${compactMode ? 'px-2 py-1.5 text-[12px]' : 'px-3 py-2 text-[13px]'} text-foreground leading-relaxed break-words transition-all duration-200
             ${isOwn
-              ? 'bg-purple-700/25 border border-purple-500/30 rounded-xl rounded-br-sm hover:bg-purple-700/35'
-              : 'bg-secondary/80 border border-border rounded-xl rounded-bl-sm hover:bg-secondary/90'
+              ? 'bg-purple-600/15 dark:bg-purple-700/25 border border-purple-500/40 dark:border-purple-500/30 rounded-xl rounded-br-sm hover:bg-purple-600/25 dark:hover:bg-purple-700/35'
+              : 'bg-secondary border border-border rounded-xl rounded-bl-sm hover:bg-secondary/90'
             }`}
             id={`message-content-${message.id}`}>
             {isEditing && onEdit ? (
@@ -229,6 +266,30 @@ const MessageBubbleContent = function MessageBubbleContent({ message, onReact, o
                 aria-haspopup="dialog"
                 title="Réagir">
                 <Smile className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+
+              {/* Favoris */}
+              <button
+                onClick={() => {
+                  if (!user?.name) return;
+                  const added = toggleBookmark(user.name, {
+                    id: message.id,
+                    salonId: salonId || '',
+                    salonName,
+                    author_name: message.author_name,
+                    text: message.text,
+                    created_date: message.created_date,
+                  });
+                  setBookmarked(added);
+                  addNotification({
+                    type: 'system',
+                    message: added ? 'Message ajouté aux favoris.' : 'Favori retiré.',
+                  });
+                }}
+                className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 ${bookmarked ? 'text-rose-400 bg-rose-500/10' : 'text-muted-foreground/60 hover:bg-white/[0.08] hover:text-rose-400'}`}
+                aria-label={bookmarked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                title={bookmarked ? 'Retirer des favoris' : 'Favori'}>
+                <Bookmark className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
 
               {/* Épingler */}
@@ -334,6 +395,8 @@ export default memo(MessageBubbleContent, (prevProps, nextProps) => {
     prevProps.onViewProfile === nextProps.onViewProfile &&
     prevProps.onReply === nextProps.onReply &&
     prevProps.onReport === nextProps.onReport &&
-    prevProps.onEdit === nextProps.onEdit
+    prevProps.onEdit === nextProps.onEdit &&
+    prevProps.salonId === nextProps.salonId &&
+    prevProps.salonName === nextProps.salonName
   );
 });

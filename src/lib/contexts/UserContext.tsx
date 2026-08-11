@@ -53,6 +53,8 @@ interface UserContextType {
   setUserStatusAdmin: (name: string, status: UserProfile['status']) => void;
   profiles: Record<string, UserProfile>;
   setProfiles: React.Dispatch<React.SetStateAction<Record<string, UserProfile>>>;
+  /** Charge les profils manquants (badges spéciaux inclus) par pseudo. */
+  ensureProfiles: (names: string[]) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | null>(null);
@@ -101,6 +103,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUserProfile | null>(null);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const isMountedRef = useRef(true);
+  const profilesRef = useRef(profiles);
+  profilesRef.current = profiles;
+  const pendingProfileFetches = useRef<Set<string>>(new Set());
   const { addNotification } = useNotifications();
 
   const trackLogin = useCallback((userId: string) => {
@@ -225,21 +230,33 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [loadGuestSession, trackLogin]);
 
+  const selfNameLiveRef = useRef<string | null>(null);
+  selfNameLiveRef.current = user?.name ?? null;
+  const isLoggedIn = !!user;
+
+  // One profiles channel for the whole session (not recreated on every name tweak).
+  // Only apply rows we already track (or self) to avoid global re-renders on idle traffic.
   useEffect(() => {
+    if (!isLoggedIn) return;
+
     const channel = supabase
       .channel('profiles_changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'profiles' },
-        async (payload) => {
-          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-            const updatedProfile = payload.new as SupabaseUserProfile;
-            const mappedProfile = mapSupabaseProfile(updatedProfile);
-            setProfiles(prev => ({ ...prev, [mappedProfile.name]: mappedProfile }));
-            if (user && user.name === mappedProfile.name) {
-              setUser(mappedProfile);
-            }
-          }
+        (payload) => {
+          if (typeof document !== 'undefined' && document.hidden) return;
+          if (payload.eventType !== 'UPDATE' && payload.eventType !== 'INSERT') return;
+
+          const updatedProfile = payload.new as SupabaseUserProfile;
+          const mappedProfile = mapSupabaseProfile(updatedProfile);
+          const isSelf = selfNameLiveRef.current === mappedProfile.name;
+
+          setProfiles((prev) => {
+            if (!isSelf && !prev[mappedProfile.name]) return prev;
+            return { ...prev, [mappedProfile.name]: { ...prev[mappedProfile.name], ...mappedProfile } };
+          });
+          if (isSelf) setUser(mappedProfile);
         },
       )
       .subscribe();
@@ -247,7 +264,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [isLoggedIn]);
 
   const login = useCallback(async (name: string, avatar: string, initials: string) => {
     const trimmed = name.trim();
@@ -286,42 +303,53 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const mappedUser = mapSupabaseProfile(sbUser);
     setUser(mappedUser);
     setProfiles(prev => ({ ...prev, [mappedUser.name]: mappedUser }));
-    void presenceService.initialize(sbUser.id).then(() => {
-      presenceService.setOnline(sbUser.id, undefined, {
-        name: sbUser.name,
-        avatar: sbUser.avatar,
-        initials: sbUser.initials,
-        status: sbUser.status || 'online',
+    // Présence clé = pseudo (aligné RLS current_actor_name), jamais l'UUID auth
+    void presenceService.initialize(mappedUser.name).then(() => {
+      presenceService.setOnline(mappedUser.name, undefined, {
+        name: mappedUser.name,
+        avatar: mappedUser.avatar,
+        initials: mappedUser.initials,
+        status: mappedUser.status || 'online',
       });
     });
   }, []);
 
   useEffect(() => {
-    const userId = supabaseUser?.id || user?.name;
-    if (!userId) return;
+    const presenceKey = user?.name;
+    if (!presenceKey) return;
 
     const markOffline = () => {
-      void presenceService.setOffline(userId);
+      void presenceService.setOffline(presenceKey);
     };
 
-    const heartbeat = window.setInterval(() => {
-      void presenceService.touch(userId, user?.status || 'online');
-    }, 30000);
+    const beat = () => {
+      void presenceService.touch(presenceKey, user?.status || 'online');
+    };
+
+    // ~60s : stale client = 4 min ≈ 3–4 heartbeats manqués (Accueil inclus, hors salon).
+    const heartbeat = window.setInterval(beat, presenceService.getHeartbeatIntervalMs());
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') beat();
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
     window.addEventListener('pagehide', markOffline);
     window.addEventListener('beforeunload', markOffline);
 
     return () => {
       window.clearInterval(heartbeat);
+      document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('pagehide', markOffline);
       window.removeEventListener('beforeunload', markOffline);
     };
-  }, [supabaseUser?.id, user?.name, user?.status]);
+  }, [user?.name, user?.status]);
 
   const logout = useCallback(async () => {
-    const userId = supabaseUser?.id || user?.name;
-    if (userId) {
-      presenceService.setOffline(userId);
+    const presenceKey = user?.name;
+    if (presenceKey) {
+      await presenceService.setOffline(presenceKey);
+      presenceService.disconnect();
     }
 
     if (user && !supabaseUser) {
@@ -349,8 +377,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       saveGuestProfileCache(updated as unknown as Record<string, unknown>);
     }
 
-    const presenceUserId = supabaseUser?.id || updated.name;
-    void presenceService.updateStatus(presenceUserId, (updated.status || 'online') as UserProfile['status'], {
+    void presenceService.updateStatus(updated.name, (updated.status || 'online') as UserProfile['status'], {
       name: updated.name,
       avatar: updated.avatar,
       initials: updated.initials,
@@ -367,7 +394,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
           status_text: updated.statusText,
           level: updated.level,
           xp: updated.xp,
-          is_premium: updated.isPremium,
+          // is_premium : uniquement via admin_set_premium (RLS/trigger)
           age: updated.age,
           city: updated.city,
           gender: updated.gender,
@@ -381,28 +408,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const setStatus = useCallback((status: UserProfile['status']) => {
     updateProfile({ status });
 
-    if (supabaseUser) {
-      if (status === 'offline') {
-        presenceService.setOffline(supabaseUser.id);
-      } else {
-        presenceService.updateStatus(supabaseUser.id, status, {
-          name: user?.name || '',
-          avatar: user?.avatar || 'av1',
-          initials: user?.initials || '',
-        });
-      }
-    } else if (user) {
-      if (status === 'offline') {
-        presenceService.setOffline(user.name);
-      } else {
-        presenceService.updateStatus(user.name, status, {
-          name: user.name,
-          avatar: user.avatar,
-          initials: user.initials,
-        });
-      }
+    if (!user?.name) return;
+    if (status === 'offline') {
+      presenceService.setOffline(user.name);
+    } else {
+      presenceService.updateStatus(user.name, status, {
+        name: user.name,
+        avatar: user.avatar || 'av1',
+        initials: user.initials || '',
+      });
     }
-  }, [updateProfile, supabaseUser, user]);
+  }, [updateProfile, user]);
 
   const setUserStatusAdmin = useCallback((name: string, status: UserProfile['status']) => {
     setProfiles(prev => {
@@ -410,6 +426,44 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (!p) return prev;
       return { ...prev, [name]: { ...p, status } };
     });
+  }, []);
+
+  const ensureProfiles = useCallback(async (names: string[]) => {
+    const unique = [...new Set(names.map((n) => n?.trim()).filter(Boolean))];
+    const toFetch = unique.filter((n) => {
+      if (profilesRef.current[n]) return false;
+      if (pendingProfileFetches.current.has(n)) return false;
+      pendingProfileFetches.current.add(n);
+      return true;
+    });
+    if (toFetch.length === 0) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(
+          'id, name, avatar, initials, bio, status, status_text, level, xp, is_premium, premium_until, is_admin, is_founder, is_direction, is_master_op, is_iridescent, special_badges, age, city, gender, email, email_confirmed_at, created_at, updated_at',
+        )
+        .in('name', toFetch);
+
+      if (error) throw error;
+      if (!isMountedRef.current) return;
+
+      if (data?.length) {
+        setProfiles((prev) => {
+          const next = { ...prev };
+          for (const row of data) {
+            const mapped = mapSupabaseProfile(row as SupabaseUserProfile);
+            next[mapped.name] = { ...next[mapped.name], ...mapped };
+          }
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('ensureProfiles:', err);
+    } finally {
+      toFetch.forEach((n) => pendingProfileFetches.current.delete(n));
+    }
   }, []);
 
   const value: UserContextType = {
@@ -423,6 +477,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setUserStatusAdmin,
     profiles,
     setProfiles,
+    ensureProfiles,
   };
 
   return (
@@ -444,6 +499,7 @@ export function useUser(): UserContextType {
     supabaseUser: null,
     profiles: {},
     setProfiles: () => {},
+    ensureProfiles: async () => {},
     login: async () => ({ success: false, error: 'UserProvider manquant' }),
     loginWithSupabase: () => {},
     logout: () => {},

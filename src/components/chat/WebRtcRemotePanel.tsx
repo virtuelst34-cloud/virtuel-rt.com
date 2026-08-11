@@ -21,9 +21,9 @@ export default function WebRtcRemotePanel({ streams }: Props) {
   if (streams.length === 0) return null;
 
   return (
-    <div className="flex gap-2 px-4 py-2 border-b border-border bg-card/40 overflow-x-auto shrink-0" data-testid="webrtc-remote-panel">
+    <div className="flex gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 border-b border-border bg-card/40 overflow-x-auto shrink-0 max-h-[18vh] sm:max-h-none" data-testid="webrtc-remote-panel">
       {streams.map(info => (
-        <div key={info.peerId} className="relative shrink-0 w-32 h-24 rounded-xl overflow-hidden bg-black border border-border">
+        <div key={info.peerId} className="relative shrink-0 w-24 h-16 sm:w-32 sm:h-24 rounded-xl overflow-hidden bg-black border border-border">
           <video
             ref={el => { if (el) refs.current.set(info.peerId, el); }}
             autoPlay

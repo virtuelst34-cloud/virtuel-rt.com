@@ -53,6 +53,15 @@ export function TypingProvider({ children }: { children: ReactNode }) {
     return channel;
   }, [user?.name]);
 
+  /** Drop idle typing channels when leaving a salon to avoid Realtime leaks. */
+  const releaseUnusedChannels = useCallback((keepSalonId?: string | null) => {
+    for (const [salonId, channel] of channelsRef.current.entries()) {
+      if (keepSalonId && salonId === keepSalonId) continue;
+      supabase.removeChannel(channel);
+      channelsRef.current.delete(salonId);
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       for (const channel of channelsRef.current.values()) {
@@ -90,13 +99,14 @@ export function TypingProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    releaseUnusedChannels(salonId);
     const channel = ensureChannel(salonId);
     void channel.send({
       type: 'broadcast',
       event: 'typing',
       payload: { username, isTyping },
     });
-  }, [ensureChannel]);
+  }, [ensureChannel, releaseUnusedChannels]);
 
   const isUserTyping = useCallback((salonId: string, username: string) => {
     return typingUsers[salonId]?.has(username) || false;

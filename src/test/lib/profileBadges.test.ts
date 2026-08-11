@@ -71,5 +71,23 @@ describe('profileBadges', () => {
 
     expect(mapped.isAdmin).toBe(true);
     expect(mapped.isDirection).toBe(true);
+    expect(mapped.isPremium).toBe(true);
+  });
+
+  it('mapSupabaseProfile Premium si badge VIP même sans is_premium', () => {
+    const mapped = mapSupabaseProfile({
+      id: '2',
+      name: 'VipUser',
+      avatar: 'av1',
+      initials: 'VI',
+      status: 'online',
+      level: 1,
+      xp: 0,
+      is_premium: false,
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      special_badges: ['vip'],
+    });
+    expect(mapped.isPremium).toBe(true);
   });
 });

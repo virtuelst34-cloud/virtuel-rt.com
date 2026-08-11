@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import pg from 'pg';
+import { assertProbeAllowed } from './lib/probeGuard.mjs';
 
 const env = readFileSync('.env.local', 'utf8');
 const url = env.match(/DATABASE_URL=(.+)/)?.[1]?.trim();
@@ -7,6 +8,7 @@ if (!url) {
   console.error('DATABASE_URL missing');
   process.exit(1);
 }
+assertProbeAllowed(url, { label: 'check-db-functions' });
 
 const client = new pg.Client({ connectionString: url });
 await client.connect();
@@ -29,7 +31,7 @@ console.log('Tables:', tbl.rows[0]);
 const rls = await client.query(`
   SELECT relname, relrowsecurity
   FROM pg_class
-  WHERE relname IN ('preferences', 'guest_sessions')
+  WHERE relname IN ('guest_sessions', 'preferences', 'messages')
 `);
 console.log('RLS:', rls.rows);
 

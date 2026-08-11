@@ -1,6 +1,7 @@
-#env
+# env
 .env
 .env.local
+.env.*.local
 !.env.example
 
 # Logs
@@ -16,6 +17,19 @@ node_modules
 dist
 dist-ssr
 *.local
+*.bak
+
+# Coverage / test artifacts
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Legacy pre-src trees (app lives in src/)
+/components/
+/lib/
+/entities/
 
 # Editor directories and files
 .vscode/*
@@ -29,3 +43,11 @@ dist-ssr
 *.sw?
 
 .vite
+supabase/.temp/
+
+# One-shot local patch scripts (if recreated)
+scripts/patch-*.mjs
+scripts/fix-achievements-import.mjs
+
+# Generated local archives
+*.zip

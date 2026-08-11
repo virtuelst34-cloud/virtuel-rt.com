@@ -39,12 +39,25 @@ export function profileFlagsFromBadges(badges: string[]) {
   };
 }
 
+/** Badges spéciaux / staff qui impliquent Premium (aligné SQL profile_qualifies_for_badge_premium). */
+export function badgesImplyPremium(badges: string[]): boolean {
+  return badges.some((b) =>
+    ['vip', 'founder', 'direction', 'master_op', 'moderator', 'iridescent'].includes(b),
+  );
+}
+
 export function mapSupabaseProfile(profile: SupabaseUserProfile): UserProfile {
   const specialBadges = badgesFromProfile(profile);
   const isFounder = specialBadges.includes('founder');
   const isDirection = specialBadges.includes('direction');
   const isMasterOp = specialBadges.includes('master_op');
   const isIridescent = specialBadges.includes('iridescent');
+  const until = (profile as { premium_until?: string | null }).premium_until;
+  const untilOk = !until || new Date(until).getTime() > Date.now();
+  const isPremium =
+    !!(profile.is_premium && untilOk) ||
+    badgesImplyPremium(specialBadges) ||
+    !!profile.is_admin;
 
   return {
     id: profile.id,
@@ -58,7 +71,7 @@ export function mapSupabaseProfile(profile: SupabaseUserProfile): UserProfile {
     isBanned: false,
     isMuted: false,
     banReason: '',
-    isPremium: profile.is_premium,
+    isPremium,
     isAdmin: !!profile.is_admin || isFounder || isDirection || isMasterOp,
     status: profile.status || 'online',
     joinedAt: profile.created_at,

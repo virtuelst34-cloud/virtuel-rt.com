@@ -21,7 +21,7 @@ describe('UsersSection component', () => {
   it('should render statistics cards', () => {
     render(<UsersSection />, { wrapper })
     expect(screen.getByText(/Actifs/i)).toBeInTheDocument()
-    expect(screen.getByText(/Bannis/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Bannis/i).length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/Total/i)).toBeInTheDocument()
   })
 
@@ -42,5 +42,48 @@ describe('UsersSection component', () => {
     const searchInput = screen.getByPlaceholderText(/Rechercher un utilisateur/i)
     fireEvent.change(searchInput, { target: { value: 'nonexistentuser12345' } })
     expect(screen.getByText(/Aucun profil trouvé/i)).toBeInTheDocument()
+  })
+
+  it('should render filter chips', () => {
+    render(<UsersSection />, { wrapper })
+    expect(screen.getByRole('button', { name: /^Tous$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^En ligne$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Bannis$/i })).toBeInTheDocument()
+  })
+
+  it('should render compact user rows with icon actions', () => {
+    const profiles = {
+      Alice: {
+        name: 'Alice',
+        avatar: 'default',
+        initials: 'A',
+        level: 2,
+        xp: 100,
+        status: 'online',
+        isBanned: false,
+        isMuted: false,
+        isPremium: false,
+        specialBadges: [],
+      },
+    }
+    const noop = vi.fn()
+    render(
+      <UsersSection
+        profiles={profiles}
+        setProfiles={noop}
+        banUser={noop}
+        unbanUser={noop}
+        muteUser={noop}
+        unmuteUser={noop}
+      />,
+      { wrapper }
+    )
+    expect(screen.getByText('Alice')).toBeInTheDocument()
+    expect(screen.queryByText(/Ne pas déranger/i)).not.toBeInTheDocument()
+    expect(screen.getByTitle(/Badge spécial/i)).toBeInTheDocument()
+    expect(screen.getByTitle(/Accorder Premium/i)).toBeInTheDocument()
+    expect(screen.getByTitle(/Bannir/i)).toBeInTheDocument()
+    expect(screen.getByTitle(/Muter/i)).toBeInTheDocument()
+    expect(screen.getByTitle(/Retirer de la liste/i)).toBeInTheDocument()
   })
 })

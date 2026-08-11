@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect, useCallback, KeyboardEvent, useMemo } from 'react';
-import { useUser, useNotifications, useXP, useDM, useMuteBlock } from '@/lib/contexts';
+import { useUser, useNotifications, useXP, useDM, useMuteBlock, useUI } from '@/lib/contexts';
 import Avatar from './Avatar';
-import DiamondBadge from './DiamondBadge';
-import { Send, X, MessageSquare, Search, Mic, Video, PhoneOff, MicOff, VideoOff, Paperclip, FileText } from 'lucide-react';
+import UserDisplayName from './UserDisplayName';
+import { Send, X, MessageSquare, Search, Mic, Video, PhoneOff, MicOff, VideoOff, Paperclip, FileText, ChevronLeft, Gamepad2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { dmTypingService } from '@/lib/dmTypingService';
-import { getSpecialBadgeForUser, SPECIAL_BADGES } from '@/lib/diamondBadges';
+import { dmGameService, DM_GAME_LABELS, type DmGamePayload, type DmGameType } from '@/lib/dmGameService';
 import { webrtcService, RemoteStreamInfo } from '@/lib/webrtcService';
 import { uploadChatFile } from '@/lib/storageService';
 import { toast } from 'sonner';
+import { DEFAULT_BANNED_WORDS, findBannedWord, mergeBannedWords } from '@/lib/bannedWords';
+import DMChallengeGames from './DMChallengeGames';
 
 interface DirectMessagePanelProps {
   onClose: () => void;
@@ -32,53 +34,11 @@ function TypingDots() {
   );
 }
 
-/** Badges spéciaux uniquement si l'utilisateur en possède réellement. */
-function SpecialBadgesOnly({ profile, size = 'xs' }: { profile?: Record<string, unknown> | null; size?: 'xs' | 'sm' }) {
-  if (!profile) return null;
-
-  const roleId = getSpecialBadgeForUser({
-    isFounder: !!profile.isFounder,
-    isDirection: !!profile.isDirection,
-    isMasterOp: !!profile.isMasterOp,
-    isIridescent: !!profile.isIridescent,
-  });
-
-  const extraIds = Array.isArray(profile.specialBadges)
-    ? (profile.specialBadges as string[]).filter((id) => id && id !== roleId)
-    : [];
-
-  const ids = [...(roleId ? [roleId] : []), ...extraIds];
-  if (ids.length === 0) return null;
-
-  const iconClass = size === 'sm' ? 'text-sm' : 'text-[11px]';
-
-  return (
-    <>
-      {ids.map((id) => {
-        if (id === 'iridescent') {
-          return <DiamondBadge key={id} level={1} size={size} specialBadge="iridescent" />;
-        }
-        const special = SPECIAL_BADGES.find((b) => b.id === id);
-        if (!special) return null;
-        return (
-          <span
-            key={id}
-            className={`${iconClass} leading-none shrink-0`}
-            title={special.label}
-            style={{ color: special.color }}
-          >
-            {special.icon}
-          </span>
-        );
-      })}
-    </>
-  );
-}
-
 export default function DirectMessagePanel({ onClose, initialUser }: DirectMessagePanelProps) {
   const { user, supabaseUser, profiles } = useUser();
   const { addNotification } = useNotifications();
   const { isMuted, isBlocked } = useMuteBlock();
+  const { openUserProfile } = useUI();
   const { sounds } = useXP();
   const { conversations, sendDM, getConversation, markRead, getUnreadCount, loadConversation } = useDM();
 
@@ -95,6 +55,8 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [showGames, setShowGames] = useState(false);
+  const [pendingGameInvite, setPendingGameInvite] = useState<DmGamePayload | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingBroadcastRef = useRef<number | null>(null);
@@ -221,6 +183,33 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
     if (selectedUser) setTimeout(() => inputRef.current?.focus(), 50);
   }, [selectedUser]);
 
+  // Écoute des défis de jeux (invite entrante)
+  useEffect(() => {
+    if (!myUserId || !contactUserId || !selectedUser) {
+      setPendingGameInvite(null);
+      return;
+    }
+    return dmGameService.subscribe(myUserId, contactUserId, (payload) => {
+      if (payload.fromId === myUserId) return;
+      if (payload.event === 'invite') {
+        setPendingGameInvite(payload);
+        setShowGames(true);
+        toast(`🎮 ${payload.from} vous défie au ${DM_GAME_LABELS[payload.gameType]}`);
+      } else if (payload.event === 'decline' || payload.event === 'cancel') {
+        setPendingGameInvite(null);
+      }
+    });
+  }, [myUserId, contactUserId, selectedUser]);
+
+  const handleGameInviteSent = useCallback((gameType: DmGameType) => {
+    if (!user?.name || !selectedUser) return;
+    void sendDM(
+      user.name,
+      selectedUser,
+      `🎮 Je vous défie au ${DM_GAME_LABELS[gameType]} — ouvrez Jeux pour répondre`,
+    );
+  }, [user?.name, selectedUser, sendDM]);
+
   const contacts = useMemo(() => {
     if (!user?.name) return [];
 
@@ -324,6 +313,11 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
   const handleSend = async () => {
     if ((!text.trim() && !selectedFile) || !selectedUser || !user || sending) return;
     if (isMuted(selectedUser) || isBlocked(selectedUser)) return;
+
+    if (text.trim() && findBannedWord(text.trim(), mergeBannedWords(DEFAULT_BANNED_WORDS))) {
+      toast.error('Message bloqué : contenu non autorisé.');
+      return;
+    }
 
     setSending(true);
     try {
@@ -445,14 +439,16 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
     );
   }
 
+  const mobileShowChat = !!selectedUser;
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[1500] animate-in fade-in duration-300 p-4" onClick={handleClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center z-[1500] animate-in fade-in duration-300 p-0 sm:p-4 safe-area-pad" onClick={handleClose}>
       <div
-        className="bg-card border-2 border-red-500/50 rounded-3xl w-full max-w-[720px] h-[90vh] max-h-[560px] flex overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5),0_0_0_1px_rgba(239,68,68,0.3)] animate-in zoom-in-95 duration-300"
+        className="bg-card border-0 sm:border-2 border-red-500/50 rounded-t-3xl sm:rounded-3xl w-full max-w-[720px] h-[92dvh] sm:h-[90vh] max-h-[92dvh] sm:max-h-[560px] flex overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5),0_0_0_1px_rgba(239,68,68,0.3)] animate-in zoom-in-95 duration-300"
         onClick={e => e.stopPropagation()}
       >
-        {/* Sidebar contacts */}
-        <div className="w-[210px] bg-secondary border-r border-border flex flex-col shrink-0">
+        {/* Sidebar contacts — full width on mobile when no chat selected */}
+        <div className={`${mobileShowChat ? 'hidden sm:flex' : 'flex'} w-full sm:w-[210px] bg-secondary sm:border-r border-border flex-col shrink-0 min-w-0`}>
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
               <MessageSquare className="w-4 h-4 text-primary animate-pulse" /> Messages
@@ -460,7 +456,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                 <span className="text-[9px] bg-primary text-white rounded-full px-1.5 py-px font-bold animate-bounce">{totalUnread}</span>
               )}
             </span>
-            <button onClick={handleClose} className="p-1 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-all duration-200 hover:scale-110 active:scale-95">
+            <button onClick={handleClose} className="p-1 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-200 hover:scale-110 active:scale-95" aria-label="Fermer">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -484,21 +480,41 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
               const profile = u.profile || profiles[u.name];
               return (
                 <button key={u.name} onClick={() => setSelectedUser(u.name)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 transition-all duration-200 text-left ${selectedUser === u.name ? 'bg-primary/15 border-r-2 border-primary' : 'hover:bg-white/[0.04] hover:scale-[1.01]'} animate-slide-in-right`}
+                  className={`w-full flex items-center gap-2.5 px-3 py-3 sm:py-2.5 transition-all duration-200 text-left min-h-[52px] sm:min-h-0 ${selectedUser === u.name ? 'bg-primary/15 border-r-2 border-primary' : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:scale-[1.01]'} animate-slide-in-right`}
                   style={{ animationDelay: `${index * 30}ms` }}>
-                  <div className="relative shrink-0 transition-transform duration-200 hover:scale-110">
+                  <div
+                    className="relative shrink-0 transition-transform duration-200 hover:scale-110"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openUserProfile(u.name);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                        openUserProfile(u.name);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Voir le profil de ${u.name}`}
+                  >
                     <Avatar avatarClass={u.avatar || 'av1'} initials={u.initials || u.name.slice(0, 2).toUpperCase()} size="sm" />
                     {unread > 0 && (
                       <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">{unread}</span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className={`text-xs font-medium truncate ${unread > 0 ? 'text-foreground' : 'text-muted-foreground/80'}`}>{u.name}</span>
-                      <span className="flex items-center gap-0.5 shrink-0">
-                        <DiamondBadge level={u.level || 1} size="xs" />
-                        <SpecialBadgesOnly profile={profile as Record<string, unknown>} />
-                      </span>
+                    <div className="flex items-center justify-between gap-1 min-w-0">
+                      <UserDisplayName
+                        name={u.name}
+                        profile={profile}
+                        level={u.level || 1}
+                        size="xs"
+                        showSpecialLabels={false}
+                        openProfileOnClick={false}
+                        nameClassName={`text-xs font-medium ${unread > 0 ? 'text-foreground' : 'text-muted-foreground/80'}`}
+                        className="min-w-0 flex-1"
+                      />
                     </div>
                     <div className={`text-[10px] truncate mt-0.5 ${unread > 0 ? 'text-foreground/60 font-medium' : 'text-muted-foreground/40'}`}>
                       {lastMsg
@@ -514,17 +530,37 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
           </div>
         </div>
 
-        {/* Zone conversation */}
-        <div className="flex-1 flex flex-col min-w-0">
+        {/* Zone conversation — full screen on mobile when a chat is open */}
+        <div className={`${mobileShowChat ? 'flex' : 'hidden sm:flex'} flex-1 flex-col min-w-0 w-full`}>
           {selectedUser && contact ? (
             <>
-              <div className="px-4 py-2.5 border-b border-border flex items-center gap-2.5 shrink-0 bg-card">
-                <Avatar avatarClass={contact.avatar || 'av1'} initials={contact.initials || contact.name.slice(0, 2).toUpperCase()} size="sm" />
+              <div className="px-3 sm:px-4 py-2.5 border-b border-border flex items-center gap-2 shrink-0 bg-card">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUser(null)}
+                  className="sm:hidden p-1.5 -ml-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5 touch-target shrink-0"
+                  aria-label="Retour aux conversations"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectedUser && openUserProfile(selectedUser)}
+                  className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  aria-label={`Voir le profil de ${contact.name}`}
+                >
+                  <Avatar avatarClass={contact.avatar || 'av1'} initials={contact.initials || contact.name.slice(0, 2).toUpperCase()} size="sm" />
+                </button>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-foreground truncate">{contact.name}</span>
-                    <DiamondBadge level={contact.level || 1} size="xs" />
-                    <SpecialBadgesOnly profile={contact as Record<string, unknown>} />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <UserDisplayName
+                      name={contact.name}
+                      profile={contact}
+                      level={contact.level || 1}
+                      size="xs"
+                      showSpecialLabels={false}
+                      nameClassName="text-sm font-semibold text-foreground"
+                    />
                   </div>
                   <div className="text-[10px] text-muted-foreground/50">
                     {inCall
@@ -538,6 +574,17 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                 <div className="flex items-center gap-1.5 shrink-0">
                   {!inCall ? (
                     <>
+                      <button
+                        type="button"
+                        onClick={() => setShowGames(true)}
+                        title="Défier / Jeux"
+                        className="p-2 rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 transition-colors relative"
+                      >
+                        <Gamepad2 className="w-3.5 h-3.5" />
+                        {pendingGameInvite && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        )}
+                      </button>
                       <button
                         type="button"
                         disabled={callBusy}
@@ -643,7 +690,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                   return (
                     <div key={msg.id} className={`flex gap-2 items-end ${isOwn ? 'flex-row-reverse' : ''} animate-slide-in-up`} style={{ animationDelay: `${index * 30}ms` }}>
                       {!isOwn && <Avatar avatarClass={msg.sender_avatar} initials={msg.sender_initials} size="xs" />}
-                      <div className={`max-w-[65%] px-3 py-2 text-[13px] rounded-xl leading-relaxed break-words transition-all duration-200 hover:scale-[1.02] ${isOwn ? 'bg-purple-700/30 border border-purple-500/30 rounded-br-sm hover:bg-purple-700/40' : 'bg-secondary border border-border rounded-bl-sm hover:bg-secondary/90'}`}>
+                      <div className={`max-w-[85%] sm:max-w-[65%] min-w-0 px-3 py-2 text-[13px] rounded-xl leading-relaxed transition-all duration-200 hover:scale-[1.02] ${isOwn ? 'bg-purple-700/30 border border-purple-500/30 rounded-br-sm hover:bg-purple-700/40' : 'bg-secondary border border-border rounded-bl-sm hover:bg-secondary/90'}`}>
                         {msg.image_url && (
                           isImage ? (
                             <a href={msg.image_url} target="_blank" rel="noopener noreferrer" className="block mb-1.5">
@@ -654,7 +701,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                               href={msg.image_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 mb-1.5 px-2 py-1.5 rounded-lg bg-black/20 border border-white/10 text-[11px] text-primary hover:bg-black/30"
+                              className="flex items-center gap-2 mb-1.5 px-2 py-1.5 rounded-lg bg-black/20 border border-border text-[11px] text-primary hover:bg-black/30"
                             >
                               <FileText className="w-3.5 h-3.5 shrink-0" />
                               <span className="truncate">Télécharger le fichier</span>
@@ -662,7 +709,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                           )
                         )}
                         {!isFileOnly && msg.text && (
-                          <span className="text-foreground">{msg.text}</span>
+                          <span className="text-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{msg.text}</span>
                         )}
                         <div className={`text-[9px] mt-1 flex items-center gap-1 ${isOwn ? 'justify-end text-purple-300/50' : 'text-muted-foreground/40'}`}>
                           {msg.created_date ? format(new Date(msg.created_date), 'HH:mm') : ''}
@@ -700,7 +747,7 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
                     </button>
                   </div>
                 )}
-                <div className="flex items-center gap-2 bg-secondary border border-white/10 rounded-xl px-3 py-1.5 focus-within:border-primary/50 focus-within:shadow-lg focus-within:shadow-primary/10 transition-all duration-200">
+                <div className="flex items-center gap-2 bg-secondary border border-border rounded-xl px-3 py-2 sm:py-1.5 focus-within:border-primary/50 focus-within:shadow-lg focus-within:shadow-primary/10 transition-all duration-200">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -739,6 +786,20 @@ export default function DirectMessagePanel({ onClose, initialUser }: DirectMessa
           )}
         </div>
       </div>
+
+      {showGames && selectedUser && contactUserId && user?.name && myUserId && (
+        <DMChallengeGames
+          myName={user.name}
+          myId={myUserId}
+          contactName={selectedUser}
+          contactId={contactUserId}
+          open={showGames}
+          onClose={() => setShowGames(false)}
+          onInviteSent={handleGameInviteSent}
+          pendingInvite={pendingGameInvite}
+          onClearPendingInvite={() => setPendingGameInvite(null)}
+        />
+      )}
     </div>
   );
 }

@@ -34,7 +34,7 @@ const SECTIONS: SectionConfig[] = [
     name: 'Modération',
     description: 'Permissions pour la gestion des utilisateurs et signalements',
     icon: '🔨',
-    actions: ['view_reports', 'ban_users', 'mute_users', 'unblock_users'],
+    actions: ['view_reports', 'ban_users', 'mute_users', 'unblock_users', 'manage_alerts', 'receive_alerts', 'staff_chat', 'handle_reports'],
   },
   {
     id: 'admin',
@@ -55,7 +55,7 @@ const SECTIONS: SectionConfig[] = [
     name: 'Salons',
     description: 'Permissions pour la gestion des salons',
     icon: '🚪',
-    actions: ['view_all', 'create_custom', 'delete_custom'],
+    actions: ['view_all', 'create_custom', 'edit_custom', 'reorder', 'delete_custom', 'manage_messages', 'pin_messages'],
   },
   {
     id: 'badges',
@@ -70,6 +70,13 @@ const SECTIONS: SectionConfig[] = [
     description: 'Permissions pour le système d\'XP',
     icon: '⭐',
     actions: ['view_own', 'view_all', 'modify_any'],
+  },
+  {
+    id: 'premium',
+    name: 'Premium',
+    description: 'Codes Premium, générateur et grant Profils',
+    icon: '🔑',
+    actions: ['view', 'create_codes', 'revoke_codes', 'grant_premium'],
   },
   {
     id: 'messages',
@@ -116,6 +123,10 @@ const ACTION_LABELS: Record<string, string> = {
   ban_users: 'Bannir des utilisateurs',
   mute_users: 'Rendre muet des utilisateurs',
   unblock_users: 'Débloquer des utilisateurs',
+  manage_alerts: 'Configurer les alertes',
+  receive_alerts: 'Recevoir les alertes',
+  staff_chat: 'Espace discussion staff',
+  handle_reports: 'Traiter les signalements',
   access_panel: 'Accéder au panneau admin',
   manage_permissions: 'Gérer les permissions',
   view_analytics: 'Voir les statistiques',
@@ -124,7 +135,11 @@ const ACTION_LABELS: Record<string, string> = {
   edit_any: 'Modifier n\'importe quel paramètre',
   view_all: 'Voir tous les salons',
   create_custom: 'Créer des salons personnalisés',
+  edit_custom: 'Modifier des salons',
+  reorder: 'Réordonner les salons',
   delete_custom: 'Supprimer des salons personnalisés',
+  manage_messages: 'Gérer les messages du salon',
+  pin_messages: 'Épingler des messages',
   view_all_badges: 'Voir tous les badges',
   assign_special: 'Attribuer des badges spéciaux',
   view_own_xp: 'Voir son XP',
@@ -139,7 +154,19 @@ const ACTION_LABELS: Record<string, string> = {
   review_queue: 'Voir la file d\'attente de modération',
   export_logs: 'Exporter les logs',
   manage_settings: 'Gérer les paramètres de logs',
+  view: 'Voir Codes / Profils Premium',
+  create_codes: 'Générer des codes Premium',
+  revoke_codes: 'Révoquer des codes Premium',
+  grant_premium: 'Accorder Premium (Profils)',
 };
+
+/** Defaults for auto-seeded missing rows (Premium générateur). */
+function defaultAllowedFor(section: string, action: string, entityId: string): boolean {
+  if (section !== 'premium') return false;
+  const staff = entityId === 'founder' || entityId === 'direction' || entityId === 'master_op';
+  if (!staff) return false;
+  return ['view', 'create_codes', 'revoke_codes', 'grant_premium'].includes(action);
+}
 
 interface Props {
   readOnly?: boolean;
@@ -213,7 +240,7 @@ export default function PermissionsSection({ readOnly = false, user }: Props) {
               action,
               user_identifier: entity.id,
               identifier_type: identifierType,
-              allowed: false,
+              allowed: defaultAllowedFor(section.id, action, entity.id),
             });
           }
         }
@@ -242,7 +269,7 @@ export default function PermissionsSection({ readOnly = false, user }: Props) {
               action,
               user_identifier: entity.id,
               identifier_type: identifierType,
-              allowed: false,
+              allowed: defaultAllowedFor(section.id, action, entity.id),
             });
           }
         }

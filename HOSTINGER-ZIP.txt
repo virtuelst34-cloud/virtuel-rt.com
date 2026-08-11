@@ -1,0 +1,36 @@
+# Déploiement Virtuel-RT sur Hostinger
+#
+# Option A — Redéploiement hPanel SOURCE zip (fallback fiable si FTPS timeout)
+# ────────────────────────────────────────────────────────────────────────────
+# Utilisez ceci quand GitHub Actions FTPS échoue (« Timeout (control socket) »)
+# ou pour un redéploiement manuel contrôlé.
+#
+# 1. Préparer le zip SOURCE (pas dist) :
+#      python .\scripts\make-hostinger-source-zip.py
+#    → Nouveau dossier\virtuel-rt-SOURCE-FULL-hostinger.zip
+# 2. hPanel → virtuel-rt.com → Déploiements → Paramètres et redéploiement
+# 3. Importer le zip SOURCE (package.json à la racine du zip)
+# 4. Variables d'env : VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
+# 5. Build : npm run build / sortie dist / Node 20+ (repo .nvmrc = 22)
+# 6. Après succès : vider données du site (Service Worker) puis Ctrl+F5
+# 7. Vérifier : index.html live ≠ ancien hash ; quiz a « Changer de thème »
+#
+# Option B — File Manager (static dist)
+# 1. npm run build
+# 2. Zipper le CONTENU de dist/ à la racine (index.html + assets/)
+# 3. Extraire dans public_html (pas dans un sous-dossier)
+#    Ou télécharger l'artifact CI hostinger-dist-<sha> et faire de même.
+#
+# Option C — GitHub Actions (push main ou master)
+# Push → CI build + FTPS (protocol ftps, port 21, security loose) vers FTP_SERVER_DIR
+# Secrets : FTP_SERVER (IP Hostinger recommandée), FTP_USERNAME, FTP_PASSWORD,
+#           FTP_SERVER_DIR (= vrai document root www)
+# Les deploys FTPS sont sérialisés (concurrency) + jusqu'à 3 tentatives
+# (timeouts croissants 180s / 240s / 300s, pauses 30s / 45s).
+# Si FTPS échoue encore : télécharger l'artifact hostinger-dist-<sha> du run,
+# ou utiliser Option A (zip SOURCE hPanel) — c'est le chemin de secours officiel.
+#
+# Permissions zip Windows (EACCES Hostinger) :
+#   powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\zip-for-hostinger.ps1"
+
+# Align deploy 2026-08-06T22:40:51Z

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
 import { useNotifications } from './NotificationsContext';
 import { useUser } from './UserContext';
 import { supabaseDbService } from '../supabaseDb';
@@ -10,7 +10,7 @@ interface AccentColor {
   value: string;
 }
 
-export type AmbianceMode = 'off' | 'nebula' | 'phosphor' | 'abyss' | 'braises' | 'spectre' | 'aurore';
+export type AmbianceMode = 'off' | 'nebula' | 'phosphor' | 'abyss' | 'braises' | 'spectre' | 'aurore' | 'coquin';
 
 export interface AmbianceOption {
   id: Exclude<AmbianceMode, 'off'>;
@@ -18,6 +18,8 @@ export interface AmbianceOption {
   description: string;
   emoji: string;
   activeClass: string;
+  /** Réservé Premium */
+  premiumOnly?: boolean;
 }
 
 interface PreferencesContextType {
@@ -35,6 +37,9 @@ interface PreferencesContextType {
   ambianceMode: AmbianceMode;
   setAmbianceMode: (mode: AmbianceMode) => void;
   AMBIANCE_OPTIONS: AmbianceOption[];
+  coquinMode: boolean;
+  setCoquinMode: (on: boolean) => boolean;
+  toggleCoquinMode: () => boolean;
   loadPreferences: () => Promise<void>;
 }
 
@@ -92,6 +97,14 @@ export const AMBIANCE_OPTIONS: AmbianceOption[] = [
     emoji: '🌅',
     activeClass: 'bg-sky-500/15 border-sky-400/50 text-sky-700 dark:text-sky-300',
   },
+  {
+    id: 'coquin',
+    label: 'Coquin',
+    description: 'Soirée 18+ rose & violet — réservé Premium',
+    emoji: '💋',
+    activeClass: 'bg-rose-500/15 border-rose-400/45 text-rose-300',
+    premiumOnly: true,
+  },
 ];
 
 const AMBIANCE_CLASSES = [
@@ -101,6 +114,7 @@ const AMBIANCE_CLASSES = [
   'ambiance-braises',
   'ambiance-spectre',
   'ambiance-aurore',
+  'ambiance-coquin',
 ] as const;
 
 export { ACCENT_COLORS };
@@ -116,7 +130,8 @@ function parseAmbiance(raw: string | null): AmbianceMode {
     raw === 'abyss' ||
     raw === 'braises' ||
     raw === 'spectre' ||
-    raw === 'aurore'
+    raw === 'aurore' ||
+    raw === 'coquin'
   ) {
     return raw;
   }
@@ -127,6 +142,7 @@ function applyAmbianceClass(mode: AmbianceMode) {
   const root = document.documentElement;
   for (const cls of AMBIANCE_CLASSES) root.classList.remove(cls);
   if (mode !== 'off') root.classList.add(`ambiance-${mode}`);
+  root.classList.toggle('coquin-mode', mode === 'coquin');
 }
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
@@ -136,6 +152,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [accentColor, setAccentColor]  = useState<string>(ACCENT_COLORS[0].id);
   const [compactMode, setCompactMode]  = useState<boolean>(false);
   const [ambianceMode, setAmbianceModeState] = useState<AmbianceMode>('off');
+  const [coquinMode, setCoquinModeState] = useState<boolean>(false);
   const { addNotification } = useNotifications();
   const { user, supabaseUser } = useUser();
 
@@ -159,6 +176,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     accentColor: string;
     compactMode: boolean;
     ambianceMode: AmbianceMode;
+    coquinMode: boolean;
   }) => {
     setThemeState(prefs.theme);
     applyTheme(prefs.theme);
@@ -169,25 +187,33 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     applyAccent(prefs.accentColor);
     setCompactMode(prefs.compactMode);
     document.documentElement.classList.toggle('compact', prefs.compactMode);
-    setAmbianceModeState(prefs.ambianceMode);
-    applyAmbianceClass(prefs.ambianceMode);
+    // Coquin ambiance implies coquinMode; coquinMode can be on without ambiance
+    const effectiveAmbiance = prefs.ambianceMode;
+    const effectiveCoquin = prefs.coquinMode || effectiveAmbiance === 'coquin';
+    setAmbianceModeState(effectiveAmbiance);
+    applyAmbianceClass(effectiveAmbiance);
+    setCoquinModeState(effectiveCoquin);
+    document.documentElement.classList.toggle('coquin-mode', effectiveCoquin);
   }, [applyAccent, applyTheme]);
 
-  const loadFromLocal = useCallback((key: string) => {
+  const loadFromLocal = useCallback((key: string, serverPremium = false) => {
     const savedTheme = readPrefsField(key, 'theme');
     const savedParty = readPrefsField(key, 'party') === 'true';
     const savedAccent = readPrefsField(key, 'accent') || ACCENT_COLORS[0].id;
     const savedCompact = readPrefsField(key, 'compact') === 'true';
-    const savedPremium = readPrefsField(key, 'premium') === 'true';
+    // Premium = profiles.is_premium côté serveur uniquement (jamais localStorage)
+    const premium = !!serverPremium;
     const savedAmbiance = parseAmbiance(readPrefsField(key, 'ambiance'));
+    const savedCoquin = readPrefsField(key, 'coquin') === 'true' || savedAmbiance === 'coquin';
 
     applyAll({
       theme: savedTheme || getSystemTheme(),
       partyMode: savedParty,
-      isPremium: savedPremium,
+      isPremium: premium,
       accentColor: savedAccent,
       compactMode: savedCompact,
-      ambianceMode: savedAmbiance,
+      ambianceMode: premium ? savedAmbiance : (savedAmbiance === 'coquin' ? 'off' : savedAmbiance),
+      coquinMode: premium && savedCoquin,
     });
   }, [applyAll]);
 
@@ -198,18 +224,20 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     accentColor?: string;
     compactMode?: boolean;
     ambianceMode?: AmbianceMode;
+    coquinMode?: boolean;
   }) => {
     if (prefs.theme !== undefined) writePrefsField(key, 'theme', prefs.theme);
     if (prefs.partyMode !== undefined) writePrefsField(key, 'party', String(prefs.partyMode));
-    if (prefs.isPremium !== undefined) writePrefsField(key, 'premium', String(prefs.isPremium));
+    // Ne pas persister isPremium en local — source de vérité = profil serveur
     if (prefs.accentColor !== undefined) writePrefsField(key, 'accent', prefs.accentColor);
     if (prefs.compactMode !== undefined) writePrefsField(key, 'compact', String(prefs.compactMode));
     if (prefs.ambianceMode !== undefined) writePrefsField(key, 'ambiance', prefs.ambianceMode);
+    if (prefs.coquinMode !== undefined) writePrefsField(key, 'coquin', String(prefs.coquinMode));
   }, []);
 
   const loadPreferences = useCallback(async () => {
     if (!user) {
-      loadFromLocal('anonymous');
+      loadFromLocal('anonymous', false);
       return;
     }
 
@@ -217,13 +245,17 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       const prefs = await supabaseDbService.getPreferences(user.name);
       if (prefs) {
         const localAmbiance = parseAmbiance(readPrefsField(userKey, 'ambiance'));
+        const localCoquin = readPrefsField(userKey, 'coquin') === 'true' || localAmbiance === 'coquin';
+        // Profil serveur prioritaire ; preferences.is_premium n'est qu'un miroir
+        const premium = !!(user.isPremium || prefs.is_premium);
         const merged = {
           theme: prefs.theme,
           partyMode: prefs.party_mode,
-          isPremium: prefs.is_premium,
+          isPremium: premium,
           accentColor: prefs.accent_color,
           compactMode: prefs.compact_mode,
-          ambianceMode: localAmbiance,
+          ambianceMode: (premium ? localAmbiance : (localAmbiance === 'coquin' ? 'off' : localAmbiance)) as AmbianceMode,
+          coquinMode: premium && localCoquin,
         };
         applyAll(merged);
         persistLocal(userKey, merged);
@@ -233,12 +265,30 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       console.error('Erreur lors du chargement des préférences:', error);
     }
 
-    loadFromLocal(userKey);
+    loadFromLocal(userKey, !!user.isPremium);
   }, [user, userKey, applyAll, loadFromLocal, persistLocal]);
 
   useEffect(() => {
     void loadPreferences();
   }, [loadPreferences]);
+
+  // Resync Premium si le profil serveur change (ex. grant admin)
+  useEffect(() => {
+    if (!user) return;
+    const premium = !!user.isPremium;
+    if (premium === isPremium) return;
+    const localAmbiance = parseAmbiance(readPrefsField(userKey, 'ambiance'));
+    const localCoquin = readPrefsField(userKey, 'coquin') === 'true' || localAmbiance === 'coquin';
+    applyAll({
+      theme,
+      partyMode,
+      isPremium: premium,
+      accentColor,
+      compactMode,
+      ambianceMode: premium ? ambianceMode : (ambianceMode === 'coquin' ? 'off' : ambianceMode),
+      coquinMode: premium && (coquinMode || localCoquin),
+    });
+  }, [user?.isPremium]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -257,12 +307,12 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const syncPreferences = useCallback(async (updates: {
     theme?: 'dark' | 'light';
     party_mode?: boolean;
-    is_premium?: boolean;
     accent_color?: string;
     compact_mode?: boolean;
   }) => {
     if (!user) return;
     try {
+      // Ne jamais envoyer is_premium depuis le client — trigger / admin RPC uniquement
       await supabaseDbService.updatePreferences(user.name, updates);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde des préférences:', error);
@@ -271,56 +321,118 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   const toggleTheme = useCallback(async () => {
     const next = theme === 'dark' ? 'light' : 'dark';
-    applyAll({ theme: next, partyMode, isPremium, accentColor, compactMode, ambianceMode });
+    applyAll({ theme: next, partyMode, isPremium, accentColor, compactMode, ambianceMode, coquinMode });
     persistLocal(userKey, { theme: next });
     await syncPreferences({ theme: next as 'dark' | 'light' });
-  }, [theme, partyMode, isPremium, accentColor, compactMode, ambianceMode, userKey, applyAll, persistLocal, syncPreferences]);
+  }, [theme, partyMode, isPremium, accentColor, compactMode, ambianceMode, coquinMode, userKey, applyAll, persistLocal, syncPreferences]);
 
   const togglePartyMode = useCallback(async () => {
     const next = !partyMode;
-    // Soirée et ambiances exclusives
     const nextAmbiance: AmbianceMode = next ? 'off' : ambianceMode;
-    applyAll({ theme, partyMode: next, isPremium, accentColor, compactMode, ambianceMode: nextAmbiance });
+    applyAll({ theme, partyMode: next, isPremium, accentColor, compactMode, ambianceMode: nextAmbiance, coquinMode });
     persistLocal(userKey, { partyMode: next, ambianceMode: nextAmbiance });
     await syncPreferences({ party_mode: next });
-  }, [theme, partyMode, isPremium, accentColor, compactMode, ambianceMode, userKey, applyAll, persistLocal, syncPreferences]);
+  }, [theme, partyMode, isPremium, accentColor, compactMode, ambianceMode, coquinMode, userKey, applyAll, persistLocal, syncPreferences]);
 
-  const activatePremium = useCallback(async () => {
-    applyAll({ theme, partyMode, isPremium: true, accentColor, compactMode, ambianceMode });
-    persistLocal(userKey, { isPremium: true });
-    addNotification({ type: 'premium', message: '🌟 Bienvenue dans le club Premium !' });
-    await syncPreferences({ is_premium: true });
-  }, [theme, partyMode, accentColor, compactMode, ambianceMode, userKey, applyAll, persistLocal, addNotification, syncPreferences]);
+  /** Upsell uniquement — le Premium est accordé côté serveur (staff / admin_set_premium). */
+  const activatePremium = useCallback(() => {
+    if (isPremium) {
+      addNotification({ type: 'premium', message: '🌟 Vous êtes déjà Premium.' });
+      return;
+    }
+    addNotification({
+      type: 'premium',
+      message: '🔒 Premium est accordé par l’équipe Virtuel-RT — contactez le staff ou utilisez le canal prévu. L’activation locale ne suffit plus.',
+    });
+    window.dispatchEvent(new CustomEvent('virtuel-rt-open-settings', { detail: { tab: 'premium' } }));
+  }, [isPremium, addNotification]);
 
   const changeAccent = useCallback(async (colorId: string) => {
-    applyAll({ theme, partyMode, isPremium, accentColor: colorId, compactMode, ambianceMode });
+    applyAll({ theme, partyMode, isPremium, accentColor: colorId, compactMode, ambianceMode, coquinMode });
     persistLocal(userKey, { accentColor: colorId });
     await syncPreferences({ accent_color: colorId });
-  }, [theme, partyMode, isPremium, compactMode, ambianceMode, userKey, applyAll, persistLocal, syncPreferences]);
+  }, [theme, partyMode, isPremium, compactMode, ambianceMode, coquinMode, userKey, applyAll, persistLocal, syncPreferences]);
 
   const toggleCompactMode = useCallback(async () => {
     const next = !compactMode;
-    applyAll({ theme, partyMode, isPremium, accentColor, compactMode: next, ambianceMode });
+    applyAll({ theme, partyMode, isPremium, accentColor, compactMode: next, ambianceMode, coquinMode });
     persistLocal(userKey, { compactMode: next });
     await syncPreferences({ compact_mode: next });
-  }, [theme, partyMode, isPremium, accentColor, compactMode, ambianceMode, userKey, applyAll, persistLocal, syncPreferences]);
+  }, [theme, partyMode, isPremium, accentColor, compactMode, ambianceMode, coquinMode, userKey, applyAll, persistLocal, syncPreferences]);
+
+  const setCoquinMode = useCallback((on: boolean): boolean => {
+    if (on && !isPremium) {
+      addNotification({
+        type: 'premium',
+        message: '🔒 Mode coquin réservé Premium — activez Premium pour débloquer.',
+      });
+      return false;
+    }
+    const nextAmbiance: AmbianceMode = on
+      ? (ambianceMode === 'off' ? 'coquin' : ambianceMode === 'coquin' ? 'coquin' : ambianceMode)
+      : (ambianceMode === 'coquin' ? 'off' : ambianceMode);
+    const nextParty = on ? false : partyMode;
+    applyAll({
+      theme,
+      partyMode: nextParty,
+      isPremium,
+      accentColor,
+      compactMode,
+      ambianceMode: nextAmbiance,
+      coquinMode: on,
+    });
+    persistLocal(userKey, { coquinMode: on, ambianceMode: nextAmbiance, partyMode: nextParty });
+    if (nextParty !== partyMode) void syncPreferences({ party_mode: nextParty });
+    addNotification({
+      type: 'system',
+      message: on
+        ? '🔥 Mode coquin activé — salons & jeux adultes débloqués (18+).'
+        : 'Mode coquin désactivé — contenu adulte masqué.',
+    });
+    return true;
+  }, [isPremium, ambianceMode, partyMode, theme, accentColor, compactMode, userKey, applyAll, persistLocal, syncPreferences, addNotification]);
+
+  const toggleCoquinMode = useCallback(() => setCoquinMode(!coquinMode), [setCoquinMode, coquinMode]);
 
   const setAmbianceMode = useCallback((mode: AmbianceMode) => {
+    const opt = AMBIANCE_OPTIONS.find(o => o.id === mode);
+    if (mode !== 'off' && opt?.premiumOnly && !isPremium) {
+      addNotification({
+        type: 'premium',
+        message: '🔒 Ambiance Coquin réservée Premium.',
+      });
+      return;
+    }
     const next = ambianceMode === mode ? 'off' : mode;
     const nextParty = next !== 'off' ? false : partyMode;
-    applyAll({ theme, partyMode: nextParty, isPremium, accentColor, compactMode, ambianceMode: next });
-    persistLocal(userKey, { ambianceMode: next, partyMode: nextParty });
+    const nextCoquin = next === 'coquin' ? true : (next === 'off' && ambianceMode === 'coquin' ? false : coquinMode);
+    applyAll({
+      theme,
+      partyMode: nextParty,
+      isPremium,
+      accentColor,
+      compactMode,
+      ambianceMode: next,
+      coquinMode: nextCoquin,
+    });
+    persistLocal(userKey, { ambianceMode: next, partyMode: nextParty, coquinMode: nextCoquin });
     if (nextParty !== partyMode) {
       void syncPreferences({ party_mode: nextParty });
     }
-  }, [theme, partyMode, isPremium, accentColor, compactMode, ambianceMode, userKey, applyAll, persistLocal, syncPreferences]);
+  }, [theme, partyMode, isPremium, accentColor, compactMode, ambianceMode, coquinMode, userKey, applyAll, persistLocal, syncPreferences, addNotification]);
 
-  const value: PreferencesContextType = {
+  const value: PreferencesContextType = useMemo(() => ({
     theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium,
     accentColor, changeAccent, ACCENT_COLORS, compactMode, toggleCompactMode,
     ambianceMode, setAmbianceMode, AMBIANCE_OPTIONS,
+    coquinMode, setCoquinMode, toggleCoquinMode,
     loadPreferences,
-  };
+  }), [
+    theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium,
+    accentColor, changeAccent, compactMode, toggleCompactMode,
+    ambianceMode, setAmbianceMode, coquinMode, setCoquinMode, toggleCoquinMode,
+    loadPreferences,
+  ]);
 
   return (
     <PreferencesContext.Provider value={value}>
@@ -329,8 +441,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function usePreferences(): PreferencesContextType {
-  const context = useContext(PreferencesContext);
-  if (!context) throw new Error('usePreferences must be used inside PreferencesProvider');
-  return context;
+export function usePreferences() {
+  const ctx = useContext(PreferencesContext);
+  if (!ctx) throw new Error('usePreferences must be used within PreferencesProvider');
+  return ctx;
 }

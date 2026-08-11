@@ -44,4 +44,19 @@ describe('chatConfig utilities', () => {
       expect(salonIds).toContain(id)
     })
   })
+
+  it('should keep only essentials in Général', () => {
+    const general = SALONS.filter(s => s.category_id === 'general').map(s => s.id)
+    expect(general.sort()).toEqual(['annonces', 'bienvenue', 'general'].sort())
+  })
+
+  it('should assign every salon a known category', () => {
+    const allowed = new Set([
+      'general', 'divertissement', 'musique', 'rencontres', 'jeux',
+      'aide', 'regional', 'lgbt', 'libre', 'culture', 'tech', 'coquin',
+    ])
+    for (const salon of SALONS) {
+      expect(allowed.has(salon.category_id || '')).toBe(true)
+    }
+  })
 })

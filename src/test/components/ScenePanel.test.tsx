@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ScenePanel from '@/components/chat/ScenePanel';
 import { TestProviders } from '@/test/utils/testProviders';
 
@@ -62,5 +63,40 @@ describe('ScenePanel component', () => {
       { wrapper }
     );
     expect(container.firstChild).toBeNull();
+  });
+
+  it('should open profile when clicking a participant', async () => {
+    const user = userEvent.setup();
+    const onViewProfile = vi.fn();
+    render(
+      <ScenePanel
+        salonId="test"
+        members={mockMembers}
+        micActive={false}
+        userMicLevel={0}
+        onViewProfile={onViewProfile}
+      />,
+      { wrapper }
+    );
+    await user.click(screen.getByRole('button', { name: /Voir le profil de User1/i }));
+    expect(onViewProfile).toHaveBeenCalledWith('User1');
+  });
+
+  it('should open DM when clicking message action', async () => {
+    const user = userEvent.setup();
+    const onOpenDM = vi.fn();
+    render(
+      <ScenePanel
+        salonId="test"
+        members={mockMembers}
+        micActive={false}
+        userMicLevel={0}
+        onOpenDM={onOpenDM}
+        onViewProfile={vi.fn()}
+      />,
+      { wrapper }
+    );
+    await user.click(screen.getByRole('button', { name: /Envoyer un message à User2/i }));
+    expect(onOpenDM).toHaveBeenCalledWith('User2');
   });
 });

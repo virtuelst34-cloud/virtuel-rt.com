@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useUser, useSalons, useMuteBlock } from '@/lib/contexts';
+import { useUser, useSalons, useMuteBlock, useUI } from '@/lib/contexts';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
 import GenderIcon from './GenderIcon';
-import UserProfileView from './UserProfileView';
-import { Users, Search, X, Crown, Shield, Star, MessageSquare, UserX, Eye } from 'lucide-react';
+import UserDisplayName from './UserDisplayName';
+import { Users, Search, X, MessageSquare, UserX, Eye } from 'lucide-react';
 import { presenceService } from '@/lib/presenceService';
 
 interface MembersPanelProps {
@@ -16,10 +16,10 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
   const { user, profiles } = useUser();
   const { currentSalon } = useSalons();
   const { isMuted, isBlocked, blockUser, unblockUser } = useMuteBlock();
+  const { openUserProfile } = useUI();
   const [search, setSearch] = useState('');
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [presenceMembers, setPresenceMembers] = useState<any[]>([]);
-  const [viewProfile, setViewProfile] = useState<string | null>(null);
 
   useEffect(() => {
     const loadOnlineUsers = () => {
@@ -65,15 +65,14 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
   };
 
   return (
-    <>
-      <div className="fixed right-0 top-0 h-full w-80 bg-card border-l border-border flex flex-col z-40 animate-in slide-in-from-right duration-300">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+      <div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto sm:w-80 bg-card sm:border-l border-border flex flex-col z-40 animate-in slide-in-from-right duration-300 safe-area-pad">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-primary" />
             <span className="text-sm font-semibold text-foreground">Membres</span>
             <span className="text-xs text-muted-foreground">({onlineMembers.length})</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-all" aria-label="Fermer la liste des membres">
+          <button onClick={onClose} className="p-2 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/5 transition-all touch-target" aria-label="Fermer la liste des membres">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -100,7 +99,7 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
                   member={member}
                   isOnline
                   blocked={isBlocked(member.name)}
-                  onViewProfile={() => setViewProfile(member.name)}
+                  onViewProfile={() => openUserProfile(member.name)}
                   onOpenDM={() => openDM(member.name)}
                   onToggleBlock={() => handleBlockToggle(member.name)}
                 />
@@ -117,7 +116,7 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
                   member={member}
                   isOnline={false}
                   blocked={isBlocked(member.name)}
-                  onViewProfile={() => setViewProfile(member.name)}
+                  onViewProfile={() => openUserProfile(member.name)}
                   onOpenDM={() => openDM(member.name)}
                   onToggleBlock={() => handleBlockToggle(member.name)}
                 />
@@ -133,15 +132,6 @@ export default function MembersPanel({ onClose, onOpenDM }: MembersPanelProps) {
           )}
         </div>
       </div>
-
-      {viewProfile && (
-        <UserProfileView
-          targetName={viewProfile}
-          onClose={() => setViewProfile(null)}
-          onOpenDM={(name) => openDM(name)}
-        />
-      )}
-    </>
   );
 }
 
@@ -168,12 +158,18 @@ function MemberItem({
       </button>
 
       <button type="button" onClick={onViewProfile} className="flex-1 min-w-0 text-left" aria-label={`Ouvrir le profil de ${member.name}`}>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
           <GenderIcon gender={member.gender} size={10} />
-          <span className={`text-xs font-medium truncate ${blocked ? 'text-red-300' : 'text-foreground'}`}>{member.name}</span>
-          {member.isFounder && <Crown className="w-3 h-3 text-yellow-400" />}
-          {member.isAdmin && <Shield className="w-3 h-3 text-red-400" />}
-          {member.isPremium && <Star className="w-3 h-3 text-yellow-400" />}
+          <UserDisplayName
+            name={member.name}
+            profile={member}
+            level={member.level || 1}
+            size="xs"
+            showLevelDiamond={false}
+            showSpecialLabels={false}
+            openProfileOnClick={false}
+            nameClassName={`text-xs font-medium ${blocked ? 'text-red-300' : 'text-foreground'}`}
+          />
         </div>
         <div className="flex items-center gap-1 mt-0.5">
           <DiamondBadge level={member.level || 1} size="xs" />
@@ -183,7 +179,7 @@ function MemberItem({
         </div>
       </button>
 
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <button type="button" onClick={onViewProfile} className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-primary hover:bg-primary/10" title="Profil" aria-label={`Voir ${member.name}`}>
           <Eye className="w-3.5 h-3.5" />
         </button>

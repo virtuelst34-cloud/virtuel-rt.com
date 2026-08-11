@@ -1,10 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback, ChangeEvent, KeyboardEvent } from 'react';
-import { Smile, Send, X, Reply, AlertCircle } from 'lucide-react';
+import { Smile, Send, X, Reply, AlertCircle, Zap } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
 import FileUpload from './FileUpload';
 import { useUser, useTyping, useSalons, useNotifications } from '@/lib/contexts';
 import { validateMessage, type MessageInput } from '@/lib/validation';
 import { detectSpam } from '@/lib/antiSpam';
+import { DEFAULT_BANNED_WORDS, findBannedWord, mergeBannedWords } from '@/lib/bannedWords';
+import { supabase } from '@/lib/supabase';
+import { getQuickReplies } from '@/lib/funFeatures';
+import SpecialBadgeInline from './SpecialBadgeInline';
 
 interface Member {
   name: string;
@@ -19,12 +23,14 @@ interface ChatInputProps {
   onSend: (text: string, image: string | null, replyTo: Message | null, file?: File | null) => void;
   onTyping?: () => void;
   disabled?: boolean;
+  /** Placeholder quand disabled (ex. salon lecture seule). */
+  disabledPlaceholder?: string;
   replyTo?: Message | null;
   onCancelReply?: () => void;
   members?: Member[];
 }
 
-export default function ChatInput({ onSend, onTyping, disabled = false, replyTo = null, onCancelReply, members = [] }: ChatInputProps) {
+export default function ChatInput({ onSend, onTyping, disabled = false, disabledPlaceholder, replyTo = null, onCancelReply, members = [] }: ChatInputProps) {
   const { profiles, user } = useUser();
   const { currentSalon } = useSalons();
   const { setTyping } = useTyping();
@@ -39,10 +45,30 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
+  const [bannedWords, setBannedWords] = useState<string[]>(DEFAULT_BANNED_WORDS);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
   const caretRef  = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('content_moderation_settings')
+          .select('banned_words')
+          .maybeSingle();
+        if (cancelled) return;
+        const words = Array.isArray(data?.banned_words) ? data.banned_words : [];
+        setBannedWords(mergeBannedWords(words));
+      } catch {
+        if (!cancelled) setBannedWords(DEFAULT_BANNED_WORDS);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Construire la liste des gens mentionnables
   const allNames = [...new Set([
@@ -135,6 +161,16 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
 
     if ((!text.trim() && !selectedImage && !selectedFile) || disabled) return;
 
+    const banned = findBannedWord(text.trim(), bannedWords);
+    if (banned) {
+      setValidationError('Message bloqué : contenu non autorisé.');
+      addNotification({
+        type: 'block',
+        message: 'Ce message contient un mot ou une expression interdite.',
+      });
+      return;
+    }
+
     // Spam detection
     if (user) {
       const spamCheck = detectSpam(user.name, text.trim());
@@ -210,7 +246,7 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
   }, [replyTo]);
 
   return (
-    <div className="border-t border-border bg-card px-4 py-2.5 shrink-0 relative" role="region" aria-label="Zone de saisie de message">
+    <div className="border-t border-border bg-card px-3 sm:px-4 py-2 sm:py-2.5 shrink-0 relative" role="region" aria-label="Zone de saisie de message">
 
       {/* Suggestions @ */}
       {mentions.length > 0 && (
@@ -239,7 +275,14 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
         <div className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-secondary border border-border rounded-xl" role="region" aria-live="polite" aria-label="Réponse en cours">
           <Reply className="w-3.5 h-3.5 text-primary shrink-0" aria-hidden="true" />
           <div className="flex-1 min-w-0">
-            <span className="text-[10px] text-primary font-semibold">Réponse à {replyTo.author_name}</span>
+            <span className="text-[10px] text-primary font-semibold inline-flex items-center gap-1">
+              Réponse à {replyTo.author_name}
+              <SpecialBadgeInline
+                profile={profiles[replyTo.author_name] || (replyTo.author_name === user?.name ? user : null)}
+                size="xs"
+                showLabels={false}
+              />
+            </span>
             <p className="text-[11px] text-muted-foreground/60 truncate">{replyTo.text}</p>
           </div>
           <button 
@@ -296,6 +339,31 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
         />
       )}
 
+      {showQuickReplies && !disabled && (
+        <div className="absolute bottom-full left-12 mb-2 z-20 bg-card border border-purple-500/25 rounded-xl shadow-xl p-2 min-w-[200px]">
+          <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-1 mb-1.5 flex items-center gap-1">
+            <Zap className="w-3 h-3 text-purple-300" /> Réponses rapides
+          </div>
+          <div className="flex flex-col gap-1">
+            {getQuickReplies(user?.name).map(qr => (
+              <button
+                key={qr.id}
+                type="button"
+                onClick={() => {
+                  setText(qr.text);
+                  setShowQuickReplies(false);
+                  inputRef.current?.focus();
+                }}
+                className="text-left px-2.5 py-1.5 rounded-lg text-[12px] hover:bg-purple-500/15 text-foreground transition-colors"
+              >
+                <span className="font-medium text-purple-300">{qr.label}</span>
+                <span className="text-muted-foreground/50 ml-1.5 truncate">{qr.text}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {showFileUpload && !disabled && (
         <div className="absolute bottom-full left-4 mb-2 z-20">
           <FileUpload 
@@ -330,6 +398,14 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
           title="Emojis">
           <Smile className="w-4 h-4" aria-hidden="true" />
         </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); if (!disabled) setShowQuickReplies(o => !o); }}
+          disabled={disabled}
+          className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 disabled:pointer-events-none ${showQuickReplies ? 'bg-primary/20 text-primary' : 'text-muted-foreground/60 hover:bg-white/[0.06] hover:text-muted-foreground'}`}
+          aria-label="Réponses rapides"
+          title="Réponses rapides">
+          <Zap className="w-4 h-4" aria-hidden="true" />
+        </button>
         <textarea
           ref={inputRef}
           value={text}
@@ -337,7 +413,7 @@ export default function ChatInput({ onSend, onTyping, disabled = false, replyTo 
           onKeyDown={handleKeyDown}
           onSelect={e => { caretRef.current = (e.target as HTMLTextAreaElement).selectionStart || 0; }}
           disabled={disabled}
-          placeholder={disabled ? 'Vous ne pouvez pas envoyer de messages.' : 'Envoyer un message... (@ pour mentionner)'}
+          placeholder={disabled ? (disabledPlaceholder || 'Vous ne pouvez pas envoyer de messages.') : 'Envoyer un message... (@ pour mentionner)'}
           rows={1}
           aria-label="Message"
           aria-describedby={mentions.length > 0 ? 'mention-suggestions' : undefined}

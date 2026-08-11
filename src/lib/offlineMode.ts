@@ -149,6 +149,14 @@ class OfflineModeService {
       .slice(0, limit);
   }
 
+  /** Supprime du cache local tous les messages d'un salon (ex. après purge serveur). */
+  clearSalonCache(salonId: string): void {
+    for (const [id, msg] of this.messageCache.entries()) {
+      if (msg.salonId === salonId) this.messageCache.delete(id);
+    }
+    this.saveToStorage();
+  }
+
   /**
    * Obtient tous les messages du cache
    */

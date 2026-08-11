@@ -1,13 +1,47 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const rootDir = fileURLToPath(new URL('.', import.meta.url))
+
+/** Même id dans le bundle (import.meta.env.VITE_APP_VERSION) et dans dist/version.json. */
+const APP_BUILD_VERSION =
+  process.env.GITHUB_SHA?.slice(0, 12) ||
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ||
+  `${Date.now().toString(36)}`
+
+/** Écrit dist/version.json à chaque build (détection de déploiement côté client). */
+function versionJsonPlugin() {
+  return {
+    name: 'virtuel-rt-version-json',
+    apply: 'build',
+    closeBundle() {
+      const payload = {
+        version: APP_BUILD_VERSION,
+        builtAt: new Date().toISOString(),
+      }
+      writeFileSync(resolve(rootDir, 'dist/version.json'), JSON.stringify(payload))
+    },
+  }
+}
 
 export default defineConfig({
   logLevel: 'error',
+  define: {
+    // Ancre la version dans le JS servi — pas dans version.json réseau seul
+    // (sinon un vieux SW + nouveau version.json masque la bannière « Mise à jour »).
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(APP_BUILD_VERSION),
+  },
   plugins: [
     react(),
+    versionJsonPlugin(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Prompt : on active skipWaiting via updateSW(true) (banner / auto-accueil)
+      registerType: 'prompt',
+      injectRegister: false,
       // Ne pas injecter de SW pendant `npm run dev`
       devOptions: { enabled: false },
       includeAssets: ['logo.png', 'manifest.json'],
@@ -20,14 +54,18 @@ export default defineConfig({
           'logo.png',
           'manifest.json',
           'manifest.webmanifest',
-          'registerSW.js',
         ],
         cleanupOutdatedCaches: true,
+        // skipWaiting via message SKIP_WAITING (updateSW) pour ne pas couper un chat
+        skipWaiting: false,
         clientsClaim: true,
-        skipWaiting: true,
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/functions\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/functions\//, /^\/version\.json$/],
         runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname === '/version.json',
+            handler: 'NetworkOnly',
+          },
           {
             urlPattern: ({ request }) => request.mode === 'navigate',
             handler: 'NetworkFirst',
@@ -38,13 +76,13 @@ export default defineConfig({
             },
           },
           {
-            // Fichiers hashés immuables
+            // Fichiers hashés immuables (status 200 only — évite de figer des fallbacks opaques)
             urlPattern: /\/(?:chunks\/)?[^/?]+\.[A-Za-z0-9_-]+\.(?:js|css)$/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'static-hashed',
               expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
+              cacheableResponse: { statuses: [200] },
             },
           },
           {

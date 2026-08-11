@@ -21,7 +21,7 @@
     "prepare": "husky",
     "supabase:apply": "node scripts/apply-supabase.mjs",
     "supabase:migrate": "node scripts/apply-supabase.mjs",
-    "supabase:deploy-functions": "npx supabase functions deploy rate-limit --project-ref mqghveoldsidfxgvefts",
+    "supabase:deploy-functions": "npx supabase functions deploy rate-limit --project-ref ${SUPABASE_PROJECT_REF:-mqghveoldsidfxgvefts} && npx supabase functions deploy moderation-alerts --project-ref ${SUPABASE_PROJECT_REF:-mqghveoldsidfxgvefts}",
     "deploy:zip": "python scripts/build-and-zip-dist.py"
   },
   "dependencies": {

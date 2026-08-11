@@ -1,6 +1,7 @@
 import { supabase, Database } from './supabase';
 import { messageRateLimiter } from './rateLimiter';
 import { checkServerRateLimit, RateLimitAction } from './rateLimitService';
+import { getStoredGuestToken } from './guestAuthService';
 
 export interface Message {
   id: string;
@@ -27,6 +28,18 @@ export interface MessageEventHandlers {
   onDelete: (messageId: string) => void;
 }
 
+const MESSAGE_COLUMNS =
+  'id, salon_id, author_name, author_avatar, author_initials, text, created_date, reactions, pinned, is_system, is_announcement, reply_to, image_url, edited, edited_at, created_at';
+
+const SALON_COLUMNS =
+  'id, name, type, icon, count, live, welcome, password, sort_order, description, created_by, category_id, subcategory, is_coquin, created_at';
+
+const SALON_CATEGORY_COLUMNS =
+  'id, name, emoji, description, sort_order, subcategories, is_coquin, created_at, updated_at';
+
+const PREFERENCES_COLUMNS =
+  'id, user_name, theme, party_mode, is_premium, accent_color, compact_mode, created_at, updated_at';
+
 export interface Salon {
   id: string;
   name: string;
@@ -36,7 +49,25 @@ export interface Salon {
   live?: boolean;
   welcome: string;
   password?: string;
+  sort_order?: number;
+  description?: string;
+  created_by?: string | null;
+  category_id?: string | null;
+  subcategory?: string;
+  is_coquin?: boolean;
   created_at: string;
+}
+
+export interface SalonCategoryRow {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  sort_order: number;
+  subcategories: string[];
+  is_coquin: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface XPEntry {
@@ -78,6 +109,10 @@ export interface Report {
   reporter: string;
   timestamp: string;
   created_at: string;
+  status?: 'pending' | 'in_progress' | 'resolved' | 'dismissed';
+  handled_by?: string | null;
+  handled_at?: string | null;
+  staff_notes?: string | null;
 }
 
 // Service de base de données Supabase
@@ -95,17 +130,18 @@ async function enforceRateLimit(action: RateLimitAction, userId: string): Promis
 
 export const supabaseDbService = {
   // Messages
-  async getMessages(salonId: string, limit: number = 200, offset: number = 0): Promise<Message[]> {
+  async getMessages(salonId: string, limit: number = 50, offset: number = 0): Promise<Message[]> {
     try {
+      // Newest-first page, then reverse for chronological UI.
       const { data, error } = await supabase
         .from('messages')
-        .select('*')
+        .select(MESSAGE_COLUMNS)
         .eq('salon_id', salonId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (error) throw error;
-      return data || [];
+      return (data || []).slice().reverse();
     } catch (error) {
       console.error('Erreur lors de la récupération des messages:', error);
       return [];
@@ -116,14 +152,25 @@ export const supabaseDbService = {
     await enforceRateLimit('message', message.author_name);
 
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .insert(message)
-        .select()
-        .maybeSingle();
+      // RPC forces author_name = current_actor_name (guest token in same TX)
+      const { data, error } = await supabase.rpc('insert_own_message', {
+        p_salon_id: message.salon_id,
+        p_author_name: message.author_name,
+        p_author_avatar: message.author_avatar,
+        p_author_initials: message.author_initials,
+        p_text: message.text,
+        p_created_date: message.created_date,
+        p_reactions: message.reactions ?? {},
+        p_pinned: message.pinned ?? false,
+        p_is_system: message.is_system ?? false,
+        p_is_announcement: message.is_announcement ?? false,
+        p_reply_to: message.reply_to ?? null,
+        p_image_url: message.image_url ?? null,
+        p_guest_token: getStoredGuestToken(),
+      });
 
       if (error) throw error;
-      return data;
+      return data as Message | null;
     } catch (error) {
       console.error('Erreur lors de l\'ajout du message:', error);
       return null;
@@ -132,7 +179,11 @@ export const supabaseDbService = {
 
   async deleteMessage(messageId: string): Promise<void> {
     try {
-      await supabase.from('messages').delete().eq('id', messageId);
+      const { error } = await supabase.rpc('delete_own_message', {
+        p_message_id: messageId,
+        p_guest_token: getStoredGuestToken(),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Erreur lors de la suppression du message:', error);
     }
@@ -144,12 +195,22 @@ export const supabaseDbService = {
     }
 
     try {
-      const { reactions, ...otherUpdates } = updates;
+      const { reactions, pinned, ...otherUpdates } = updates;
 
       if (reactions) {
         const { error } = await supabase.rpc('update_message_reaction', {
           message_id: messageId,
           new_reactions: reactions,
+          p_guest_token: getStoredGuestToken(),
+        });
+        if (error) throw error;
+      }
+
+      if (pinned !== undefined) {
+        const { error } = await supabase.rpc('set_message_pinned', {
+          p_message_id: messageId,
+          p_pinned: !!pinned,
+          p_guest_token: getStoredGuestToken(),
         });
         if (error) throw error;
       }
@@ -167,7 +228,10 @@ export const supabaseDbService = {
   // Salons
   async getSalons(): Promise<Salon[]> {
     try {
-      const { data, error } = await supabase.from('salons').select('*');
+      const { data, error } = await supabase
+        .from('salons')
+        .select(SALON_COLUMNS)
+        .order('sort_order', { ascending: true });
       if (error) throw error;
       return data || [];
     } catch (error) {
@@ -176,14 +240,53 @@ export const supabaseDbService = {
     }
   },
 
+  async getSalonDisplayOrder(): Promise<Record<string, number>> {
+    try {
+      const { data, error } = await supabase
+        .from('salon_display_order')
+        .select('salon_id, sort_order');
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const row of data || []) {
+        map[row.salon_id] = row.sort_order;
+      }
+      return map;
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'ordre des salons:', error);
+      return {};
+    }
+  },
+
+  async setSalonDisplayOrder(orderedIds: string[]): Promise<void> {
+    const rows = orderedIds.map((salon_id, index) => ({
+      salon_id,
+      sort_order: index * 10,
+      updated_at: new Date().toISOString(),
+    }));
+    const { error } = await supabase
+      .from('salon_display_order')
+      .upsert(rows, { onConflict: 'salon_id' });
+    if (error) {
+      console.error('Erreur lors de la sauvegarde de l\'ordre des salons:', error);
+      throw error;
+    }
+  },
+
   async addSalon(salon: Omit<Salon, 'created_at'>, creatorName?: string): Promise<Salon | null> {
     if (creatorName) {
       await enforceRateLimit('salon_create', creatorName);
     }
 
+    const payload = {
+      ...salon,
+      created_by: salon.created_by ?? creatorName ?? null,
+      sort_order: salon.sort_order ?? 1000 + Date.now() % 100000,
+      description: salon.description ?? '',
+    };
+
     const { data, error } = await supabase
       .from('salons')
-      .insert(salon)
+      .insert(payload)
       .select()
       .maybeSingle();
 
@@ -192,12 +295,92 @@ export const supabaseDbService = {
       throw error;
     }
 
+    if (data?.id != null) {
+      try {
+        await supabase.from('salon_display_order').upsert({
+          salon_id: data.id,
+          sort_order: data.sort_order ?? 1000,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'salon_id' });
+      } catch { /* ignore order sync */ }
+    }
+
     return data;
+  },
+
+  async updateSalon(salonId: string, updates: Partial<Omit<Salon, 'id' | 'created_at'>>): Promise<Salon | null> {
+    const { data, error } = await supabase
+      .from('salons')
+      .update(updates)
+      .eq('id', salonId)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('Erreur lors de la mise à jour du salon:', error);
+      throw error;
+    }
+
+    if (updates.sort_order !== undefined) {
+      try {
+        await supabase.from('salon_display_order').upsert({
+          salon_id: salonId,
+          sort_order: updates.sort_order,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'salon_id' });
+      } catch { /* ignore */ }
+    }
+
+    return data;
+  },
+
+  async getSalonCategories(): Promise<SalonCategoryRow[]> {
+    try {
+      const { data, error } = await supabase
+        .from('salon_categories')
+        .select(SALON_CATEGORY_COLUMNS)
+        .order('sort_order', { ascending: true });
+      if (error) throw error;
+      return (data || []).map((row: SalonCategoryRow & { subcategories?: string[] | null }) => ({
+        ...row,
+        subcategories: Array.isArray(row.subcategories) ? row.subcategories : [],
+      }));
+    } catch (error) {
+      console.error('Erreur lors de la récupération des catégories:', error);
+      return [];
+    }
+  },
+
+  async upsertSalonCategory(category: Omit<SalonCategoryRow, 'created_at' | 'updated_at'>): Promise<SalonCategoryRow | null> {
+    const payload = {
+      ...category,
+      subcategories: category.subcategories || [],
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase
+      .from('salon_categories')
+      .upsert(payload, { onConflict: 'id' })
+      .select()
+      .maybeSingle();
+    if (error) {
+      console.error('Erreur lors de la sauvegarde de la catégorie:', error);
+      throw error;
+    }
+    return data;
+  },
+
+  async deleteSalonCategory(categoryId: string): Promise<void> {
+    const { error } = await supabase.from('salon_categories').delete().eq('id', categoryId);
+    if (error) {
+      console.error('Erreur lors de la suppression de la catégorie:', error);
+      throw error;
+    }
   },
 
   async deleteSalon(salonId: string): Promise<void> {
     try {
       await supabase.from('salons').delete().eq('id', salonId);
+      await supabase.from('salon_display_order').delete().eq('salon_id', salonId);
     } catch (error) {
       console.error('Erreur lors de la suppression du salon:', error);
     }
@@ -262,7 +445,7 @@ export const supabaseDbService = {
     try {
       let request = supabase
         .from('messages')
-        .select('*')
+        .select(MESSAGE_COLUMNS)
         .ilike('text', `%${trimmed}%`)
         .order('created_at', { ascending: false })
         .limit(options.limit ?? 100);
@@ -334,7 +517,7 @@ export const supabaseDbService = {
     try {
       const { data, error } = await supabase
         .from('preferences')
-        .select('*')
+        .select(PREFERENCES_COLUMNS)
         .eq('user_name', userName)
         .maybeSingle();
 
@@ -347,12 +530,15 @@ export const supabaseDbService = {
   },
 
   async updatePreferences(userName: string, updates: Partial<Preferences>): Promise<void> {
-    const { error } = await supabase
-      .from('preferences')
-      .upsert(
-        { user_name: userName, ...updates },
-        { onConflict: 'user_name' },
-      );
+    // Never send is_premium from client — RPC + trigger enforce actor + premium mirror
+    const { error } = await supabase.rpc('upsert_own_preferences', {
+      p_user_name: userName,
+      p_theme: updates.theme ?? null,
+      p_party_mode: updates.party_mode ?? null,
+      p_accent_color: updates.accent_color ?? null,
+      p_compact_mode: updates.compact_mode ?? null,
+      p_guest_token: getStoredGuestToken(),
+    });
 
     if (error) throw error;
   },
@@ -360,7 +546,9 @@ export const supabaseDbService = {
   // Badges personnalisés
   async getCustomBadges(): Promise<CustomBadge[]> {
     try {
-      const { data, error } = await supabase.from('custom_badges').select('*');
+      const { data, error } = await supabase
+        .from('custom_badges')
+        .select('id, name, icon, min_level, created_at');
       if (error) throw error;
       return data || [];
     } catch (error) {
@@ -446,24 +634,6 @@ export const supabaseDbService = {
       .subscribe();
   },
 
-  // Realtime subscription pour les profils utilisateurs
-  subscribeToProfiles(callback: (profile: any) => void) {
-    return supabase
-      .channel('profiles')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-        },
-        (payload) => {
-          callback(payload.new);
-        }
-      )
-      .subscribe();
-  },
-
   async notifyUserByName(
     targetName: string,
     type: string,
@@ -480,5 +650,141 @@ export const supabaseDbService = {
     } catch (error) {
       console.error('Erreur notification utilisateur:', error);
     }
+  },
+
+  /** Staff only — grant/revoke Premium (profiles.is_premium). */
+  async adminSetPremium(userName: string, premium: boolean, premiumUntil?: string | null): Promise<boolean> {
+    const { data, error } = await supabase.rpc('admin_set_premium', {
+      p_user_name: userName,
+      p_premium: premium,
+      ...(premiumUntil !== undefined ? { p_premium_until: premiumUntil } : {}),
+    });
+    if (error) {
+      console.error('Erreur admin_set_premium:', error);
+      throw error;
+    }
+    return !!data;
+  },
+
+  /** Staff only — search profiles by pseudo for Premium Profils tab. */
+  async adminSearchProfiles(query: string, limit = 20): Promise<Array<{
+    id: string;
+    name: string;
+    avatar: string;
+    initials: string;
+    is_premium: boolean;
+    premium_until: string | null;
+    level: number;
+    xp: number;
+  }>> {
+    const { data, error } = await supabase.rpc('admin_search_profiles', {
+      p_query: query,
+      p_limit: limit,
+    });
+    if (error) throw error;
+    return (data || []) as Array<{
+      id: string;
+      name: string;
+      avatar: string;
+      initials: string;
+      is_premium: boolean;
+      premium_until: string | null;
+      level: number;
+      xp: number;
+    }>;
+  },
+
+  async adminCreatePremiumCode(opts: {
+    code: string;
+    durationDays?: number | null;
+    maxUses?: number;
+    expiresAt?: string | null;
+    note?: string | null;
+  }): Promise<string> {
+    const { data, error } = await supabase.rpc('admin_create_premium_code', {
+      p_code: opts.code,
+      p_duration_days: opts.durationDays ?? null,
+      p_max_uses: opts.maxUses ?? 1,
+      p_expires_at: opts.expiresAt ?? null,
+      p_note: opts.note ?? null,
+    });
+    if (error) throw error;
+    return data as string;
+  },
+
+  async adminListPremiumCodes(): Promise<Array<{
+    id: string;
+    code: string;
+    duration_days: number | null;
+    max_uses: number;
+    use_count: number;
+    active: boolean;
+    expires_at: string | null;
+    note: string | null;
+    created_at: string;
+  }>> {
+    const { data, error } = await supabase.rpc('admin_list_premium_codes');
+    if (error) throw error;
+    return (data || []) as Array<{
+      id: string;
+      code: string;
+      duration_days: number | null;
+      max_uses: number;
+      use_count: number;
+      active: boolean;
+      expires_at: string | null;
+      note: string | null;
+      created_at: string;
+    }>;
+  },
+
+  async adminDeactivatePremiumCode(id: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('admin_deactivate_premium_code', { p_id: id });
+    if (error) throw error;
+    return !!data;
+  },
+
+  async adminListPremiumRedemptions(codeId?: string | null): Promise<Array<{
+    id: string;
+    code_id: string;
+    code: string;
+    user_id: string;
+    user_name: string | null;
+    redeemed_at: string;
+  }>> {
+    const { data, error } = await supabase.rpc('admin_list_premium_redemptions', {
+      p_code_id: codeId ?? null,
+    });
+    if (error) throw error;
+    return (data || []) as Array<{
+      id: string;
+      code_id: string;
+      code: string;
+      user_id: string;
+      user_name: string | null;
+      redeemed_at: string;
+    }>;
+  },
+
+  async redeemPremiumCode(code: string): Promise<{ ok: boolean; premium_until: string | null; permanent: boolean }> {
+    const { data, error } = await supabase.rpc('redeem_premium_code', { p_code: code });
+    if (error) throw error;
+    return data as { ok: boolean; premium_until: string | null; permanent: boolean };
+  },
+
+  async staffSetFeaturedSalon(salonId: string | null): Promise<boolean> {
+    const { data, error } = await supabase.rpc('staff_set_featured_salon', {
+      p_salon_id: salonId,
+    });
+    if (error) throw error;
+    return !!data;
+  },
+
+  async sendMerciModo(targetName: string): Promise<{ ok: boolean; staff_notified?: number }> {
+    const { data, error } = await supabase.rpc('send_merci_modo', {
+      p_target_name: targetName,
+    });
+    if (error) throw error;
+    return data as { ok: boolean; staff_notified?: number };
   },
 };

@@ -148,6 +148,9 @@ export interface Database {
           live?: boolean;
           welcome: string;
           password?: string;
+          sort_order?: number;
+          description?: string;
+          created_by?: string;
           created_at: string;
         };
         Insert: {
@@ -159,6 +162,9 @@ export interface Database {
           live?: boolean;
           welcome: string;
           password?: string;
+          sort_order?: number;
+          description?: string;
+          created_by?: string;
           created_at?: string;
         };
         Update: {
@@ -170,6 +176,26 @@ export interface Database {
           live?: boolean;
           welcome?: string;
           password?: string;
+          sort_order?: number;
+          description?: string;
+          created_by?: string;
+        };
+      };
+      salon_display_order: {
+        Row: {
+          salon_id: string;
+          sort_order: number;
+          updated_at: string;
+        };
+        Insert: {
+          salon_id: string;
+          sort_order: number;
+          updated_at?: string;
+        };
+        Update: {
+          salon_id?: string;
+          sort_order?: number;
+          updated_at?: string;
         };
       };
       xp_monthly: {

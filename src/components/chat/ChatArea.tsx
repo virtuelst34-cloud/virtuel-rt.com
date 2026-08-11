@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, ChangeEvent, KeyboardEvent } from 'react';
-import { useUser, useSalons, useXP, useModeration, useMessages, useNotifications, useMuteBlock, useTyping } from '@/lib/contexts';
+import { useUser, useSalons, useXP, useModeration, useMessages, useNotifications, useMuteBlock, useTyping, usePreferences, useUI } from '@/lib/contexts';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { SALONS } from '@/lib/chatConfig';
 import { Message } from '@/lib/searchUtils';
@@ -9,7 +9,6 @@ import ReactionPicker from './ReactionPicker';
 import LevelUpToast from './LevelUpToast';
 import ScenePanel from './ScenePanel';
 import QuizPanel from './QuizPanel';
-import UserProfileView from './UserProfileView';
 import { FilterPanel } from './FilterPanel';
 import { ExportPanel } from './ExportPanel';
 import { ReportPanel } from './ReportPanel';
@@ -23,7 +22,13 @@ import { recordMessageSent, recordReaction, recordMention } from '@/lib/userActi
 import { uploadChatMedia, uploadChatFile } from '@/lib/storageService';
 import { supabaseDbService } from '@/lib/supabaseDb';
 import { mediaBroadcastService } from '@/lib/mediaBroadcastService';
-import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown, Filter as FilterIcon, Download } from 'lucide-react';
+import { Users, Search, VolumeX, X, ArrowLeft, Pin, ChevronDown, Filter as FilterIcon, Download, PartyPopper, Zap, MoreHorizontal } from 'lucide-react';
+import { APPLAUSE_EVENT, broadcastApplause, isSalonMuted, REACTION_RAIN_EVENT, type ApplauseDetail, type ReactionRainDetail } from '@/lib/funFeatures';
+import DailySparkCard from './DailySparkCard';
+import WelcomeGuideCard from './WelcomeGuideCard';
+import ChatToolsPanel from './ChatToolsPanel';
+import ReactionRainOverlay from './ReactionRainOverlay';
+import { mergeAndSortSalons } from '@/lib/salonUtils';
 
 interface JoinToastProps {
   name: string;
@@ -58,24 +63,30 @@ interface ChatAreaProps {
   micActive: boolean;
   micLevel: number;
   onOpenDM?: (name: string) => void;
+  /** Media / WebRTC au-dessus du composer (pas sous la zone d’écriture). */
+  composerExtras?: React.ReactNode;
 }
 
-export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProps) {
+export default function ChatArea({ micActive, micLevel, onOpenDM, composerExtras }: ChatAreaProps) {
   const { user, profiles } = useUser();
-  const { currentSalon, setCurrentSalon, customSalons, hiddenSalons } = useSalons();
+  const { currentSalon, setCurrentSalon, customSalons, hiddenSalons, displayOrder } = useSalons();
+  const { coquinMode, isPremium } = usePreferences();
   const { awardXP, sounds } = useXP();
   const { isUserBanned, isUserMuted, isBlocked } = useModeration();
   const { isMuted: isLocallyMuted, isBlocked: isLocallyBlocked } = useMuteBlock();
   const { getTypingUsers } = useTyping();
-  const { can, isAdmin } = usePermissions();
+  const { can, isAdmin, isFounder } = usePermissions();
   const { getMessages, addMessage, deleteMessage, pinMessage, updateMessage, updateReaction, setCurrentSalonId, loadMoreMessages, isLoadingHistory } = useMessages();
   const { addNotification } = useNotifications();
+  const { openUserProfile } = useUI();
 
   const scrollRef                           = useRef<HTMLDivElement>(null);
   const messagesEndRef                      = useRef<HTMLDivElement>(null);
   const typingTimerRef                      = useRef<number | null>(null);
   const timeoutsRef                         = useRef<number[]>([]);
   const prevMsgCountRef                     = useRef(0);
+  const stickToBottomRef                    = useRef(true);
+  const forceBottomRef                      = useRef(false);
   const inputRef                           = useRef<HTMLTextAreaElement>(null);
 
   const [reactionPicker, setReactionPicker] = useState<{ msgId: string; x: number; y: number } | null>(null);
@@ -85,11 +96,11 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const [showMembers, setShowMembers]       = useState(false);
   const [joinToast, setJoinToast]           = useState<string | null>(null);
   const [typing, setTypingLocal]                 = useState<string[]>([]);
-  const [viewProfile, setViewProfile]       = useState<string | null>(null);
   const [replyTo, setReplyTo]               = useState<any>(null);
   const [isAtBottom, setIsAtBottom]         = useState(true);
   const [unreadNew, setUnreadNew]           = useState(0);
   const [showFilter, setShowFilter]         = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [filteredMessages, setFilteredMessages] = useState<Message[] | null>(null);
   const [showExport, setShowExport]         = useState(false);
   const [showReport, setShowReport]         = useState(false);
@@ -97,18 +108,65 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   const [reportTarget, setReportTarget]     = useState<{ id: string; type: 'message' | 'user'; name?: string; content?: string } | null>(null);
   const [, setPresenceTick]                 = useState(0);
   const [remoteMic, setRemoteMic]           = useState<Record<string, { active: boolean; level: number }>>({});
+  const [applauseBurst, setApplauseBurst]   = useState<{ id: number; from: string } | null>(null);
+  const [showTools, setShowTools]           = useState(false);
+  const [reactionRain, setReactionRain]     = useState<ReactionRainDetail | null>(null);
 
-  const allSalons    = [...SALONS, ...(customSalons || [])].filter(s => !(hiddenSalons || []).includes(s.id));
+  const allSalons    = mergeAndSortSalons(customSalons || [], hiddenSalons || [], displayOrder || {}, { coquinMode: coquinMode && isPremium });
   const salon        = allSalons.find(s => s.id === currentSalon);
+
+  // Quitter un salon coquin si Premium / mode coquin off (UI) — le serveur refuse aussi
+  useEffect(() => {
+    if (!currentSalon || (coquinMode && isPremium)) return;
+    const fromBuiltin = SALONS.find(s => s.id === currentSalon);
+    const fromCustom = (customSalons || []).find(s => s.id === currentSalon);
+    const target = fromCustom || fromBuiltin;
+    if (target && (target.isCoquin || target.category_id === 'coquin')) {
+      setCurrentSalon(null);
+    }
+  }, [coquinMode, isPremium, currentSalon, customSalons, setCurrentSalon]);
+
   const onlineUsers  = currentSalon
     ? presenceService.getOnlineUsersInSalon(currentSalon).filter(u => !isLocallyMuted(u.name) && !isLocallyBlocked(u.name))
     : [];
-  const hasScene     = salon?.type === 'vocal' || salon?.type === 'chat vocal' || salon?.type === 'video';
+  // Scène interactive dans tous les salons (profil + DM sur les participants)
+  const hasScene     = !!currentSalon;
   const messages     = currentSalon ? getMessages(currentSalon) : [];
   const pinnedMsg    = messages.find(m => m.pinned);
 
   // Demander permission push au montage
   useEffect(() => { requestPushPermission(); }, []);
+
+  useEffect(() => {
+    const showBurst = (detail: ApplauseDetail) => {
+      if (!detail?.from) return;
+      setApplauseBurst({ id: detail.at, from: detail.from });
+      window.setTimeout(() => setApplauseBurst(prev => (prev?.id === detail.at ? null : prev)), 2200);
+    };
+    const onApplause = (e: Event) => {
+      showBurst((e as CustomEvent<ApplauseDetail>).detail);
+    };
+    window.addEventListener(APPLAUSE_EVENT, onApplause);
+    return () => window.removeEventListener(APPLAUSE_EVENT, onApplause);
+  }, []);
+
+  useEffect(() => {
+    const onRain = (e: Event) => {
+      const detail = (e as CustomEvent<ReactionRainDetail>).detail;
+      if (detail?.from) setReactionRain(detail);
+    };
+    window.addEventListener(REACTION_RAIN_EVENT, onRain);
+    return () => window.removeEventListener(REACTION_RAIN_EVENT, onRain);
+  }, []);
+
+  useEffect(() => {
+    if (!currentSalon) return;
+    return mediaBroadcastService.subscribeApplause(currentSalon, (detail) => {
+      // Local user already animated via CustomEvent; still show remote claps
+      setApplauseBurst({ id: detail.at, from: detail.from });
+      window.setTimeout(() => setApplauseBurst(prev => (prev?.id === detail.at ? null : prev)), 2200);
+    });
+  }, [currentSalon]);
 
   useEffect(() => {
     return presenceService.subscribe(() => {
@@ -141,9 +199,8 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
         : (remote?.active ? remote.level : 0),
     };
   });
-  useEffect(() => {
-    window.location.hash = currentSalon ? `salon/${currentSalon}` : '';
-  }, [currentSalon]);
+  // Hash `#salon/:id` est synchronisé dans SalonsContext.setCurrentSalon (pas ici :
+  // ChatArea est démonté sur Accueil et ne pourrait plus effacer le hash).
 
   // Synchroniser le salon actif avec MessagesContext pour charger/souscrire les messages
   useEffect(() => {
@@ -162,6 +219,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   }, [currentSalon]);
 
   useEffect(() => {
+    // Hash / URL first — never restore from lastSalon storage on load
     const hash = window.location.hash.replace('#', '');
     if (hash.startsWith('salon/')) {
       const id = hash.replace('salon/', '');
@@ -171,12 +229,34 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customSalons.length]);
 
-  // Reset ?tat ? chaque changement de salon
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const el = scrollRef.current;
+    if (el) {
+      if (behavior === 'auto') {
+        el.scrollTop = el.scrollHeight;
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+    }
+    setUnreadNew(0);
+    setIsAtBottom(true);
+    stickToBottomRef.current = true;
+  }, []);
+
+  // Reset état à chaque changement de salon — forcer le bas
   useEffect(() => {
     if (!salon) return;
     setSearchQuery(''); setSearchOpen(false); setShowMembers(false);
     setReplyTo(null); setUnreadNew(0); setIsAtBottom(true);
-    prevMsgCountRef.current = messages.length;
+    stickToBottomRef.current = true;
+    forceBottomRef.current = true;
+    prevMsgCountRef.current = 0;
+    const t1 = window.setTimeout(() => scrollToBottom('auto'), 0);
+    const t2 = window.setTimeout(() => scrollToBottom('auto'), 80);
+    const t3 = window.setTimeout(() => scrollToBottom('auto'), 250);
+    timeoutsRef.current.push(t1, t2, t3);
     if (user) {
       setJoinToast(user.name);
       sounds?.join();
@@ -185,34 +265,57 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSalon]);
 
-  // Scroll intelligent : scroll si en bas, sinon compteur nouveaux messages
+  // Scroll intelligent : entrée salon / nouveaux messages / stick-to-bottom
   useEffect(() => {
     const newCount = messages.length;
     const added    = newCount - prevMsgCountRef.current;
     prevMsgCountRef.current = newCount;
-    if (added <= 0) return;
 
-    if (isAtBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      setUnreadNew(0);
-    } else {
-      setUnreadNew(prev => prev + added);
+    if (forceBottomRef.current) {
+      forceBottomRef.current = false;
+      scrollToBottom('auto');
+      const t1 = window.setTimeout(() => scrollToBottom('auto'), 50);
+      const t2 = window.setTimeout(() => scrollToBottom('auto'), 200);
+      timeoutsRef.current.push(t1, t2);
+    } else if (added > 0) {
+      if (stickToBottomRef.current) {
+        scrollToBottom('smooth');
+      } else {
+        setUnreadNew(prev => prev + added);
+      }
     }
 
-    // Notification push pour les mentions
-    if (user && added > 0) {
+    // Notification push pour les mentions (sauf salon muté)
+    if (user && added > 0 && currentSalon && !isSalonMuted(user.name, currentSalon)) {
       const last = messages[messages.length - 1];
       if (last && last.author_name !== user.name && last.text?.includes(`@${user.name}`)) {
-        sendPush(`${last.author_name} vous a mentionn�`, last.text);
+        sendPush(`${last.author_name} vous a mentionné`, last.text);
         addNotification({
           type: 'mention',
-          message: `@ ${last.author_name} vous a mentionn� dans #${salon?.name}`,
-          groupKey: `mention:${last.author_name}`,
+          message: `@ ${last.author_name} vous a mentionné dans #${salon?.name}`,
+          groupKey: `mention:${currentSalon}:${last.author_name}`,
+          metadata: {
+            salon_id: currentSalon,
+            message_id: last.id,
+            author_name: last.author_name,
+          },
         });
         recordMention(user.name);
       }
     }
-  }, [messages.length]);
+  }, [messages.length, currentSalon, scrollToBottom, user, addNotification, salon?.name]);
+
+  // Re-stick après chargement d'images si l'utilisateur est en bas
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onImgLoad = (e: Event) => {
+      if ((e.target as HTMLElement)?.tagName !== 'IMG') return;
+      if (stickToBottomRef.current) scrollToBottom('auto');
+    };
+    el.addEventListener('load', onImgLoad, true);
+    return () => el.removeEventListener('load', onImgLoad, true);
+  }, [currentSalon, scrollToBottom]);
 
   // Raccourcis clavier
   useEffect(() => {
@@ -241,29 +344,31 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchOpen]);
 
-  // D?tecter si l'utilisateur est en bas du scroll et charger plus de messages en haut
+  // Détecter si l'utilisateur est en bas du scroll et charger plus de messages en haut
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     setIsAtBottom(atBottom);
+    stickToBottomRef.current = atBottom;
     if (atBottom) setUnreadNew(0);
-    
-    // Charger plus de messages quand on est pr?s du haut
+
+    // Charger plus de messages quand on est près du haut
     if (el.scrollTop < 100 && currentSalon && !isLoadingHistory) {
       loadMoreMessages(currentSalon);
     }
   }, [currentSalon, loadMoreMessages, isLoadingHistory]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    setUnreadNew(0);
-    setIsAtBottom(true);
-  };
-
   const handleSend = useCallback(async (text: string, imageUrl: string | null, reply: any = null, file?: File | null) => {
     if (!user || !currentSalon) return;
     if (isUserBanned(user.name) || isUserMuted(user.name)) return;
+    if (currentSalon === 'bienvenue' && !isFounder) {
+      addNotification({
+        type: 'system',
+        message: 'Le salon Bienvenue est réservé aux annonces du fondateur (lecture seule).',
+      });
+      return;
+    }
 
     const ownerFolder = user.id || user.name || 'guest';
     let uploadedImageUrl: string | null = null;
@@ -294,11 +399,26 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     sounds?.message();
     setReplyTo(null);
     recordMessageSent(user.name, (achievement) => {
-      addNotification({ type: 'achievement', message: `${achievement.icon} Succ?s d?bloqu? : ${achievement.name}` });
+      addNotification({ type: 'achievement', message: `${achievement.icon} Succès débloqué : ${achievement.name}` });
     });
+    // Notifier les utilisateurs mentionnés (@pseudo) — Système B
+    if (text) {
+      const mentionMatches = text.match(/@([A-Za-z0-9_\-.]+)/g) || [];
+      const mentioned = [...new Set(mentionMatches.map((m) => m.slice(1)))].filter(
+        (name) => name.toLowerCase() !== user.name.toLowerCase(),
+      );
+      for (const name of mentioned) {
+        void supabaseDbService.notifyUserByName(
+          name,
+          'mention',
+          `@ ${user.name} vous a mentionné dans #${salon?.name || currentSalon}`,
+          `mention:${currentSalon}:${user.name}`,
+        );
+      }
+    }
     const newLevel = await awardXP();
     if (newLevel) setLevelUp(newLevel);
-  }, [user, currentSalon, isUserBanned, isUserMuted, addMessage, sounds, recordMessageSent, awardXP, addNotification]);
+  }, [user, currentSalon, isUserBanned, isUserMuted, isFounder, addMessage, sounds, recordMessageSent, awardXP, addNotification, salon?.name]);
 
   const handleQuizAnswerPosted = useCallback((text: string) => {
     if (!currentSalon || currentSalon !== 'quiz') return;
@@ -346,16 +466,12 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
           addNotification({ type: 'achievement', message: `${achievement.icon} Succ?s d?bloqu? : ${achievement.name}` });
         });
         if (msg.author_name !== user.name) {
-          addNotification({
-            type: 'dm',
-            message: `${user.name} a r?agi ${emoji} ? votre message`,
-            groupKey: `reaction:${msg.id}`,
-          });
+          // Notifie uniquement l'auteur (Système B) — pas le réacteur
           void supabaseDbService.notifyUserByName(
             msg.author_name,
-            'dm',
-            `${user.name} a r?agi ${emoji} ? votre message`,
-            `reaction:${msg.id}`,
+            'system',
+            `${user.name} a réagi ${emoji} à votre message`,
+            currentSalon ? `reaction:${currentSalon}:${msg.id}` : `reaction:${msg.id}`,
           );
         }
       }
@@ -377,7 +493,7 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
     deleteMessage(currentSalon, msgId);
   }, [currentSalon, deleteMessage, getMessages, user, isAdmin, can, addNotification]);
   const handlePin         = useCallback((msgId: string) => { if (currentSalon) pinMessage(currentSalon, msgId); }, [currentSalon, pinMessage]);
-  const handleViewProfile = useCallback((name: string) => { if (name !== user?.name) setViewProfile(name); }, [user]);
+  const handleViewProfile = useCallback((name: string) => { openUserProfile(name); }, [openUserProfile]);
   const handleReply       = useCallback((msg: any) => setReplyTo(msg), []);
   const handleReport      = useCallback((targetId: string, targetType: 'message' | 'user', targetName?: string, targetContent?: string) => {
     setReportTarget({ id: targetId, type: targetType, name: targetName, content: targetContent });
@@ -391,10 +507,24 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
 
   const typingUsers = currentSalon ? getTypingUsers(currentSalon) : [];
 
-  if (!salon) return null;
-
   const banned = user && isUserBanned(user.name);
   const muted  = user && isUserMuted(user.name);
+
+  // Salon introuvable / filtré (coquin, masqué…) : ne pas laisser une colonne vide sans barre d’écriture
+  if (!salon) {
+    return (
+      <div className="flex-1 flex flex-col min-h-0 items-center justify-center gap-3 px-6 text-center">
+        <p className="text-sm text-muted-foreground">Ce salon n’est plus disponible.</p>
+        <button
+          type="button"
+          onClick={() => setCurrentSalon(null)}
+          className="px-4 py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold"
+        >
+          Retour à l’accueil
+        </button>
+      </div>
+    );
+  }
 
   const visibleMessages = (filteredMessages || messages).filter(msg => {
     if (msg.is_system) return true;
@@ -423,45 +553,172 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
       {joinToast && <JoinToast name={joinToast} onDone={() => setJoinToast(null)} />}
       <OfflineBanner />
 
-      {/* Header */}
-      <div className="px-4 py-2.5 border-b border-border flex items-center gap-2.5 shrink-0 bg-card">
+      {showTools && currentSalon && (
+        <ChatToolsPanel
+          open={showTools}
+          onClose={() => setShowTools(false)}
+          userName={user?.name}
+          salonId={currentSalon}
+          salonName={salon?.name}
+          onDiceResult={(text) => {
+            void handleSend(text, null, null);
+          }}
+          onReactionRain={(emoji) => {
+            if (user?.name) {
+              setReactionRain({ from: user.name, emoji, at: Date.now() });
+              addNotification({ type: 'system', message: `Pluie de ${emoji} lancée !` });
+            }
+          }}
+          addNotification={addNotification}
+        />
+      )}
+
+      {/* Header — allégé sur téléphone (⋯ pour le secondaire) */}
+      <div className="px-2 sm:px-4 py-2 sm:py-2.5 border-b border-border flex items-center gap-1.5 sm:gap-2.5 shrink-0 bg-card min-w-0 relative">
         <button onClick={() => setCurrentSalon(null)}
-          className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 hover:text-foreground transition-colors" title="Retour">
+          className="p-2 sm:p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 hover:text-foreground transition-colors shrink-0 touch-target" title="Retour à l'accueil (Étincelle du jour)">
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center text-lg shrink-0">
-          {salon.emoji || ({'musique60':'??','musique80':'??','karaoke':'??','debat':'?','quiz':'??','jeunes':'??','lgbt':'??','divorce':'??','libre':'??','insulte':'??','cameras':'??','bar':'??'})[currentSalon || ''] || '#'}
+          {salon.emoji || ({'bienvenue':'👋','musique60':'🎵','musique80':'🎸','karaoke':'🎤','debat':'⚡','quiz':'🧠','jeunes':'👋','lgbt':'🌈','divorce':'💙','libre':'🚪','insulte':'😤','cameras':'📹','bar':'🍷'})[currentSalon || ''] || '#'}
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-foreground truncate">{salon.name}</div>
-          <div className="text-[11px] text-muted-foreground/60 flex items-center gap-1.5">
-            <span>{salon.type}</span>
-            {salon.live && <span className="text-[9px] bg-red-600 text-red-100 rounded px-1.5 py-px font-semibold">LIVE</span>}
-            <span className="text-muted-foreground/30">?</span>
-            <span>{allMembers.length} membres</span>
+          <div className="text-[11px] text-muted-foreground/60 flex items-center gap-1.5 truncate">
+            <span className="truncate">{salon.type}</span>
+            {salon.live && <span className="text-[9px] bg-red-600 text-red-100 rounded px-1.5 py-px font-semibold shrink-0">LIVE</span>}
+            <span className="text-muted-foreground/30 hidden xs:inline">·</span>
+            <span className="hidden sm:inline shrink-0">{allMembers.length} membres</span>
           </div>
         </div>
-        <button onClick={() => setSearchOpen(o => !o)}
-          className={`p-1.5 rounded-lg border transition-colors ${searchOpen ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
-          title="Rechercher" aria-label="Rechercher dans le salon">
-          <Search className="w-4 h-4" />
-        </button>
-        <button onClick={() => setShowFilter(true)}
-          className={`p-1.5 rounded-lg border transition-colors ${filteredMessages ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
-          title="Filtres" aria-label="Filtrer les messages">
-          <FilterIcon className="w-4 h-4" />
-        </button>
-        <button onClick={() => setShowExport(true)}
-          className="p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 transition-colors"
-          title="Exporter" aria-label="Exporter les messages">
-          <Download className="w-4 h-4" />
-        </button>
-        <button onClick={() => setShowMembers(o => !o)}
-          className={`p-1.5 rounded-lg border transition-colors ${showMembers ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
-          title="Membres" aria-label="Voir les membres du salon">
-          <Users className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 justify-end">
+          <button onClick={() => setShowMembers(o => !o)}
+            className={`p-2 sm:p-1.5 rounded-lg border transition-colors touch-target ${showMembers ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+            title="Membres" aria-label="Voir les membres du salon">
+            <Users className="w-4 h-4" />
+          </button>
+
+          {/* Desktop : outils visibles */}
+          <button onClick={() => setSearchOpen(o => !o)}
+            className={`hidden sm:flex p-1.5 rounded-lg border transition-colors ${searchOpen ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+            title="Rechercher" aria-label="Rechercher dans le salon">
+            <Search className="w-4 h-4" />
+          </button>
+          <button onClick={() => setShowFilter(true)}
+            className={`hidden sm:flex p-1.5 rounded-lg border transition-colors ${filteredMessages ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+            title="Filtres" aria-label="Filtrer les messages">
+            <FilterIcon className="w-4 h-4" />
+          </button>
+          <button onClick={() => setShowExport(true)}
+            className="hidden sm:flex p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 transition-colors"
+            title="Exporter" aria-label="Exporter les messages">
+            <Download className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowTools(o => !o)}
+            className={`hidden sm:flex p-1.5 rounded-lg border transition-colors ${showTools ? 'border-purple-500/40 bg-purple-500/10 text-purple-300' : 'border-white/10 text-muted-foreground/60 hover:bg-white/5'}`}
+            title="Outils du salon"
+            aria-label="Ouvrir les outils du salon">
+            <Zap className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!user?.name) {
+                addNotification({ type: 'system', message: 'Connectez-vous pour applaudir.' });
+                return;
+              }
+              const detail = broadcastApplause(user.name);
+              if (currentSalon && detail) mediaBroadcastService.broadcastApplause(currentSalon, detail);
+              addNotification({ type: 'system', message: '👏 Applaudissements envoyés au salon !' });
+            }}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 hover:border-amber-500/50 transition-colors"
+            title="Applaudissements — envoie une salve de 👏 visible dans le salon"
+            aria-label="Applaudir le salon">
+            <PartyPopper className="w-4 h-4" />
+            <span className="text-[11px] font-medium whitespace-nowrap hidden md:inline">Applaudir</span>
+          </button>
+
+          {/* Mobile : menu secondaire */}
+          <div className="relative sm:hidden">
+            <button
+              type="button"
+              onClick={() => setHeaderMenuOpen((o) => !o)}
+              className={`p-2 rounded-lg border transition-colors touch-target ${headerMenuOpen ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-muted-foreground/60'}`}
+              aria-label="Plus d'actions"
+              aria-expanded={headerMenuOpen}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            {headerMenuOpen && (
+              <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-40"
+                  aria-label="Fermer le menu"
+                  onClick={() => setHeaderMenuOpen(false)}
+                />
+                <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border border-border bg-card shadow-xl py-1 animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs text-foreground hover:bg-white/5 touch-target"
+                    onClick={() => { setSearchOpen((o) => !o); setHeaderMenuOpen(false); }}
+                  >
+                    <Search className="w-3.5 h-3.5 text-muted-foreground" /> Rechercher
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs text-foreground hover:bg-white/5 touch-target"
+                    onClick={() => { setShowTools((o) => !o); setHeaderMenuOpen(false); }}
+                  >
+                    <Zap className="w-3.5 h-3.5 text-purple-300" /> Outils
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs text-foreground hover:bg-white/5 touch-target"
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      if (!user?.name) {
+                        addNotification({ type: 'system', message: 'Connectez-vous pour applaudir.' });
+                        return;
+                      }
+                      const detail = broadcastApplause(user.name);
+                      if (currentSalon && detail) mediaBroadcastService.broadcastApplause(currentSalon, detail);
+                      addNotification({ type: 'system', message: '👏 Applaudissements envoyés au salon !' });
+                    }}
+                  >
+                    <PartyPopper className="w-3.5 h-3.5 text-amber-300" /> Applaudir
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
+
+      {applauseBurst && (
+        <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden" aria-hidden>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <span
+              key={`${applauseBurst.id}-${i}`}
+              className="absolute text-2xl animate-fade-in-down"
+              style={{
+                left: `${8 + (i * 7) % 84}%`,
+                top: `${12 + (i % 5) * 14}%`,
+                animationDelay: `${i * 60}ms`,
+                opacity: 0.85,
+                transform: `rotate(${(i % 5) * 12 - 24}deg)`,
+              }}
+            >
+              👏
+            </span>
+          ))}
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
+            {applauseBurst.from} applaudit !
+          </div>
+        </div>
+      )}
 
       {/* Recherche */}
       {searchOpen && (
@@ -502,18 +759,39 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
       <div className="flex flex-1 min-h-0">
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
 
-          {hasScene && <ScenePanel salonId={currentSalon || ''} members={sceneMembers} micActive={micActive} userMicLevel={micLevel} />}
+          {/* Scène plafonnée sur mobile pour ne jamais pousser la barre d’écriture hors écran */}
+          {hasScene && (
+            <ScenePanel
+              salonId={currentSalon || ''}
+              members={sceneMembers}
+              micActive={micActive}
+              userMicLevel={micLevel}
+              onViewProfile={handleViewProfile}
+              onOpenDM={onOpenDM}
+            />
+          )}
           {currentSalon === 'quiz' && (
-            <QuizPanel salonId={currentSalon} onAnswerPosted={handleQuizAnswerPosted} />
+            <div className="shrink-0 max-h-[28vh] sm:max-h-none overflow-y-auto overscroll-contain">
+              <QuizPanel salonId={currentSalon} onAnswerPosted={handleQuizAnswerPosted} />
+            </div>
           )}
 
           {/* Zone messages avec scroll intelligent */}
           <div ref={scrollRef} onScroll={handleScroll}
-            className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-0.5">
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-0.5 relative overscroll-contain">
+            <ReactionRainOverlay burst={reactionRain} />
+            {!searchQuery && currentSalon === 'bienvenue' && (
+              <div className="sticky top-0 z-[5] -mx-1 px-1 pb-1 bg-background/95 backdrop-blur-sm">
+                <WelcomeGuideCard />
+              </div>
+            )}
             {!searchQuery && (
               <div className="text-center text-[10px] text-muted-foreground/40 py-2 flex items-center gap-2">
                 <div className="flex-1 h-px bg-border" /><span>Aujourd'hui</span><div className="flex-1 h-px bg-border" />
               </div>
+            )}
+            {!searchQuery && visibleMessages.filter(m => !m.is_system).length === 0 && (
+              <DailySparkCard compact className="mb-3 mx-auto max-w-md w-full" />
             )}
             {visibleMessages.map((msg, index) => (
               <div key={msg.id} className="animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${index * 30}ms` }}>
@@ -526,6 +804,8 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
                   onViewProfile={handleViewProfile}
                   onReply={handleReply}
                   onReport={(id, name, content) => handleReport(id, 'message', name, content)}
+                  salonId={currentSalon || undefined}
+                  salonName={salon?.name}
                 />
               </div>
             ))}
@@ -540,8 +820,8 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
 
           {/* Bouton scroll bas + compteur nouveaux messages */}
           {!isAtBottom && (
-            <button onClick={scrollToBottom}
-              className="absolute bottom-24 right-6 flex items-center gap-2 bg-primary text-white text-xs px-3 py-1.5 rounded-full shadow-lg hover:bg-primary/80 transition-all z-10">
+            <button onClick={() => scrollToBottom('smooth')}
+              className="absolute bottom-24 right-4 sm:right-6 flex items-center gap-2 bg-primary text-white text-xs px-3 py-2 sm:py-1.5 rounded-full shadow-lg hover:bg-primary/80 transition-all z-10 touch-target">
               <ChevronDown className="w-3.5 h-3.5" />
               {unreadNew > 0 ? `${unreadNew} nouveau${unreadNew > 1 ? 'x' : ''}` : 'Bas'}
             </button>
@@ -549,14 +829,23 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
 
           <TypingIndicator />
 
-          <ChatInput
-            onSend={handleSend}
-            onTyping={handleTyping}
-            disabled={banned || muted || undefined}
-            replyTo={replyTo}
-            onCancelReply={() => setReplyTo(null)}
-            members={allMembers}
-          />
+          {/* Dock composer : média/WebRTC au-dessus de l’écriture, collé en bas du salon */}
+          <div className="chat-composer-dock shrink-0 z-20 bg-card border-t border-border/60">
+            {composerExtras}
+            <ChatInput
+              onSend={handleSend}
+              onTyping={handleTyping}
+              disabled={banned || muted || (currentSalon === 'bienvenue' && !isFounder) || undefined}
+              disabledPlaceholder={
+                currentSalon === 'bienvenue' && !isFounder
+                  ? 'Salon Bienvenue — annonces du fondateur uniquement (lecture seule).'
+                  : undefined
+              }
+              replyTo={replyTo}
+              onCancelReply={() => setReplyTo(null)}
+              members={allMembers}
+            />
+          </div>
         </div>
 
         {/* Panneau membres */}
@@ -598,13 +887,6 @@ export default function ChatArea({ micActive, micLevel, onOpenDM }: ChatAreaProp
         />
       )}
 
-      {viewProfile && (
-        <UserProfileView
-          targetName={viewProfile}
-          onClose={() => setViewProfile(null)}
-          onOpenDM={(name) => { setViewProfile(null); onOpenDM?.(name); }}
-        />
-      )}
     </div>
   );
 }

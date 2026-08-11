@@ -1,16 +1,34 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useUser, usePreferences, useXP, useBadges, useMuteBlock, useFriends, useNotifications } from '@/lib/contexts';
 import { supabaseAuthService } from '@/lib/supabaseAuth';
+import { mapSupabaseProfile } from '@/lib/utils/profileBadges';
 import Avatar from './Avatar';
 import DiamondBadge from './DiamondBadge';
+import UserDisplayName from './UserDisplayName';
 import { getBadgeForLevel, getUnlockedBadges } from '@/lib/diamondBadges';
-import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare } from 'lucide-react';
+import { X, User, Palette, Shield, Check, Edit3, Sun, Moon, Flame, Calendar, UserX, Star, PartyPopper, Diamond, Minimize2, LucideIcon, Mail, Lock, AlertCircle, Eye, EyeOff, UserCheck, UserPlus, Trophy, MessageSquare, Scale, Zap, Bookmark, Smartphone, KeyRound, Users } from 'lucide-react';
 import AchievementsSection from './AchievementsSection';
 import TwoFactorSection from './TwoFactorSection';
+import DailySparkCard from './DailySparkCard';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-
-const AVATARS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8', 'av9', 'av10', 'av11', 'av12'] as const;
+import { AVATAR_IDS } from '@/lib/chatConfig';
+import { supabase } from '@/lib/supabase';
+import { supabaseDbService } from '@/lib/supabaseDb';
+import {
+  MOOD_OPTIONS,
+  getMood,
+  setMood,
+  getSignature,
+  setSignature,
+  getQuickReplies,
+  setQuickReplies,
+  getBookmarks,
+  type MoodId,
+  type QuickReply,
+} from '@/lib/funFeatures';
+import { Link } from 'react-router-dom';
+import { MENTIONS_LEGALES_HREF } from '@/lib/welcomeContent';
 
 interface Tab {
   id: string;
@@ -22,6 +40,7 @@ const TABS: Tab[] = [
   { id: 'profile',  label: 'Profil',    icon: User },
   { id: 'account',  label: 'Compte',    icon: Mail },
   { id: 'theme',    label: 'Apparence', icon: Palette },
+  { id: 'extras',   label: 'Extras',    icon: Zap },
   { id: 'friends',  label: 'Amis',      icon: UserCheck },
   { id: 'achievements', label: 'Succès', icon: Trophy },
   { id: 'blocked',  label: 'Bloqués',   icon: Shield },
@@ -52,7 +71,7 @@ interface SettingsPanelProps {
 export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewProfile }: SettingsPanelProps) {
   const { user, updateProfile, setStatus, supabaseUser, logout, loginWithSupabase } = useUser();
   const { xpProgress, xpForLevel } = useXP();
-  const { theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium, accentColor, changeAccent, ACCENT_COLORS, compactMode, toggleCompactMode, ambianceMode, setAmbianceMode, AMBIANCE_OPTIONS } = usePreferences();
+  const { theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium, accentColor, changeAccent, ACCENT_COLORS, compactMode, toggleCompactMode, ambianceMode, setAmbianceMode, AMBIANCE_OPTIONS, coquinMode, toggleCoquinMode } = usePreferences();
   const { mutedUsers, blockedUsers, unmuteUser, unblockUser } = useMuteBlock();
   const { friends, pendingRequests, outgoingRequests, acceptRequestFromSender, rejectRequestFromSender, removeFriend, cancelRequestToRecipient, reloadFriends } = useFriends();
   const { addNotification } = useNotifications();
@@ -68,8 +87,13 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
     name: user?.name || '',
     age: user?.age || '',
     city: user?.city || '',
-    gender: user?.gender || 'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say'
+    gender: user?.gender || 'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say',
+    mood: (user?.name ? getMood(user.name) : 'off') as MoodId,
+    signature: user?.name ? getSignature(user.name) : '',
   });
+  const [quickRepliesDraft, setQuickRepliesDraft] = useState<QuickReply[]>(() => getQuickReplies(user?.name));
+  const [newReplyLabel, setNewReplyLabel] = useState('');
+  const [newReplyText, setNewReplyText] = useState('');
   const [saved, setSaved]         = useState(false);
   const savedTimerRef             = useRef<number | null>(null);
 
@@ -82,6 +106,22 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
   const [linkSuccess, setLinkSuccess] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [alertPrefs, setAlertPrefs] = useState({
+    phone_number: '',
+    phone_consent: false,
+    notify_mod_app: true,
+    notify_mod_email: true,
+    notify_mod_sms: false,
+  });
+  const [alertPrefsSaving, setAlertPrefsSaving] = useState(false);
+  const [alertPrefsMsg, setAlertPrefsMsg] = useState<string | null>(null);
+  const [premiumCode, setPremiumCode] = useState('');
+  const [redeemingCode, setRedeemingCode] = useState(false);
+  const [redeemMsg, setRedeemMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -92,6 +132,27 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
   }, [activeTab, reloadFriends]);
 
   useEffect(() => {
+    if (!supabaseUser?.id) return;
+    let active = true;
+    void (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('phone_number, phone_consent, notify_mod_app, notify_mod_email, notify_mod_sms')
+        .eq('id', supabaseUser.id)
+        .maybeSingle();
+      if (!active || !data) return;
+      setAlertPrefs({
+        phone_number: data.phone_number || '',
+        phone_consent: !!data.phone_consent,
+        notify_mod_app: data.notify_mod_app !== false,
+        notify_mod_email: data.notify_mod_email !== false,
+        notify_mod_sms: !!data.notify_mod_sms,
+      });
+    })();
+    return () => { active = false; };
+  }, [supabaseUser?.id]);
+
+  useEffect(() => {
     setDraft({ 
       bio: user?.bio || '', 
       avatar: user?.avatar || 'av1', 
@@ -99,9 +160,71 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
       name: user?.name || '',
       age: user?.age || '',
       city: user?.city || '',
-      gender: user?.gender || 'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say'
+      gender: user?.gender || 'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say',
+      mood: (user?.name ? getMood(user.name) : 'off') as MoodId,
+      signature: user?.name ? getSignature(user.name) : '',
     });
   }, [user]);
+
+  const saveAlertPrefs = async () => {
+    if (!supabaseUser?.id) return;
+    if (alertPrefs.notify_mod_sms && (!alertPrefs.phone_consent || !alertPrefs.phone_number.trim())) {
+      setAlertPrefsMsg('Consentement et numéro requis pour les SMS.');
+      return;
+    }
+    setAlertPrefsSaving(true);
+    setAlertPrefsMsg(null);
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        phone_number: alertPrefs.phone_number.trim() || null,
+        phone_consent: alertPrefs.phone_consent,
+        notify_mod_app: alertPrefs.notify_mod_app,
+        notify_mod_email: alertPrefs.notify_mod_email,
+        notify_mod_sms: alertPrefs.notify_mod_sms && alertPrefs.phone_consent,
+      })
+      .eq('id', supabaseUser.id);
+    setAlertPrefsSaving(false);
+    setAlertPrefsMsg(error ? 'Erreur lors de la sauvegarde.' : 'Préférences d\'alerte enregistrées.');
+  };
+
+  const redeemPremiumCode = async () => {
+    if (!supabaseUser) {
+      setRedeemMsg({ type: 'err', text: 'Connectez-vous avec un compte pour utiliser un code.' });
+      return;
+    }
+    const code = premiumCode.trim();
+    if (code.length < 4) {
+      setRedeemMsg({ type: 'err', text: 'Saisissez un code valide.' });
+      return;
+    }
+    setRedeemingCode(true);
+    setRedeemMsg(null);
+    try {
+      const result = await supabaseDbService.redeemPremiumCode(code);
+      setRedeemMsg({
+        type: 'ok',
+        text: result.permanent
+          ? 'Premium activé définitivement !'
+          : `Premium activé jusqu’au ${result.premium_until ? format(new Date(result.premium_until), 'd MMM yyyy', { locale: fr }) : '…'}`,
+      });
+      setPremiumCode('');
+      // Recharger le profil serveur (source de vérité is_premium / premium_until)
+      const refreshed = await supabaseAuthService.getCurrentUser();
+      if (refreshed) {
+        const mapped = mapSupabaseProfile(refreshed);
+        updateProfile({ isPremium: mapped.isPremium });
+      } else {
+        updateProfile({ isPremium: true });
+      }
+      addNotification({ type: 'system', message: 'Code Premium accepté — bienvenue dans Premium !' });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Code invalide ou déjà utilisé';
+      setRedeemMsg({ type: 'err', text: msg.replace(/^.*Exception:?\s*/i, '') || 'Code invalide' });
+    } finally {
+      setRedeemingCode(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -130,19 +253,50 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
   };
 
   const handleSave = () => {
+    const ageNum = draft.age ? parseInt(draft.age.toString(), 10) : undefined;
+    if (ageNum != null && (!Number.isFinite(ageNum) || ageNum < 18 || ageNum > 120)) {
+      addNotification({ type: 'system', message: 'L’âge doit être entre 18 et 120 ans (service 18+).' });
+      return;
+    }
     updateProfile({ 
       bio: draft.bio, 
       avatar: draft.avatar, 
       statusText: draft.statusText,
       name: draft.name,
-      age: draft.age ? parseInt(draft.age.toString()) : undefined,
+      age: ageNum,
       city: draft.city,
       gender: draft.gender
     });
+    setMood(draft.name || user.name, draft.mood);
+    // Always key signature by the name that appears on messages (after rename: both keys)
+    setSignature(draft.name || user.name, draft.signature, user.name);
     setEditing(false);
     setSaved(true);
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordMsg(null);
+    if (newPassword.length < 6) {
+      setPasswordMsg({ type: 'err', text: 'Au moins 6 caractères.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({ type: 'err', text: 'Les mots de passe ne correspondent pas.' });
+      return;
+    }
+    setChangingPassword(true);
+    const result = await supabaseAuthService.updatePassword(newPassword);
+    setChangingPassword(false);
+    if (result.success) {
+      setPasswordMsg({ type: 'ok', text: 'Mot de passe mis à jour.' });
+      setNewPassword('');
+      setConfirmPassword('');
+      addNotification({ type: 'system', message: 'Mot de passe modifié' });
+    } else {
+      setPasswordMsg({ type: 'err', text: result.error || 'Échec de la mise à jour' });
+    }
   };
 
   const handleLinkEmail = async () => {
@@ -225,8 +379,8 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[2000] animate-in fade-in duration-300 p-4" onClick={onClose}>
-      <div className="bg-card border-2 border-red-500/50 rounded-3xl w-full max-w-[580px] max-h-[90vh] flex flex-col overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5),0_0_0_1px_rgba(239,68,68,0.3)] animate-in zoom-in-95 duration-300"
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center z-[2000] animate-in fade-in duration-300 p-0 sm:p-4 safe-area-pad" onClick={onClose}>
+      <div className="bg-card border-2 border-red-500/50 rounded-t-3xl sm:rounded-3xl w-full max-w-[580px] max-h-[92dvh] sm:max-h-[90vh] flex flex-col overflow-hidden shadow-[0_32px_96px_rgba(0,0,0,0.5),0_0_0_1px_rgba(239,68,68,0.3)] animate-in zoom-in-95 duration-300"
         onClick={e => e.stopPropagation()}>
 
         <div className="px-5 py-4 border-b border-border flex items-center gap-2.5 shrink-0">
@@ -236,21 +390,21 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
               <Check className="w-3 h-3" /> Sauvegardé
             </span>
           )}
-          <button onClick={onClose} className="flex items-center justify-center p-1.5 rounded-lg border border-white/10 text-muted-foreground/60 hover:bg-white/5 hover:text-foreground transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer">
+          <button onClick={onClose} className="flex items-center justify-center p-2 rounded-lg border border-border text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground transition-all duration-200 active:scale-95 cursor-pointer touch-target" aria-label="Fermer">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          <div className="w-[150px] bg-secondary border-r border-border p-1.5 flex flex-col gap-0.5 shrink-0">
+        <div className="flex flex-1 min-h-0 overflow-hidden flex-col sm:flex-row">
+          <div className="w-full sm:w-[150px] bg-secondary sm:border-r border-b sm:border-b-0 border-border p-1.5 flex flex-row sm:flex-col gap-1 sm:gap-0.5 shrink-0 overflow-x-auto overflow-y-hidden sm:overflow-y-auto sm:overflow-x-hidden scrollbar-thin" role="tablist" aria-label="Onglets paramètres">
             {TABS.map((tab, index) => {
               const Icon = tab.icon;
               const friendsBadge = tab.id === 'friends' ? pendingRequests.length : 0;
               return (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition-all border ${activeTab === tab.id ? 'bg-primary/12 border-primary/25 text-primary scale-105' : 'border-transparent text-muted-foreground/60 hover:bg-white/[0.04] hover:text-muted-foreground hover:scale-[1.02]'} animate-slide-in-right`}
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} role="tab" aria-selected={activeTab === tab.id}
+                  className={`relative flex items-center gap-2 px-3 py-2.5 sm:px-2.5 sm:py-2 rounded-lg text-xs transition-all border shrink-0 whitespace-nowrap min-h-[44px] sm:min-h-0 ${activeTab === tab.id ? 'bg-primary/12 border-primary/25 text-primary' : 'border-transparent text-muted-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-foreground'} animate-slide-in-right`}
                   style={{ animationDelay: `${index * 50}ms` }}>
-                  <Icon className="w-3.5 h-3.5" />{tab.label}
+                  <Icon className="w-3.5 h-3.5 shrink-0" />{tab.label}
                   {friendsBadge > 0 && (
                     <span className="ml-auto min-w-[16px] h-4 px-1 rounded-full bg-blue-500 text-white text-[9px] font-bold flex items-center justify-center">
                       {friendsBadge > 9 ? '9+' : friendsBadge}
@@ -261,7 +415,7 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
             })}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 min-w-0 w-full">
 
             {/* ── Profil ── */}
             {activeTab === 'profile' && (
@@ -281,7 +435,9 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                             name: user.name||'',
                             age: user.age||'',
                             city: user.city||'',
-                            gender: user.gender||'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say'
+                            gender: user.gender||'prefer_not_to_say' as 'male' | 'female' | 'other' | 'prefer_not_to_say',
+                            mood: getMood(user.name),
+                            signature: getSignature(user.name),
                           }); 
                           setEditing(false); 
                         }} className="flex items-center justify-center px-3 py-1.5 rounded-lg bg-white/5 border border-border text-muted-foreground text-xs hover:bg-white/10 transition-all active:scale-95 cursor-pointer">Annuler</button>
@@ -289,6 +445,8 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                       </div>
                   }
                 </div>
+
+                <DailySparkCard compact className="mb-4" />
 
                 {/* Statut */}
                 <div className="mb-4">
@@ -308,23 +466,45 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                 <div className="mb-4">
                   <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-2">Avatar</div>
                   {editing ? (
-                    <div className="grid grid-cols-6 gap-2.5 max-w-[260px]">
-                      {AVATARS.map((av, index) => (
-                        <button key={av} onClick={() => setDraft(d => ({ ...d, avatar: av }))}
+                    <div className="grid grid-cols-6 gap-2 max-h-[180px] overflow-y-auto p-1 pr-2">
+                      {AVATAR_IDS.map((av, index) => (
+                        <button key={av} type="button" onClick={() => setDraft(d => ({ ...d, avatar: av }))}
                           className={`rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ${draft.avatar === av ? 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-110' : 'opacity-60 hover:opacity-100'}`}
-                          style={{ animationDelay: `${index * 30}ms` }}>
-                          <Avatar avatarClass={av} initials={user.initials} size="md" />
+                          style={{ animationDelay: `${index * 20}ms` }}>
+                          <Avatar avatarClass={av} initials={user.initials} size="md" mood={draft.mood} />
                         </button>
                       ))}
                     </div>
                   ) : (
                     <div className="relative inline-block transition-transform duration-200 hover:scale-110">
-                      <Avatar avatarClass={user.avatar} initials={user.initials} size="lg" />
+                      <Avatar avatarClass={user.avatar} initials={user.initials} size="lg" mood={getMood(user.name)} />
                       <div className="absolute -bottom-2 -right-2 animate-float">
                         <DiamondBadge level={lvl} size="sm" />
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Humeur */}
+                <div className="mb-4">
+                  <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-2">Aura d&apos;humeur</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {MOOD_OPTIONS.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        disabled={!editing}
+                        onClick={() => setDraft(d => ({ ...d, mood: m.id }))}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] transition-all ${
+                          (editing ? draft.mood : getMood(user.name)) === m.id
+                            ? 'bg-primary/12 border-primary/30 text-primary'
+                            : 'bg-secondary border-border text-muted-foreground/60'
+                        } ${editing ? 'hover:scale-105' : 'opacity-80'}`}
+                      >
+                        <span>{m.emoji}</span>{m.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Nom */}
@@ -339,10 +519,15 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                       className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200" 
                     />
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[15px] font-bold text-foreground">{user.name}</span>
-                      {user.isFounder && <DiamondBadge level={lvl} size="xs" specialBadge="founder" />}
-                      {user.isIridescent && <DiamondBadge level={lvl} size="xs" specialBadge="iridescent" />}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <UserDisplayName
+                        name={user.name}
+                        profile={user}
+                        level={lvl}
+                        size="xs"
+                        showSpecialLabels
+                        nameClassName="text-[15px] font-bold text-foreground"
+                      />
                       {isPremium && <span className="text-[10px] bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 rounded-full px-2 py-px animate-pulse">PREMIUM</span>}
                     </div>
                   )}
@@ -356,21 +541,24 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
 
                 {/* Informations personnelles */}
                 <div className="mb-4 grid grid-cols-2 gap-3">
-                  {/* Âge */}
+                  {/* Âge (18+ uniquement — champ indicatif, pas de vérification d'identité) */}
                   <div>
-                    <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5">Âge</div>
+                    <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5">Âge (18+)</div>
                     {editing ? (
                       <input 
                         type="number"
                         value={draft.age}
                         onChange={e => setDraft(d => ({ ...d, age: e.target.value }))}
-                        min={13}
+                        min={18}
                         max={120}
-                        placeholder="Âge"
+                        placeholder="18+"
                         className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200" 
                       />
                     ) : (
                       <span className="text-sm text-muted-foreground/80">{user.age ? `${user.age} ans` : 'Non renseigné'}</span>
+                    )}
+                    {editing && (
+                      <p className="text-[10px] text-muted-foreground/45 mt-1">Virtuel-RT est réservé aux adultes. Aucune pièce d’identité n’est demandée.</p>
                     )}
                   </div>
 
@@ -452,6 +640,30 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                       className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 resize-none transition-all duration-200" />
                   ) : (
                     <p className="text-sm text-muted-foreground/80 italic">{user.bio || 'Aucune bio.'}</p>
+                  )}
+                </div>
+
+                {/* Signature chat */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest">Signature chat</div>
+                    {editing && <div className="text-[10px] text-muted-foreground/40">{draft.signature.length}/40</div>}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/45 mb-1.5">
+                    Affichée sous vos messages dans les salons. Cliquez Modifier pour la définir.
+                  </p>
+                  {editing ? (
+                    <input
+                      value={draft.signature}
+                      onChange={e => setDraft(d => ({ ...d, signature: e.target.value.slice(0, 40) }))}
+                      maxLength={40}
+                      placeholder="Ex: Toujours de bonne humeur ✨"
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200"
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground/80 italic">
+                      {getSignature(user.name) || 'Aucune signature.'}
+                    </p>
                   )}
                 </div>
 
@@ -563,6 +775,178 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                 {supabaseUser && user.email && (
                   <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
                     <TwoFactorSection userId={supabaseUser.id} email={user.email} />
+                  </div>
+                )}
+
+                <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <KeyRound className="w-4 h-4 text-yellow-400" />
+                    <span className="text-xs font-semibold text-foreground">J’ai un code Premium</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mb-3">
+                    Entrez un code fourni par l’équipe pour activer Premium (durée ou permanent). Compte email requis.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      value={premiumCode}
+                      onChange={(e) => setPremiumCode(e.target.value.toUpperCase())}
+                      placeholder="VR-XXXXXXXX"
+                      className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-yellow-500/40"
+                      disabled={redeemingCode}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void redeemPremiumCode()}
+                      disabled={redeemingCode || !premiumCode.trim()}
+                      className="px-3 py-2 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 text-xs font-semibold hover:bg-yellow-500/25 disabled:opacity-40"
+                    >
+                      {redeemingCode ? '…' : 'Valider'}
+                    </button>
+                  </div>
+                  {redeemMsg && (
+                    <p className={`text-[11px] mt-2 ${redeemMsg.type === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {redeemMsg.text}
+                    </p>
+                  )}
+                </div>
+
+                <Link
+                  to="/equipe"
+                  className="flex items-center gap-2 mb-4 px-3 py-2.5 rounded-xl border border-border bg-secondary/50 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all"
+                >
+                  <Users className="w-4 h-4 text-primary" /> Voir l’équipe Virtuel-RT
+                </Link>
+
+                {supabaseUser && (
+                  <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Smartphone className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-semibold text-foreground">Alertes modération / sécurité</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mb-3">
+                      Choisissez comment être prévenu en cas d&apos;événement de modération sur votre compte (staff : aussi pour les alertes équipe).
+                    </p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5 block">
+                          Téléphone (optionnel, format international)
+                        </label>
+                        <input
+                          type="tel"
+                          value={alertPrefs.phone_number}
+                          onChange={(e) => setAlertPrefs((p) => ({ ...p, phone_number: e.target.value }))}
+                          placeholder="+33 6 12 34 56 78"
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50"
+                        />
+                      </div>
+                      <label className="flex items-start gap-2 text-[11px] text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={alertPrefs.phone_consent}
+                          onChange={(e) => setAlertPrefs((p) => ({ ...p, phone_consent: e.target.checked }))}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          J&apos;accepte de recevoir des SMS d&apos;alerte de modération / sécurité sur ce numéro.
+                          Consentement révocable à tout moment.
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {(
+                          [
+                            ['notify_mod_app', 'In-app'],
+                            ['notify_mod_email', 'Email'],
+                            ['notify_mod_sms', 'SMS'],
+                          ] as const
+                        ).map(([key, label]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setAlertPrefs((p) => ({ ...p, [key]: !p[key] }))}
+                            className={`px-2.5 py-1.5 rounded-lg border text-[11px] ${
+                              alertPrefs[key]
+                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                : 'border-border text-muted-foreground'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={alertPrefsSaving}
+                        onClick={() => void saveAlertPrefs()}
+                        className="w-full py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs hover:bg-primary/25 disabled:opacity-50"
+                      >
+                        {alertPrefsSaving ? 'Enregistrement…' : 'Enregistrer les préférences'}
+                      </button>
+                      {alertPrefsMsg && (
+                        <p className="text-[11px] text-muted-foreground">{alertPrefsMsg}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Changer le mot de passe (compte connecté) */}
+                {supabaseUser && (
+                  <div className="bg-secondary border border-border rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Lock className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-semibold text-foreground">Changer le mot de passe</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5 block">Nouveau mot de passe</label>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          autoComplete="new-password"
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-1.5 block">Confirmer</label>
+                        <input
+                          type="password"
+                          value={confirmPassword}
+                          onChange={e => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          autoComplete="new-password"
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-primary/50 focus:shadow-lg focus:shadow-primary/10 transition-all duration-200"
+                        />
+                      </div>
+                      {passwordMsg && (
+                        <div className={`rounded-lg p-2 text-xs flex items-center gap-2 border ${
+                          passwordMsg.type === 'ok'
+                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                            : 'bg-red-500/15 border-red-500/30 text-red-400'
+                        }`}>
+                          {passwordMsg.type === 'ok' ? <Check className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+                          {passwordMsg.text}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void handleChangePassword()}
+                        disabled={changingPassword || !newPassword || !confirmPassword}
+                        className="w-full py-2.5 rounded-lg bg-primary text-white font-medium text-sm flex items-center justify-center gap-2 hover:bg-primary/80 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {changingPassword ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Mise à jour...
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-4 h-4" />
+                            Mettre à jour le mot de passe
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -719,19 +1103,67 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                   </div>
                 </button>
 
+                {/* Mode coquin Premium */}
+                <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 mt-6 flex items-center gap-2">
+                  Mode coquin 🔥
+                  <span className="text-[8px] px-1.5 py-px rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">18+</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isPremium && !coquinMode) {
+                      setActiveTab('premium');
+                      return;
+                    }
+                    toggleCoquinMode();
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] ${
+                    coquinMode
+                      ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                      : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'
+                  }`}
+                >
+                  <span className="text-xl shrink-0" aria-hidden>💋</span>
+                  <div className="flex-1 text-left">
+                    <div className="text-sm font-medium flex items-center gap-2">
+                      {coquinMode ? 'Mode coquin actif' : 'Activer le Mode coquin'}
+                      {!isPremium && (
+                        <span className="text-[9px] px-2 py-px rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          Réservé Premium
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] opacity-60 mt-0.5">
+                      {isPremium
+                        ? 'Salons, jeux et réactions flirty (consentement obligatoire)'
+                        : 'Débloquez Premium pour accéder à la zone 18+'}
+                    </div>
+                  </div>
+                  <div className={`w-9 h-5 rounded-full transition-all duration-300 ${coquinMode ? 'bg-rose-500' : 'bg-muted-foreground/20'} relative`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-300 ${coquinMode ? 'left-4' : 'left-0.5'}`} />
+                  </div>
+                </button>
+
                 {/* Ambiances */}
                 <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 mt-6">Ambiances</div>
                 <div className="space-y-2">
                   {AMBIANCE_OPTIONS.map((opt) => {
                     const active = ambianceMode === opt.id;
+                    const locked = !!opt.premiumOnly && !isPremium;
                     return (
                       <button
                         key={opt.id}
                         type="button"
-                        onClick={() => setAmbianceMode(opt.id)}
+                        onClick={() => {
+                          if (locked) {
+                            setActiveTab('premium');
+                            return;
+                          }
+                          setAmbianceMode(opt.id);
+                        }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] ${
                           active ? opt.activeClass : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'
-                        }`}
+                        } ${locked ? 'opacity-70' : ''}`}
                       >
                         <span className="text-xl shrink-0" aria-hidden>{opt.emoji}</span>
                         <div className="flex-1 text-left">
@@ -739,6 +1171,9 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                             {active ? `${opt.label} actif` : opt.label}
                             {active && (
                               <span className="text-[9px] rounded-full px-2 py-px bg-white/10 border border-white/15">Actif</span>
+                            )}
+                            {locked && (
+                              <span className="text-[9px] rounded-full px-2 py-px bg-amber-500/15 text-amber-300 border border-amber-500/30">Premium</span>
                             )}
                           </div>
                           <div className="text-[10px] opacity-60 mt-0.5">{opt.description}</div>
@@ -767,7 +1202,105 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
               </div>
             )}
 
-            {/* ── Bloqués ── */}
+            {/* ── Extras ── */}
+            {activeTab === 'extras' && (
+              <div className="space-y-6">
+                <h3 className="text-[13px] font-semibold text-foreground">Extras</h3>
+
+                <div>
+                  <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <Zap className="w-3 h-3 text-purple-300" /> Réponses rapides
+                  </div>
+                  <p className="text-[11px] text-muted-foreground/55 mb-3">
+                    Accessibles dans le chat via l’icône éclair à côté des emojis.
+                  </p>
+                  <div className="space-y-1.5 mb-3">
+                    {quickRepliesDraft.map(qr => (
+                      <div key={qr.id} className="flex items-center gap-2 bg-secondary border border-border rounded-xl px-3 py-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-purple-300 font-medium">{qr.label}</div>
+                          <div className="text-[10px] text-muted-foreground/60 truncate">{qr.text}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = quickRepliesDraft.filter(r => r.id !== qr.id);
+                            setQuickRepliesDraft(next);
+                            if (user?.name) setQuickReplies(user.name, next);
+                          }}
+                          className="text-[10px] text-red-400 hover:text-red-300"
+                        >
+                          Suppr.
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={newReplyLabel}
+                      onChange={e => setNewReplyLabel(e.target.value.slice(0, 20))}
+                      placeholder="Libellé"
+                      className="bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs"
+                    />
+                    <input
+                      value={newReplyText}
+                      onChange={e => setNewReplyText(e.target.value.slice(0, 120))}
+                      placeholder="Texte du message"
+                      className="bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newReplyLabel.trim() || !newReplyText.trim() || !user?.name) return;
+                        const next = [
+                          ...quickRepliesDraft,
+                          { id: `qr_${Date.now()}`, label: newReplyLabel.trim(), text: newReplyText.trim() },
+                        ].slice(0, 12);
+                        setQuickRepliesDraft(next);
+                        setQuickReplies(user.name, next);
+                        setNewReplyLabel('');
+                        setNewReplyText('');
+                        addNotification({ type: 'system', message: 'Réponse rapide ajoutée.' });
+                      }}
+                      className="col-span-2 py-2 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-semibold hover:bg-purple-500/25"
+                    >
+                      Ajouter une réponse
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <Bookmark className="w-3 h-3 text-rose-400" /> Favoris messages
+                  </div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {getBookmarks(user?.name).length === 0 && (
+                      <p className="text-[11px] text-muted-foreground/45 italic">Aucun favori — cliquez ★ sur un message dans un salon.</p>
+                    )}
+                    {getBookmarks(user?.name).slice(0, 20).map(b => (
+                      <div key={b.id + b.savedAt} className="bg-secondary/70 border border-border rounded-xl px-3 py-2">
+                        <div className="text-[10px] text-purple-300 inline-flex items-center gap-1 flex-wrap">
+                          <UserDisplayName name={b.author_name} size="xs" showLevelDiamond={false} showSpecialLabels={false} nameClassName="text-purple-300" />
+                          <span>· {b.salonName || b.salonId}</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground/70 truncate">{b.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-border">
+                  <Link
+                    to={MENTIONS_LEGALES_HREF}
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-purple-300 transition-colors"
+                  >
+                    <Scale className="w-3.5 h-3.5" /> Mentions légales
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* ── Amis ── */}
             {activeTab === 'friends' && (
               <div>
                 <h3 className="text-[13px] font-semibold text-foreground mb-5">Amis et demandes</h3>
@@ -801,7 +1334,13 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                         {pendingRequests.map(req => (
                           <div key={req.id} className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-3 py-2.5">
                             <UserPlus className="w-4 h-4 text-blue-400 shrink-0" />
-                            <span className="text-sm text-foreground flex-1">{req.user_id}</span>
+                            <UserDisplayName
+                              name={req.user_id}
+                              size="xs"
+                              showSpecialLabels={false}
+                              nameClassName="text-sm text-foreground"
+                              className="flex-1 min-w-0"
+                            />
                             <button onClick={() => void runFriendAction(() => acceptRequestFromSender(req.user_id), `${req.user_id} ajouté à vos amis`)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] hover:bg-emerald-500/25 transition-all active:scale-95 cursor-pointer">Accepter</button>
                             <button onClick={() => void runFriendAction(() => rejectRequestFromSender(req.user_id), `Demande de ${req.user_id} refusée`)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-300 text-[11px] hover:bg-red-500/20 transition-all active:scale-95 cursor-pointer">Refuser</button>
                           </div>
@@ -819,7 +1358,13 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                         {outgoingRequests.map(req => (
                           <div key={req.id} className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-3 py-2.5">
                             <UserPlus className="w-4 h-4 text-muted-foreground/50 shrink-0" />
-                            <span className="text-sm text-foreground flex-1">{req.friend_id}</span>
+                            <UserDisplayName
+                              name={req.friend_id}
+                              size="xs"
+                              showSpecialLabels={false}
+                              nameClassName="text-sm text-foreground"
+                              className="flex-1 min-w-0"
+                            />
                             <span className="text-[10px] text-muted-foreground/55">En attente</span>
                             <button onClick={() => void runFriendAction(() => cancelRequestToRecipient(req.friend_id), `Demande à ${req.friend_id} annulée`)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/25 text-red-300 text-[11px] hover:bg-red-500/20 transition-all active:scale-95 cursor-pointer">Annuler</button>
                           </div>
@@ -840,10 +1385,15 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                             <button
                               type="button"
                               onClick={() => onViewProfile?.(name)}
-                              className="text-sm text-foreground flex-1 text-left hover:text-primary transition-colors truncate"
+                              className="flex-1 min-w-0 text-left hover:opacity-90 transition-opacity"
                               title={`Voir le profil de ${name}`}
                             >
-                              {name}
+                              <UserDisplayName
+                                name={name}
+                                size="xs"
+                                showSpecialLabels={false}
+                                nameClassName="text-sm text-foreground hover:text-primary"
+                              />
                             </button>
                             {onOpenDM && (
                               <button
@@ -885,7 +1435,13 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                       <div key={name} className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-3 py-2.5 transition-all duration-200 hover:scale-[1.01] animate-slide-in-up"
                         style={{ animationDelay: `${index * 50}ms` }}>
                         <UserX className="w-4 h-4 text-muted-foreground/40 shrink-0" />
-                        <span className="text-sm text-foreground flex-1">{name}</span>
+                        <UserDisplayName
+                          name={name}
+                          size="xs"
+                          showSpecialLabels={false}
+                          nameClassName="text-sm text-foreground"
+                          className="flex-1 min-w-0"
+                        />
                         <span className="text-[10px] text-muted-foreground/60">{blocked ? 'Bloqué' : 'Muet'}</span>
                         {muted && <button onClick={() => unmuteUser(name)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] hover:bg-emerald-500/25 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer">Réactiver</button>}
                         {blocked && <button onClick={() => unblockUser(name)} className="flex items-center justify-center px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] hover:bg-emerald-500/25 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer">Débloquer</button>}
@@ -909,7 +1465,7 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                 ) : (
                   <div className="space-y-4">
                     <div className="bg-secondary border border-border rounded-xl p-4 space-y-2">
-                      {['🎨 Badge Premium exclusif', '⚡ XP x2 par message', '🎵 Accès aux salons VIP', '🌟 Couleur de pseudo personnalisée', '📌 Messages épinglés'].map((f, index) => (
+                      {['🎨 Badge Premium exclusif', '⚡ XP x2 par message', '🎵 Accès aux salons VIP', '🌟 Couleur de pseudo personnalisée', '📌 Messages épinglés', '🔥 Mode coquin 18+ (salons, jeux, réactions)'].map((f, index) => (
                         <div key={f} className="flex items-center gap-2 text-sm text-muted-foreground/80 transition-all duration-200 hover:scale-[1.01]"
                           style={{ animationDelay: `${index * 50}ms` }}>
                           <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />{f}
@@ -917,9 +1473,18 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                       ))}
                     </div>
                     <button onClick={activatePremium} className="w-full py-3 rounded-xl premium-gradient text-white font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
-                      <Star className="w-4 h-4" /> Activer Premium (démo)
+                      <Star className="w-4 h-4" /> Demander Premium
                     </button>
-                    <p className="text-[10px] text-muted-foreground/40 text-center">Mode démo — aucun paiement requis</p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('account')}
+                      className="w-full py-2.5 rounded-xl border border-yellow-500/30 bg-yellow-500/10 text-yellow-300 text-sm font-medium flex items-center justify-center gap-2 hover:bg-yellow-500/20"
+                    >
+                      <KeyRound className="w-4 h-4" /> J’ai un code Premium
+                    </button>
+                    <p className="text-[10px] text-muted-foreground/40 text-center">
+                      Accès par code ou accordé par le staff (★) — pas de paiement en ligne. Mode coquin 18+ inclus.
+                    </p>
                   </div>
                 )}
               </div>

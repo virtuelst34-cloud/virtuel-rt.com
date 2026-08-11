@@ -66,7 +66,16 @@ CREATE TABLE IF NOT EXISTS public.salons (
   live BOOLEAN DEFAULT false,
   welcome TEXT NOT NULL DEFAULT '',
   password TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 1000,
+  description TEXT NOT NULL DEFAULT '',
+  created_by TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.salon_display_order (
+  salon_id TEXT PRIMARY KEY,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.xp_monthly (

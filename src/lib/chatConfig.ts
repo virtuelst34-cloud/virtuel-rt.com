@@ -9,21 +9,75 @@ export interface Salon {
   emoji?: string;
   isPrivate?: boolean;
   password?: string;
+  category_id?: string;
+  subcategory?: string;
+  sort_order?: number;
+  /** Salon réservé Mode coquin (Premium) */
+  isCoquin?: boolean;
 }
 
 export const SALONS: Salon[] = [
-  { id: 'musique60', name: 'Musique 60s',   type: 'chat vocal', icon: 'Music',      count: 128, welcome: '🎵 Bienvenue dans le salon Musique 60s ! Partagez vos coups de cœur des années 60.' },
-  { id: 'musique80', name: 'Musique 80s',   type: 'chat vocal', icon: 'Music',      count: 84,  welcome: '🎸 Bienvenue dans le salon Musique 80s ! Les synthés et les hits de la décennie vous attendent.' },
-  { id: 'karaoke',   name: 'Karaoké',       type: 'vocal',      icon: 'Mic',        live: true, welcome: '🎤 Bienvenue au Karaoké ! Prenez le micro et chantez sans retenue !' },
-  { id: 'debat',     name: 'Débat',         type: 'chat vocal', icon: 'Zap',        count: 76,  welcome: '⚡ Bienvenue dans le salon Débat ! Exprimez-vous avec respect et bonne foi.' },
-  { id: 'quiz',      name: 'Quiz',          type: 'chat',       icon: 'Bot',        count: 54,  welcome: '🧠 Bienvenue au Quiz ! Testez vos connaissances et défiez les autres membres.' },
-  { id: 'jeunes',    name: '18–25 ans',     type: 'chat vocal', icon: 'Users',      count: 52,  welcome: '👋 Bienvenue dans le salon 18–25 ans ! Un espace pour les jeunes adultes.' },
-  { id: 'lgbt',      name: 'LGBT+',         type: 'chat vocal', icon: 'Rainbow',    count: 23,  welcome: '🌈 Bienvenue dans le salon LGBT+ ! Espace bienveillant et inclusif.' },
-  { id: 'divorce',   name: 'Divorce',       type: 'chat',       icon: 'HeartCrack', count: 15,  welcome: '💙 Bienvenue dans le salon Divorce. Un espace d\'écoute et de soutien.' },
-  { id: 'libre',     name: 'Salon libre',   type: 'chat vocal', icon: 'DoorOpen',   count: 67,  welcome: '🚪 Bienvenue dans le Salon libre ! Tous les sujets sont les bienvenus.' },
-  { id: 'insulte',   name: 'Insulte libre', type: 'chat',       icon: 'Angry',      count: 89,  welcome: '😤 Bienvenue dans le salon Insulte libre. Défoulez-vous, mais restez fair-play !' },
-  { id: 'cameras',   name: 'Caméras live',  type: 'video',      icon: 'Video',      live: true, welcome: '📹 Bienvenue dans le salon Caméras live ! Activez votre caméra pour apparaître sur scène.' },
-  { id: 'bar',       name: 'Bar & Détente', type: 'chat vocal', icon: 'Wine',       count: 41,  welcome: '🍷 Bienvenue au Bar & Détente ! Posez-vous, relaxez et discutez tranquillement.' },
+  // Général — essentiels uniquement
+  { id: 'bienvenue', name: 'Bienvenue', type: 'chat', icon: 'DoorOpen', emoji: '👋', count: 0, category_id: 'general', subcategory: 'Accueil', sort_order: 0, welcome: '👋 Bienvenue sur Virtuel-RT ! Lisez les règles et le guide épinglés ci-dessous, puis explorez les salons. (Annonces fondateur uniquement — lecture seule pour les membres.)' },
+  { id: 'annonces', name: 'Annonces', type: 'chat', icon: 'Megaphone', emoji: '📢', count: 0, category_id: 'general', subcategory: 'Annonces', sort_order: 5, welcome: '📢 Salon Annonces — infos officielles et nouveautés Virtuel-RT.' },
+  { id: 'general', name: 'Salon général', type: 'chat vocal', icon: 'MessagesSquare', emoji: '💬', count: 0, category_id: 'general', subcategory: 'Communauté', sort_order: 8, welcome: '💬 Salon général — le point de rencontre de la communauté Virtuel-RT.' },
+
+  // Divertissement
+  { id: 'cameras', name: 'Caméras live', type: 'video', icon: 'Video', emoji: '📹', live: true, category_id: 'divertissement', subcategory: 'Soirée', sort_order: 100, welcome: '📹 Bienvenue dans le salon Caméras live ! Activez votre caméra pour apparaître sur scène.' },
+  { id: 'bar', name: 'Bar & Détente', type: 'chat vocal', icon: 'Wine', emoji: '🍷', count: 41, category_id: 'divertissement', subcategory: 'Détente', sort_order: 110, welcome: '🍷 Bienvenue au Bar & Détente ! Posez-vous, relaxez et discutez tranquillement.' },
+  { id: 'humour', name: 'Humour', type: 'chat vocal', icon: 'Laugh', emoji: '😂', count: 36, category_id: 'divertissement', subcategory: 'Humour', sort_order: 120, welcome: '😂 Blagues, memes et bonne humeur — gardez le fair-play !' },
+  { id: 'cuisine', name: 'Cuisine', type: 'chat', icon: 'Utensils', emoji: '🍳', count: 28, category_id: 'divertissement', subcategory: 'Détente', sort_order: 130, welcome: '🍳 Partagez recettes, tips et fails culinaires !' },
+  { id: 'voyage', name: 'Voyage', type: 'chat', icon: 'Plane', emoji: '✈️', count: 33, category_id: 'divertissement', subcategory: 'Détente', sort_order: 140, welcome: '✈️ Destinations, conseils et récits de voyage.' },
+
+  // Musique
+  { id: 'musique60', name: 'Musique 60s', type: 'chat vocal', icon: 'Music', emoji: '🎶', count: 128, category_id: 'musique', subcategory: 'Décennies', sort_order: 200, welcome: '🎵 Bienvenue dans le salon Musique 60s ! Partagez vos coups de cœur des années 60.' },
+  { id: 'musique80', name: 'Musique 80s', type: 'chat vocal', icon: 'Music', emoji: '🎸', count: 84, category_id: 'musique', subcategory: 'Décennies', sort_order: 210, welcome: '🎸 Bienvenue dans le salon Musique 80s ! Les synthés et les hits de la décennie vous attendent.' },
+  { id: 'musique90', name: 'Musique 90s', type: 'chat vocal', icon: 'Music', emoji: '💿', count: 61, category_id: 'musique', subcategory: 'Décennies', sort_order: 220, welcome: '💿 Hits des années 90 — boy bands, eurodance et nostalgie garantie.' },
+  { id: 'musique2000', name: 'Années 2000', type: 'chat vocal', icon: 'Music', emoji: '🎧', count: 48, category_id: 'musique', subcategory: 'Décennies', sort_order: 230, welcome: '🎧 Pop, R&B et hits des années 2000 — partagez vos playlists !' },
+  { id: 'karaoke', name: 'Karaoké', type: 'vocal', icon: 'Mic', emoji: '🎤', live: true, category_id: 'musique', subcategory: 'Karaoké', sort_order: 240, welcome: '🎤 Bienvenue au Karaoké ! Prenez le micro et chantez sans retenue !' },
+
+  // Rencontres
+  { id: 'amical', name: 'Faire connaissance', type: 'chat vocal', icon: 'Handshake', emoji: '🤝', count: 44, category_id: 'rencontres', subcategory: 'Amical', sort_order: 300, welcome: '🤝 Icebreakers et discussions amicales — présentez-vous !' },
+  { id: 'jeunes', name: '18–25 ans', type: 'chat vocal', icon: 'Users', emoji: '👋', count: 52, category_id: 'rencontres', subcategory: 'Âge', sort_order: 310, welcome: '👋 Bienvenue dans le salon 18–25 ans ! Un espace pour les jeunes adultes.' },
+  { id: 'quarante', name: '40 ans et +', type: 'chat vocal', icon: 'Users', emoji: '☕', count: 27, category_id: 'rencontres', subcategory: 'Âge', sort_order: 320, welcome: '☕ Salon 40 ans et + — échanges posés et bonne compagnie.' },
+
+  // Jeux
+  { id: 'quiz', name: 'Quiz', type: 'chat', icon: 'Bot', emoji: '🧠', count: 54, category_id: 'jeux', subcategory: 'Quiz', sort_order: 400, welcome: '🧠 Bienvenue au Quiz ! Testez vos connaissances et défiez les autres membres.' },
+  { id: 'blindtest', name: 'Blind test', type: 'chat vocal', icon: 'Headphones', emoji: '🎼', count: 39, category_id: 'jeux', subcategory: 'Défis', sort_order: 410, welcome: '🎼 Blind test — devinez les titres, chantez les refrains !' },
+  { id: 'gaming', name: 'Gaming', type: 'chat vocal', icon: 'Gamepad2', emoji: '🎮', count: 72, category_id: 'jeux', subcategory: 'Compétition', sort_order: 420, welcome: '🎮 Looking for group, tips et sessions multi.' },
+  { id: 'sport', name: 'Sport', type: 'chat', icon: 'Trophy', emoji: '⚽', count: 45, category_id: 'jeux', subcategory: 'Compétition', sort_order: 430, welcome: '⚽ Foot, JO, résultats et débats sportifs fair-play.' },
+
+  // Aide
+  { id: 'divorce', name: 'Divorce', type: 'chat', icon: 'HeartCrack', emoji: '💙', count: 15, category_id: 'aide', subcategory: 'Soutien', sort_order: 500, welcome: '💙 Bienvenue dans le salon Divorce. Un espace d\'écoute et de soutien.' },
+  { id: 'aide', name: 'Entraide', type: 'chat', icon: 'HeartHandshake', emoji: '🤲', count: 22, category_id: 'aide', subcategory: 'Conseils', sort_order: 510, welcome: '🤲 Besoin d\'un coup de main ou d\'une oreille attentive ? Vous êtes au bon endroit.' },
+
+  // Régional
+  { id: 'france', name: 'France', type: 'chat vocal', icon: 'MapPin', emoji: '🇫🇷', count: 55, category_id: 'regional', subcategory: 'France', sort_order: 600, welcome: '🇫🇷 Salon France — actu, régions et discussions entre Francophones.' },
+  { id: 'belgique', name: 'Belgique', type: 'chat vocal', icon: 'MapPin', emoji: '🇧🇪', count: 18, category_id: 'regional', subcategory: 'Belgique', sort_order: 610, welcome: '🇧🇪 Accents, frites et bonne humeur — salon Belgique.' },
+  { id: 'quebec', name: 'Québec', type: 'chat vocal', icon: 'MapPin', emoji: '🇨🇦', count: 14, category_id: 'regional', subcategory: 'Québec', sort_order: 620, welcome: '🇨🇦 Bienvenue au salon Québec — discussions et culture québécoise.' },
+  { id: 'suisse', name: 'Suisse', type: 'chat vocal', icon: 'MapPin', emoji: '🇨🇭', count: 11, category_id: 'regional', subcategory: 'Suisse', sort_order: 630, welcome: '🇨🇭 Salon Suisse — romandie, traditions et discussions locales.' },
+
+  // LGBT+
+  { id: 'lgbt', name: 'LGBT+', type: 'chat vocal', icon: 'Rainbow', emoji: '🌈', count: 23, category_id: 'lgbt', subcategory: 'Communauté', sort_order: 700, welcome: '🌈 Bienvenue dans le salon LGBT+ ! Espace bienveillant et inclusif.' },
+
+  // Libre
+  { id: 'libre', name: 'Salon libre', type: 'chat vocal', icon: 'DoorOpen', emoji: '🚪', count: 67, category_id: 'libre', subcategory: 'Libre', sort_order: 800, welcome: '🚪 Bienvenue dans le Salon libre ! Tous les sujets sont les bienvenus.' },
+  { id: 'debat', name: 'Débat', type: 'chat vocal', icon: 'Zap', emoji: '⚡', count: 76, category_id: 'libre', subcategory: 'Débat', sort_order: 810, welcome: '⚡ Bienvenue dans le salon Débat ! Exprimez-vous avec respect et bonne foi.' },
+  { id: 'insulte', name: 'Insulte libre', type: 'chat', icon: 'Angry', emoji: '😤', count: 89, category_id: 'libre', subcategory: 'Libre', sort_order: 820, welcome: '😤 Bienvenue dans le salon Insulte libre. Défoulez-vous, mais restez fair-play !' },
+
+  // Culture
+  { id: 'cinema', name: 'Cinéma', type: 'chat', icon: 'Clapperboard', emoji: '🎬', count: 38, category_id: 'culture', subcategory: 'Cinéma', sort_order: 900, welcome: '🎬 Critiques, recommandations et spoiler alerts (avec spoiler tags SVP).' },
+  { id: 'series', name: 'Séries TV', type: 'chat', icon: 'Tv', emoji: '📺', count: 42, category_id: 'culture', subcategory: 'Séries', sort_order: 910, welcome: '📺 Séries du moment, spoiler tags obligatoires et recommandations welcome.' },
+  { id: 'livres', name: 'Livres', type: 'chat', icon: 'BookOpen', emoji: '📚', count: 19, category_id: 'culture', subcategory: 'Livres', sort_order: 920, welcome: '📚 Romans, BD, essais — partagez vos lectures du moment.' },
+
+  // Tech
+  { id: 'tech', name: 'Tech & Web', type: 'chat', icon: 'Cpu', emoji: '💻', count: 31, category_id: 'tech', subcategory: 'Web', sort_order: 1000, welcome: '💻 Actu tech, outils et discussions geek bienveillantes.' },
+  { id: 'ia', name: 'IA & futur', type: 'chat', icon: 'Sparkles', emoji: '🤖', count: 26, category_id: 'tech', subcategory: 'IA', sort_order: 1010, welcome: '🤖 Intelligence artificielle, outils et débats sur le futur — curiosité bienvenue.' },
+
+  // Coquins Premium (masqués hors Mode coquin)
+  { id: 'coquin_lounge', name: 'Lounge coquin', type: 'chat vocal', icon: 'Flame', emoji: '🔥', count: 12, category_id: 'coquin', subcategory: 'Soirée', sort_order: 9000, isCoquin: true, welcome: '🔥 Lounge coquin (18+ Premium) — ambiance flirty, respect et consentement avant tout.' },
+  { id: 'coquin_flirt', name: 'Flirt soft', type: 'chat', icon: 'Heart', emoji: '💋', count: 9, category_id: 'coquin', subcategory: 'Flirt', sort_order: 9010, isCoquin: true, welcome: '💋 Flirt soft — messages suggestifs OK, harcèlement jamais.' },
+  { id: 'coquin_jeux', name: 'Jeux coquins', type: 'chat', icon: 'Sparkles', emoji: '😏', count: 7, category_id: 'coquin', subcategory: 'Jeux', sort_order: 9020, isCoquin: true, welcome: '😏 Jeux coquins — Action ou vérité, défis hot seat… toujours consentants.' },
 ];
 
 // Membres simulés sur scène (micro actif) par salon
@@ -55,10 +109,12 @@ export const SCENE_MEMBERS: Record<string, SceneMember[]> = {
   ],
 };
 
-export const EMOJIS = ['😀','😂','😍','🥰','😎','😢','😮','😡','🤔','👍','👎','❤️','🔥','🎉','✨','💯','🙏','😅','🤣','😭','💀','🥹','😤','🤯','🫡','👀','💪','🫂','🎵','🎶'];
+export const EMOJIS = ['😀','😂','😍','🥰','😎','😢','😮','😡','🤔','👍','👎','❤️','🔥','🎉','✨','💯','🙏','😅','🤣','😭','💀','🥹','😤','🤯','🫡','👀','💪','🫂','🎵','🎶','💋','😏','🍷','🌶️'];
 export const QUICK_REACTIONS = ['👍','❤️','😂','😮','😢','🔥'];
+/** Réactions rapides Mode coquin (Premium) — fusionnées dans le picker si actif */
+export const COQUIN_QUICK_REACTIONS = ['🔥','💋','😏','🍷'];
 export const SALON_TYPES = ['chat', 'vocal', 'chat vocal', 'video'];
-export const SALON_EMOJIS_LIST = ['💬','🎵','🎸','🎤','⚡','🧠','👋','🌈','💙','🚪','😤','📹','🍷','🎮','📚','🎭','🌍','💼','🎨','🏆'];
+export const SALON_EMOJIS_LIST = ['💬','🎵','🎸','🎤','⚡','🧠','👋','🌈','💙','🚪','😤','📹','🍷','🎮','📚','🎭','🌍','💼','🎨','🏆','🔥','💋','📢','🍳','✈️','🇧🇪','🇨🇦','🇫🇷','🇨🇭','🎬','📺','💻','🤖','⚽','🤝','😏','😂','🎧','🎼','☕','🤲'];
 
 export interface AvatarStyle {
   bg: string;

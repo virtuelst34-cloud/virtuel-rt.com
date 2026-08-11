@@ -23,11 +23,16 @@ export function badgesFromProfile(profile: {
 
 export function profileFlagsFromBadges(badges: string[]) {
   const unique = [...new Set(badges)];
+  const isFounder = unique.includes('founder');
+  const isDirection = unique.includes('direction');
+  const isMasterOp = unique.includes('master_op');
+
   return {
-    is_founder: unique.includes('founder'),
-    is_direction: unique.includes('direction'),
-    is_master_op: unique.includes('master_op'),
+    is_founder: isFounder,
+    is_direction: isDirection,
+    is_master_op: isMasterOp,
     is_iridescent: unique.includes('iridescent'),
+    is_admin: isFounder || isDirection || isMasterOp,
     special_badges: unique.filter((b) =>
       (STORED_BADGE_IDS as readonly string[]).includes(b)
     ),

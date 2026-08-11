@@ -3,6 +3,7 @@ import { ShieldAlert, Save, RefreshCw, AlertTriangle, Bot, FileText, Trash2, Plu
 import { supabase } from '@/lib/supabase';
 import { SectionTitle } from './AdminComponents';
 import { hasAdminAccess } from '@/lib/utils/founderCheck';
+import { DEFAULT_BANNED_WORDS, mergeBannedWords } from '@/lib/bannedWords';
 
 interface ContentModerationSettings {
   id?: string;
@@ -30,7 +31,7 @@ const DEFAULT_SETTINGS: ContentModerationSettings = {
   spam_threshold: 0.8,
   enable_link_filtering: true,
   blocked_domains: [],
-  banned_words: [],
+  banned_words: [...DEFAULT_BANNED_WORDS],
   enable_ai_moderation: false,
   ai_moderation_model: 'gpt-4',
   enable_report_review: true,
@@ -75,7 +76,12 @@ export default function ContentModerationSection({ readOnly = false, user }: Pro
           console.error('Erreur lors du chargement des paramètres de modération:', error);
         }
       } else if (data) {
-        setSettings(data as ContentModerationSettings);
+        const loaded = data as ContentModerationSettings;
+        const words = Array.isArray(loaded.banned_words) ? loaded.banned_words : [];
+        const merged = mergeBannedWords(words);
+        const addedDefaults = merged.length > words.length;
+        setSettings({ ...loaded, banned_words: merged });
+        if (addedDefaults || words.length === 0) setHasChanges(true);
       }
     } catch (error) {
       console.error('Erreur lors du chargement des paramètres de modération:', error);

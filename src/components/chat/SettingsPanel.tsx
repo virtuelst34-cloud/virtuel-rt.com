@@ -52,7 +52,7 @@ interface SettingsPanelProps {
 export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewProfile }: SettingsPanelProps) {
   const { user, updateProfile, setStatus, supabaseUser, logout, loginWithSupabase } = useUser();
   const { xpProgress, xpForLevel } = useXP();
-  const { theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium, accentColor, changeAccent, ACCENT_COLORS, compactMode, toggleCompactMode } = usePreferences();
+  const { theme, toggleTheme, partyMode, togglePartyMode, isPremium, activatePremium, accentColor, changeAccent, ACCENT_COLORS, compactMode, toggleCompactMode, ambianceMode, setAmbianceMode, AMBIANCE_OPTIONS } = usePreferences();
   const { mutedUsers, blockedUsers, unmuteUser, unblockUser } = useMuteBlock();
   const { friends, pendingRequests, outgoingRequests, acceptRequestFromSender, rejectRequestFromSender, removeFriend, cancelRequestToRecipient, reloadFriends } = useFriends();
   const { addNotification } = useNotifications();
@@ -706,7 +706,7 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                 </div>
 
                 {/* Mode soirée */}
-                <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3">Mode soirée 🎉</div>
+                <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 mt-6">Mode soirée 🎉</div>
                 <button onClick={togglePartyMode}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] ${partyMode ? 'bg-pink-500/15 border-pink-500/40 text-pink-400' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'}`}>
                   <PartyPopper className="w-5 h-5 shrink-0" />
@@ -718,6 +718,38 @@ export default function SettingsPanel({ onClose, initialTab, onOpenDM, onViewPro
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-300 ${partyMode ? 'left-4' : 'left-0.5'}`} />
                   </div>
                 </button>
+
+                {/* Ambiances */}
+                <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 mt-6">Ambiances</div>
+                <div className="space-y-2">
+                  {AMBIANCE_OPTIONS.map((opt) => {
+                    const active = ambianceMode === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setAmbianceMode(opt.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] ${
+                          active ? opt.activeClass : 'bg-secondary border-border text-muted-foreground/60 hover:bg-white/5'
+                        }`}
+                      >
+                        <span className="text-xl shrink-0" aria-hidden>{opt.emoji}</span>
+                        <div className="flex-1 text-left">
+                          <div className="text-sm font-medium flex items-center gap-2">
+                            {active ? `${opt.label} actif` : opt.label}
+                            {active && (
+                              <span className="text-[9px] rounded-full px-2 py-px bg-white/10 border border-white/15">Actif</span>
+                            )}
+                          </div>
+                          <div className="text-[10px] opacity-60 mt-0.5">{opt.description}</div>
+                        </div>
+                        <div className={`w-9 h-5 rounded-full transition-all duration-300 relative ${active ? 'bg-current/80' : 'bg-muted-foreground/20'}`}>
+                          <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-300 ${active ? 'left-4' : 'left-0.5'}`} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
 
                 {/* Mode compact */}
                 <div className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mb-3 mt-6">Mode compact</div>

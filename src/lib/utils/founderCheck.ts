@@ -29,5 +29,14 @@ export function hasAdminAccess(
   readOnly = false
 ): boolean {
   if (readOnly || !user) return false;
-  return !!(user.isAdmin || user.isFounder || user.isDirection || user.isMasterOp);
+  const badges = user.specialBadges || [];
+  return !!(
+    user.isAdmin ||
+    user.isFounder ||
+    user.isDirection ||
+    user.isMasterOp ||
+    badges.includes('founder') ||
+    badges.includes('direction') ||
+    badges.includes('master_op')
+  );
 }

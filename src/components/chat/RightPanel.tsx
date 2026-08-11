@@ -50,9 +50,10 @@ export default function RightPanel({ onOpenDM }: RightPanelProps) {
     return unsubscribe;
   }, []);
 
-  // Classement mensuel
+  // Classement mensuel (XP du mois > 0 uniquement)
   const monthlyRanked = Object.entries(monthlyXP || {})
-    .map(([name, mxp]) => ({ mxp, ...(profiles[name] || {}) }))
+    .filter(([, mxp]) => (mxp as number) > 0)
+    .map(([name, mxp]) => ({ ...(profiles[name] || {}), name, mxp: mxp as number }))
     .sort((a, b) => b.mxp - a.mxp)
     .slice(0, 10);
 

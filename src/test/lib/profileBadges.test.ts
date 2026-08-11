@@ -32,6 +32,7 @@ describe('founderCheck', () => {
     expect(hasAdminAccess({ ...baseUser, isFounder: true })).toBe(true);
     expect(hasAdminAccess({ ...baseUser, isDirection: true })).toBe(true);
     expect(hasAdminAccess({ ...baseUser, isMasterOp: true })).toBe(true);
+    expect(hasAdminAccess({ ...baseUser, specialBadges: ['founder'] })).toBe(true);
     expect(hasAdminAccess(baseUser)).toBe(false);
     expect(hasAdminAccess(null)).toBe(false);
   });
@@ -48,6 +49,7 @@ describe('profileBadges', () => {
       is_direction: false,
       is_master_op: false,
       is_iridescent: false,
+      is_admin: true,
       special_badges: ['founder', 'moderator'],
     });
   });

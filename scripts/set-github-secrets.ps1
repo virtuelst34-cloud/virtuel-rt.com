@@ -50,6 +50,33 @@ if ($vars["VITE_SENTRY_DSN"]) {
   & $ghCmd secret set VITE_SENTRY_DSN --body $vars["VITE_SENTRY_DSN"] -R $repo
 }
 
+# Secrets FTP Hostinger (ajoutez-les dans .env.local)
+$ftpKeys = @("FTP_SERVER", "FTP_USERNAME", "FTP_PASSWORD", "FTP_SERVER_DIR")
+$ftpMissing = @()
+foreach ($key in $ftpKeys) {
+  if ($key -eq "FTP_SERVER_DIR") { continue }
+  if (-not $vars[$key]) { $ftpMissing += $key }
+}
+
+if ($ftpMissing.Count -gt 0) {
+  Write-Host ""
+  Write-Host "FTP non configure. Ajoutez dans .env.local :" -ForegroundColor Yellow
+  Write-Host "  FTP_SERVER=ftp.virtuel-rt.com"
+  Write-Host "  FTP_USERNAME=u123456789"
+  Write-Host "  FTP_PASSWORD=votre_mot_de_passe"
+  Write-Host "  FTP_SERVER_DIR=/domains/virtuel-rt.com/public_html/"
+  Write-Host ""
+  Write-Host "Trouvez-les dans hPanel > Fichiers > Comptes FTP" -ForegroundColor Yellow
+} else {
+  & $ghCmd secret set FTP_SERVER --body $vars["FTP_SERVER"] -R $repo
+  & $ghCmd secret set FTP_USERNAME --body $vars["FTP_USERNAME"] -R $repo
+  & $ghCmd secret set FTP_PASSWORD --body $vars["FTP_PASSWORD"] -R $repo
+  if ($vars["FTP_SERVER_DIR"]) {
+    & $ghCmd secret set FTP_SERVER_DIR --body $vars["FTP_SERVER_DIR"] -R $repo
+  }
+  Write-Host "Secrets FTP configures." -ForegroundColor Green
+}
+
 @("VITE_BASE44_APP_ID", "VITE_BASE44_APP_BASE_URL", "VITE_BASE44_API_KEY") | ForEach-Object {
   & $ghCmd secret delete $_ -R $repo 2>$null
 }

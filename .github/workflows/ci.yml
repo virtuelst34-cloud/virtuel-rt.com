@@ -117,7 +117,7 @@ jobs:
         run: npm run build
 
       - name: Deploy to Hostinger via FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
@@ -126,6 +126,9 @@ jobs:
           port: 21
           local-dir: ./dist/
           server-dir: ${{ secrets.FTP_SERVER_DIR || '/domains/virtuel-rt.com/public_html/' }}
-          # Supprime les anciens chunks/index hashés absents du nouveau build
+          log-level: verbose
           dangerous-clean-slate: true
-          exclude: ''
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**

@@ -37,11 +37,11 @@ const Sidebar = memo(function Sidebar({ onOpenDM, onOpenNotifications, onOpenSet
     <div className="hidden sm:flex w-[72px] bg-card flex-col items-center border-r border-border shrink-0 h-full py-3 gap-1.5">
 
       {/* Logo */}
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 overflow-hidden bg-black/40 ring-1 ring-primary/25 shadow-md shadow-primary/20">
         <img
           src="/logo.png"
           alt="Virtuel-RT"
-          className="w-full h-full object-cover object-[center_12%] scale-[1.34] origin-[center_12%]"
+          className="w-full h-full object-contain p-0.5"
         />
       </div>
 

@@ -12,40 +12,40 @@ interface MediaBarProps {
   onRemoteStreams?: (streams: RemoteStreamInfo[]) => void;
 }
 
-function isMediaSalon(salonId: string | null): boolean {
-  if (!salonId) return false;
-  const salon = SALONS.find(s => s.id === salonId);
-  const type = salon?.type;
+function isMediaSalonType(type?: string): boolean {
   return type === 'vocal' || type === 'chat vocal' || type === 'video';
 }
 
 export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps) {
-  const { currentSalon, setCurrentSalon, user } = useChat();
+  const { currentSalon, setCurrentSalon, user, customSalons = [] } = useChat();
   const [micActive, setMicActive] = useState(false);
   const [camActive, setCamActive] = useState(false);
   const [bars, setBars] = useState([3, 5, 7, 5, 3]);
   const [remoteStreams, setRemoteStreams] = useState<RemoteStreamInfo[]>([]);
 
   const streamRef = useRef<MediaStream | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const isRequestingRef = useRef(false);
   const webrtcJoinedRef = useRef(false);
 
-  const mediaSalon = isMediaSalon(currentSalon);
+  const allSalons = [...SALONS, ...(customSalons || [])];
+  const salon = allSalons.find((s) => s.id === currentSalon);
+  const mediaSalon = isMediaSalonType(salon?.type);
 
   useEffect(() => {
     webrtcService.setListeners(
       (info) => {
-        setRemoteStreams(prev => {
-          const next = prev.filter(s => s.peerId !== info.peerId);
+        setRemoteStreams((prev) => {
+          const next = prev.filter((s) => s.peerId !== info.peerId);
           next.push(info);
           return next;
         });
       },
       (peerId) => {
-        setRemoteStreams(prev => prev.filter(s => s.peerId !== peerId));
+        setRemoteStreams((prev) => prev.filter((s) => s.peerId !== peerId));
       },
     );
   }, []);
@@ -54,10 +54,27 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
     onRemoteStreams?.(remoteStreams);
   }, [remoteStreams, onRemoteStreams]);
 
+  // Aperçu local de la caméra
+  useEffect(() => {
+    const el = localVideoRef.current;
+    if (!el) return;
+    if (camActive && streamRef.current) {
+      el.srcObject = streamRef.current;
+      void el.play().catch(() => undefined);
+    } else {
+      el.srcObject = null;
+    }
+  }, [camActive]);
+
   const ensureWebRtc = useCallback(async (wantVideo: boolean) => {
-    if (!currentSalon || !user?.name) return;
+    if (!currentSalon || !user?.name) {
+      throw new Error('not ready');
+    }
     if (webrtcJoinedRef.current && webrtcService.isJoined()) {
-      if (wantVideo) await webrtcService.ensureVideoTrack();
+      if (wantVideo) {
+        const ok = await webrtcService.ensureVideoTrack();
+        if (!ok) throw new Error('no video');
+      }
       streamRef.current = webrtcService.getLocalStream();
       return;
     }
@@ -67,13 +84,20 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
       user.name,
       { audio: true, video: wantVideo },
     );
-    if (stream) {
-      streamRef.current = stream;
-      webrtcJoinedRef.current = true;
+    if (!stream) throw new Error('join failed');
+    streamRef.current = stream;
+    webrtcJoinedRef.current = true;
+    if (wantVideo && !stream.getVideoTracks().some((t) => t.readyState === 'live')) {
+      const ok = await webrtcService.ensureVideoTrack();
+      if (!ok) throw new Error('no video');
+      streamRef.current = webrtcService.getLocalStream();
     }
   }, [currentSalon, user]);
 
   const startVU = useCallback((stream: MediaStream) => {
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks.length) return;
+
     const ctx = new (window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!)();
     const source = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
@@ -142,7 +166,7 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
 
     const peers = presenceService
       .getOnlineUsersInSalon(currentSalon)
-      .filter(u => u.name !== user.name);
+      .filter((u) => u.name !== user.name);
 
     for (const peer of peers) {
       webrtcService.connectToPeer(peer.userId || peer.name, peer.name);
@@ -151,7 +175,7 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
 
   const toggleMic = async () => {
     if (!mediaSalon) {
-      toast.message('Activez un salon vocal ou vidéo pour utiliser le micro.');
+      toast.message('Rejoins un salon vocal ou vidéo pour utiliser le micro.');
       return;
     }
     if (isRequestingRef.current) return;
@@ -169,7 +193,7 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
         setMicActive(true);
         startVU(stream);
       } catch {
-        toast.error('Impossible d\'accéder au microphone.');
+        toast.error('Impossible d\'accéder au microphone. Vérifie les permissions du navigateur.');
       } finally {
         isRequestingRef.current = false;
       }
@@ -178,7 +202,7 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
 
   const toggleCam = async () => {
     if (!mediaSalon) {
-      toast.message('Activez un salon vocal ou vidéo pour utiliser la caméra.');
+      toast.message('Rejoins un salon vocal ou vidéo (ex. Caméras live) pour utiliser la caméra.');
       return;
     }
     if (isRequestingRef.current) return;
@@ -190,16 +214,18 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
       try {
         await ensureWebRtc(true);
         const ok = await webrtcService.ensureVideoTrack();
-        if (!ok && !webrtcService.getLocalStream()?.getVideoTracks().length) {
+        const stream = webrtcService.getLocalStream();
+        const hasVideo = !!stream?.getVideoTracks().some((t) => t.readyState === 'live');
+        if (!ok && !hasVideo) {
           throw new Error('no video');
         }
         webrtcService.toggleTrack('video', true);
-        const stream = webrtcService.getLocalStream();
         if (stream) streamRef.current = stream;
         setCamActive(true);
+        toast.success('Caméra activée');
         if (micActive && stream?.getAudioTracks().length) startVU(stream);
       } catch {
-        toast.error('Impossible d\'accéder à la caméra.');
+        toast.error('Impossible d\'accéder à la caméra. Autorise l\'accès dans le navigateur.');
       } finally {
         isRequestingRef.current = false;
       }
@@ -207,7 +233,7 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
   };
 
   const handleLeave = async () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current?.getTracks().forEach((t) => t.stop());
     stopVU();
     setMicActive(false);
     setCamActive(false);
@@ -219,7 +245,7 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
 
   useEffect(() => {
     return () => {
-      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current?.getTracks().forEach((t) => t.stop());
       stopVU();
       void webrtcService.leaveSalon();
     };
@@ -229,30 +255,56 @@ export default function MediaBar({ onMicChange, onRemoteStreams }: MediaBarProps
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-card border-t border-border shrink-0" data-testid="media-bar">
-      <button type="button" onClick={toggleMic}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${micActive ? 'bg-emerald-500/15 border-emerald-500/60 text-emerald-400' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-secondary/80'}`}>
+      <button
+        type="button"
+        onClick={toggleMic}
+        title={mediaSalon ? (micActive ? 'Couper le micro' : 'Activer le micro') : 'Salon vocal/vidéo requis'}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${micActive ? 'bg-emerald-500/15 border-emerald-500/60 text-emerald-400' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-secondary/80'}`}
+      >
         {micActive ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
         <span className="hidden sm:inline">{micActive ? 'Micro actif' : 'Micro'}</span>
       </button>
 
       <div className={`flex items-end gap-[2px] h-5 transition-opacity ${micActive ? 'opacity-100' : 'opacity-20'}`}>
         {bars.map((h, i) => (
-          <div key={i}
+          <div
+            key={i}
             className={`w-[3px] rounded-sm transition-all duration-75 ${micActive ? 'bg-emerald-400' : 'bg-muted-foreground/40'}`}
-            style={{ height: Math.round(h) }} />
+            style={{ height: Math.round(h) }}
+          />
         ))}
       </div>
 
-      <button type="button" onClick={toggleCam}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${camActive ? 'bg-blue-500/15 border-blue-500/60 text-blue-400' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-secondary/80'}`}>
+      <button
+        type="button"
+        onClick={toggleCam}
+        title={mediaSalon ? (camActive ? 'Couper la caméra' : 'Activer la caméra') : 'Salon vocal/vidéo requis'}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${camActive ? 'bg-blue-500/15 border-blue-500/60 text-blue-400' : 'bg-secondary border-border text-muted-foreground/60 hover:bg-secondary/80'}`}
+      >
         {camActive ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
         <span className="hidden sm:inline">{camActive ? 'Caméra active' : 'Caméra'}</span>
       </button>
 
+      {camActive && (
+        <div className="relative w-16 h-12 rounded-lg overflow-hidden border border-blue-500/40 bg-black shrink-0">
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-cover mirror"
+            style={{ transform: 'scaleX(-1)' }}
+          />
+        </div>
+      )}
+
       <div className="flex-1" />
 
-      <button type="button" onClick={handleLeave}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors">
+      <button
+        type="button"
+        onClick={handleLeave}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors"
+      >
         <PhoneOff className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Quitter</span>
       </button>

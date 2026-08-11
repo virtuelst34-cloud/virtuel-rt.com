@@ -156,10 +156,43 @@ export function getSpecialBadgeForUser(user: {
   isDirection?: boolean;
   isMasterOp?: boolean;
   isIridescent?: boolean;
+  specialBadges?: string[];
+  special_badges?: string[];
 }): string | null {
-  if (user.isIridescent) return 'iridescent';
-  if (user.isFounder) return 'founder';
-  if (user.isMasterOp) return 'master_op';
-  if (user.isDirection) return 'direction';
+  const fromArray = user.specialBadges || user.special_badges || [];
+  const has = (id: string) =>
+    fromArray.includes(id) ||
+    (id === 'founder' && !!user.isFounder) ||
+    (id === 'direction' && !!user.isDirection) ||
+    (id === 'master_op' && !!user.isMasterOp) ||
+    (id === 'iridescent' && !!user.isIridescent);
+
+  // Priorité visuelle : iridescent > founder > master_op > direction > moderator > vip
+  if (has('iridescent')) return 'iridescent';
+  if (has('founder')) return 'founder';
+  if (has('master_op')) return 'master_op';
+  if (has('direction')) return 'direction';
+  if (has('moderator')) return 'moderator';
+  if (has('vip')) return 'vip';
   return null;
+}
+
+/** Tous les badges spéciaux affichés à côté du diamant de niveau. */
+export function getSpecialBadgeIdsForUser(user: {
+  isFounder?: boolean;
+  isDirection?: boolean;
+  isMasterOp?: boolean;
+  isIridescent?: boolean;
+  specialBadges?: string[];
+  special_badges?: string[];
+}): string[] {
+  const fromArray = user.specialBadges || user.special_badges || [];
+  const ids = [
+    ...(user.isIridescent || fromArray.includes('iridescent') ? ['iridescent'] : []),
+    ...(user.isFounder || fromArray.includes('founder') ? ['founder'] : []),
+    ...(user.isMasterOp || fromArray.includes('master_op') ? ['master_op'] : []),
+    ...(user.isDirection || fromArray.includes('direction') ? ['direction'] : []),
+    ...fromArray.filter((b) => b === 'moderator' || b === 'vip'),
+  ];
+  return [...new Set(ids)];
 }

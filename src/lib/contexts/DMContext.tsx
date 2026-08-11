@@ -35,11 +35,12 @@ export interface DMDisplayMessage {
   text: string;
   created_date: string;
   is_read: boolean;
+  image_url?: string;
 }
 
 interface DMContextType {
   conversations: Record<string, DMMessage[]>;
-  sendDM: (fromName: string, toName: string, text: string) => Promise<void>;
+  sendDM: (fromName: string, toName: string, text: string, imageUrl?: string | null) => Promise<void>;
   markRead: (userName: string, otherName: string) => Promise<void>;
   getConversation: (userName1: string, userName2: string) => DMDisplayMessage[];
   getUnreadCount: (userName: string) => number;
@@ -75,6 +76,7 @@ function toDisplayMessage(
     text: message.text,
     created_date: message.created_at,
     is_read: !!message.read_at,
+    image_url: message.image_url || undefined,
   };
 }
 
@@ -211,7 +213,7 @@ function DMProviderInner({ children }: { children: ReactNode }) {
   }, [currentUserName, addNotification]);
 
   const sendDM = useCallback(
-    async (fromName: string, toName: string, text: string) => {
+    async (fromName: string, toName: string, text: string, imageUrl?: string | null) => {
       const rate = await checkServerRateLimit('dm', fromName);
       if (!rate.allowed) {
         throw new Error(rate.error || 'Trop de messages privés. Veuillez patienter.');
@@ -226,6 +228,12 @@ function DMProviderInner({ children }: { children: ReactNode }) {
         throw new Error('Impossible de s\'envoyer un message à soi-même');
       }
 
+      const trimmed = text.trim();
+      const media = imageUrl?.trim() || null;
+      if (!trimmed && !media) {
+        throw new Error('Message vide');
+      }
+
       await withGuestContext();
 
       const { data, error } = await supabase
@@ -233,7 +241,8 @@ function DMProviderInner({ children }: { children: ReactNode }) {
         .insert({
           sender_id: senderName,
           receiver_id: receiverName,
-          text,
+          text: trimmed || (media ? '📎 Fichier' : ''),
+          image_url: media,
         })
         .select()
         .single();

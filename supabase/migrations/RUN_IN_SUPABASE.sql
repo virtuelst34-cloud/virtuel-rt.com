@@ -1,7 +1,9 @@
--- Corrige les politiques RLS admin (ré-exécutable sans erreur)
--- + colonnes admin manquantes + protection des badges + droits Createur
+-- ============================================================
+-- VIRTUEL-RT — Script complet à coller dans Supabase SQL Editor
+-- Ré-exécutable sans erreur. Ordre : colonnes → fonctions → RLS → données
+-- ============================================================
 
--- Colonnes admin sur profiles
+-- ── 1. Colonnes admin sur profiles ──────────────────────────
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_founder BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_direction BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_master_op BOOLEAN NOT NULL DEFAULT false;
@@ -9,6 +11,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL D
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_iridescent BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS special_badges TEXT[] DEFAULT '{}';
 
+-- ── 2. Fonction is_site_admin ───────────────────────────────
 CREATE OR REPLACE FUNCTION public.is_site_admin()
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -32,7 +35,7 @@ AS $$
   );
 $$;
 
--- Synchronise is_founder etc. depuis special_badges à chaque INSERT/UPDATE
+-- ── 3. Trigger sync : is_founder suit special_badges ────────
 CREATE OR REPLACE FUNCTION public.sync_profile_badge_columns()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -54,7 +57,7 @@ CREATE TRIGGER sync_profile_badge_columns_trigger
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_profile_badge_columns();
 
--- Empêche les non-admins de modifier special_badges / is_admin (les booléens badges sont synchronisés par sync_profile_badge_columns)
+-- ── 4. Trigger protect : seuls admins modifient badges ──────
 CREATE OR REPLACE FUNCTION public.protect_profile_admin_fields()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -76,13 +79,14 @@ CREATE TRIGGER protect_profile_admin_fields_trigger
   FOR EACH ROW
   EXECUTE FUNCTION public.protect_profile_admin_fields();
 
+-- ── 5. RLS profiles : admins peuvent modifier les profils ───
 DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
 CREATE POLICY "Admins can update any profile" ON public.profiles
   FOR UPDATE TO authenticated
   USING (public.is_site_admin())
   WITH CHECK (public.is_site_admin());
 
--- global_settings
+-- ── 6. RLS paramètres admin (global, security, messages…) ───
 DROP POLICY IF EXISTS "Founders can update global settings" ON public.global_settings;
 DROP POLICY IF EXISTS "Founders can insert global settings" ON public.global_settings;
 DROP POLICY IF EXISTS "Admins can update global settings" ON public.global_settings;
@@ -92,7 +96,6 @@ CREATE POLICY "Admins can update global settings" ON public.global_settings
 CREATE POLICY "Admins can insert global settings" ON public.global_settings
   FOR INSERT TO authenticated WITH CHECK (public.is_site_admin());
 
--- security_settings
 DROP POLICY IF EXISTS "Founders can update security settings" ON public.security_settings;
 DROP POLICY IF EXISTS "Founders can insert security settings" ON public.security_settings;
 DROP POLICY IF EXISTS "Admins can update security settings" ON public.security_settings;
@@ -102,7 +105,6 @@ CREATE POLICY "Admins can update security settings" ON public.security_settings
 CREATE POLICY "Admins can insert security settings" ON public.security_settings
   FOR INSERT TO authenticated WITH CHECK (public.is_site_admin());
 
--- message_settings
 DROP POLICY IF EXISTS "Founders can update message settings" ON public.message_settings;
 DROP POLICY IF EXISTS "Founders can insert message settings" ON public.message_settings;
 DROP POLICY IF EXISTS "Admins can update message settings" ON public.message_settings;
@@ -112,7 +114,6 @@ CREATE POLICY "Admins can update message settings" ON public.message_settings
 CREATE POLICY "Admins can insert message settings" ON public.message_settings
   FOR INSERT TO authenticated WITH CHECK (public.is_site_admin());
 
--- notification_settings
 DROP POLICY IF EXISTS "Founders can update notification settings" ON public.notification_settings;
 DROP POLICY IF EXISTS "Founders can insert notification settings" ON public.notification_settings;
 DROP POLICY IF EXISTS "Admins can update notification settings" ON public.notification_settings;
@@ -122,7 +123,6 @@ CREATE POLICY "Admins can update notification settings" ON public.notification_s
 CREATE POLICY "Admins can insert notification settings" ON public.notification_settings
   FOR INSERT TO authenticated WITH CHECK (public.is_site_admin());
 
--- content_moderation_settings
 DROP POLICY IF EXISTS "Founders can update content moderation settings" ON public.content_moderation_settings;
 DROP POLICY IF EXISTS "Founders can insert content moderation settings" ON public.content_moderation_settings;
 DROP POLICY IF EXISTS "Admins can update content moderation settings" ON public.content_moderation_settings;
@@ -132,7 +132,6 @@ CREATE POLICY "Admins can update content moderation settings" ON public.content_
 CREATE POLICY "Admins can insert content moderation settings" ON public.content_moderation_settings
   FOR INSERT TO authenticated WITH CHECK (public.is_site_admin());
 
--- logs_audit_settings
 DROP POLICY IF EXISTS "Founders can update logs audit settings" ON public.logs_audit_settings;
 DROP POLICY IF EXISTS "Founders can insert logs audit settings" ON public.logs_audit_settings;
 DROP POLICY IF EXISTS "Admins can update logs audit settings" ON public.logs_audit_settings;
@@ -142,7 +141,7 @@ CREATE POLICY "Admins can update logs audit settings" ON public.logs_audit_setti
 CREATE POLICY "Admins can insert logs audit settings" ON public.logs_audit_settings
   FOR INSERT TO authenticated WITH CHECK (public.is_site_admin());
 
--- permissions
+-- ── 7. RLS permissions ──────────────────────────────────────
 DROP POLICY IF EXISTS "Founders can manage permissions" ON public.permissions;
 DROP POLICY IF EXISTS "Admins can manage permissions" ON public.permissions;
 CREATE POLICY "Admins can manage permissions" ON public.permissions
@@ -150,7 +149,7 @@ CREATE POLICY "Admins can manage permissions" ON public.permissions
   USING (public.is_site_admin())
   WITH CHECK (public.is_site_admin());
 
--- Permissions manquantes pour sections messages, sécurité, contenu, logs
+-- ── 8. Permissions manquantes (sections admin) ──────────────
 INSERT INTO public.permissions (section, action, user_identifier, identifier_type, allowed)
 SELECT v.section, v.action, v.user_identifier, v.identifier_type, v.allowed
 FROM (VALUES
@@ -190,7 +189,7 @@ WHERE NOT EXISTS (
     AND p.user_identifier = v.user_identifier
 );
 
--- Droits admin pour Createur
+-- ── 9. Droits Createur ──────────────────────────────────────
 UPDATE public.profiles
 SET
   is_admin = true,
@@ -198,26 +197,86 @@ SET
   special_badges = ARRAY['founder']::TEXT[]
 WHERE name = 'Createur';
 
--- Aligner les colonnes booléennes avec special_badges (tous les profils)
+-- ── 10. Resync tous les profils ─────────────────────────────
 UPDATE public.profiles
 SET
-  is_founder = COALESCE(is_founder, false) OR 'founder' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[])),
-  is_direction = COALESCE(is_direction, false) OR 'direction' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[])),
-  is_master_op = COALESCE(is_master_op, false) OR 'master_op' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[])),
-  is_iridescent = COALESCE(is_iridescent, false) OR 'iridescent' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[]))
-WHERE
-  COALESCE(is_founder, false) <> ('founder' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[])))
-  OR COALESCE(is_direction, false) <> ('direction' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[])))
-  OR COALESCE(is_master_op, false) <> ('master_op' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[])))
-  OR COALESCE(is_iridescent, false) <> ('iridescent' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[])));
+  is_founder = 'founder' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[])),
+  is_direction = 'direction' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[])),
+  is_master_op = 'master_op' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[])),
+  is_iridescent = 'iridescent' = ANY(COALESCE(special_badges, ARRAY[]::TEXT[]));
 
--- Vérification (doit retourner is_site_admin = true quand connecté en tant que Createur)
-SELECT
-  name,
-  is_admin,
-  is_founder,
-  is_direction,
-  is_master_op,
-  special_badges
-FROM public.profiles
-WHERE name = 'Createur';
+-- ── 11. Messages privés (sender_id / receiver_id = pseudos) ─
+CREATE OR REPLACE FUNCTION public.set_guest_session(p_token TEXT)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_token IS NULL OR length(trim(p_token)) = 0 THEN
+    PERFORM set_config('app.guest_token', '', true);
+    RETURN;
+  END IF;
+  PERFORM set_config('app.guest_token', trim(p_token), true);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.set_guest_session(TEXT) TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.current_guest_name()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT guest_name
+  FROM public.guest_sessions
+  WHERE session_token = NULLIF(current_setting('app.guest_token', true), '')
+    AND expires_at > NOW()
+  LIMIT 1;
+$$;
+
+CREATE OR REPLACE FUNCTION public.current_actor_name()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    (SELECT name FROM public.profiles WHERE id = auth.uid()),
+    public.current_guest_name()
+  );
+$$;
+
+DROP POLICY IF EXISTS "Users can read their own messages" ON public.direct_messages;
+DROP POLICY IF EXISTS "Users can send messages" ON public.direct_messages;
+DROP POLICY IF EXISTS "Users can update read status" ON public.direct_messages;
+DROP POLICY IF EXISTS "Actors can read their own DMs" ON public.direct_messages;
+DROP POLICY IF EXISTS "Actors can send DMs" ON public.direct_messages;
+DROP POLICY IF EXISTS "Actors can mark DMs read" ON public.direct_messages;
+
+CREATE POLICY "Actors can read their own DMs"
+  ON public.direct_messages FOR SELECT TO authenticated, anon
+  USING (public.current_actor_name() IN (sender_id, receiver_id));
+
+CREATE POLICY "Actors can send DMs"
+  ON public.direct_messages FOR INSERT TO authenticated, anon
+  WITH CHECK (
+    public.current_actor_name() IS NOT NULL
+    AND public.current_actor_name() = sender_id
+    AND sender_id <> receiver_id
+  );
+
+CREATE POLICY "Actors can mark DMs read"
+  ON public.direct_messages FOR UPDATE TO authenticated, anon
+  USING (public.current_actor_name() = receiver_id)
+  WITH CHECK (public.current_actor_name() = receiver_id);
+
+-- ── 12. Vérifications ───────────────────────────────────────
+SELECT 'Createur' AS check_label, name, is_admin, is_founder, special_badges
+FROM public.profiles WHERE name = 'Createur';
+
+SELECT 'Permissions count' AS check_label, COUNT(*) AS total
+FROM public.permissions;

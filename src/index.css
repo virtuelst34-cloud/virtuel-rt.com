@@ -189,3 +189,320 @@
 .party .border-border {
   border-color: rgba(200, 0, 255, 0.15);
 }
+
+/* ── Ambiance Nébuleuse 🌌 ── */
+.ambiance-nebula {
+  --background: 260 45% 4%;
+  --card: 265 40% 7%;
+  --secondary: 270 35% 10%;
+  --border: 280 40% 18%;
+  --muted: 270 30% 12%;
+}
+.ambiance-nebula body,
+.ambiance-nebula .bg-background {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 20%, rgba(139, 92, 246, 0.28), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 85% 15%, rgba(34, 211, 238, 0.18), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 50% 90%, rgba(236, 72, 153, 0.12), transparent 55%),
+    linear-gradient(160deg, #070214 0%, #0c0620 45%, #050818 100%);
+  background-attachment: fixed;
+}
+.ambiance-nebula::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 30% 70%, rgba(200,220,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 70% 40%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 90% 80%, rgba(180,200,255,0.45), transparent),
+    radial-gradient(1px 1px at 55% 15%, rgba(255,255,255,0.55), transparent);
+  animation: nebula-twinkle 7s ease-in-out infinite alternate;
+  opacity: 0.55;
+}
+@keyframes nebula-twinkle {
+  from { opacity: 0.35; }
+  to { opacity: 0.7; }
+}
+.ambiance-nebula .bg-card {
+  box-shadow: 0 0 40px rgba(139, 92, 246, 0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+  backdrop-filter: blur(6px);
+}
+
+/* ── Ambiance Phosphore 🖥️ ── */
+.ambiance-phosphor {
+  --background: 120 30% 3%;
+  --foreground: 120 80% 72%;
+  --card: 120 25% 5%;
+  --card-foreground: 120 70% 75%;
+  --secondary: 120 20% 8%;
+  --secondary-foreground: 120 70% 70%;
+  --muted-foreground: 120 30% 45%;
+  --border: 120 40% 14%;
+  --primary: 120 90% 45%;
+  --ring: 120 90% 45%;
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+.ambiance-phosphor body,
+.ambiance-phosphor .bg-background {
+  background: #020804;
+  background-image:
+    linear-gradient(rgba(0, 255, 100, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 100, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.ambiance-phosphor::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.18) 2px,
+    rgba(0, 0, 0, 0.18) 4px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+.ambiance-phosphor::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.45) 100%);
+}
+.ambiance-phosphor .bg-card {
+  box-shadow: 0 0 0 1px rgba(0, 255, 120, 0.12), 0 0 24px rgba(0, 255, 100, 0.06);
+  text-shadow: 0 0 6px rgba(0, 255, 120, 0.15);
+}
+
+/* ── Ambiance Abysse 🌊 ── */
+.ambiance-abyss {
+  --background: 200 60% 4%;
+  --card: 195 50% 6%;
+  --secondary: 190 40% 9%;
+  --border: 185 45% 16%;
+  --primary: 175 80% 45%;
+  --ring: 175 80% 45%;
+}
+.ambiance-abyss body,
+.ambiance-abyss .bg-background {
+  background:
+    radial-gradient(ellipse 50% 40% at 30% 80%, rgba(16, 185, 129, 0.22), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 75% 60%, rgba(56, 189, 248, 0.18), transparent 55%),
+    radial-gradient(ellipse 35% 25% at 50% 30%, rgba(45, 212, 191, 0.1), transparent 50%),
+    linear-gradient(180deg, #021018 0%, #031820 40%, #020c14 100%);
+  background-attachment: fixed;
+  animation: abyss-drift 14s ease-in-out infinite alternate;
+}
+@keyframes abyss-drift {
+  from { background-position: 0% 0%, 100% 50%, 50% 0%, 0 0; }
+  to { background-position: 10% 20%, 80% 40%, 45% 15%, 0 0; }
+}
+.ambiance-abyss::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background:
+    radial-gradient(circle at 20% 70%, rgba(45, 212, 191, 0.35) 0 2px, transparent 3px),
+    radial-gradient(circle at 60% 55%, rgba(125, 211, 252, 0.4) 0 1.5px, transparent 3px),
+    radial-gradient(circle at 80% 75%, rgba(52, 211, 153, 0.3) 0 2px, transparent 3px),
+    radial-gradient(circle at 40% 40%, rgba(165, 243, 252, 0.25) 0 1px, transparent 2px);
+  animation: abyss-glow 5s ease-in-out infinite alternate;
+  opacity: 0.7;
+}
+@keyframes abyss-glow {
+  from { opacity: 0.4; filter: blur(0px); }
+  to { opacity: 0.85; filter: blur(0.5px); }
+}
+.ambiance-abyss .bg-card {
+  box-shadow: 0 8px 32px rgba(6, 78, 90, 0.35), inset 0 1px 0 rgba(103, 232, 249, 0.06);
+  backdrop-filter: blur(8px);
+}
+
+/* ── Ambiance Braises 🔥 ── */
+.ambiance-braises {
+  --background: 15 50% 4%;
+  --card: 18 45% 7%;
+  --secondary: 20 40% 10%;
+  --border: 22 50% 18%;
+  --primary: 24 95% 53%;
+  --ring: 24 95% 53%;
+}
+.ambiance-braises body,
+.ambiance-braises .bg-background {
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 100%, rgba(249, 115, 22, 0.35), transparent 55%),
+    radial-gradient(ellipse 40% 30% at 20% 85%, rgba(239, 68, 68, 0.22), transparent 50%),
+    radial-gradient(ellipse 35% 25% at 80% 90%, rgba(251, 191, 36, 0.18), transparent 50%),
+    linear-gradient(180deg, #0a0402 0%, #140804 50%, #1a0a04 100%);
+  background-attachment: fixed;
+  animation: braises-hearth 10s ease-in-out infinite alternate;
+}
+@keyframes braises-hearth {
+  from { background-position: 50% 100%, 20% 85%, 80% 90%, 0 0; }
+  to { background-position: 48% 95%, 25% 80%, 75% 88%, 0 0; }
+}
+.ambiance-braises::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background-image:
+    radial-gradient(circle at 15% 90%, rgba(251, 146, 60, 0.9) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 35% 80%, rgba(253, 186, 116, 0.7) 0 1px, transparent 2px),
+    radial-gradient(circle at 55% 95%, rgba(239, 68, 68, 0.8) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 70% 75%, rgba(251, 191, 36, 0.75) 0 1px, transparent 2px),
+    radial-gradient(circle at 85% 88%, rgba(249, 115, 22, 0.85) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 45% 70%, rgba(254, 215, 170, 0.5) 0 1px, transparent 2px);
+  animation: braises-sparks 4.5s ease-in-out infinite;
+  opacity: 0.75;
+}
+@keyframes braises-sparks {
+  0% { transform: translateY(0); opacity: 0.45; }
+  50% { transform: translateY(-18px); opacity: 0.9; }
+  100% { transform: translateY(-36px); opacity: 0.35; }
+}
+.ambiance-braises .bg-card {
+  box-shadow: 0 0 36px rgba(249, 115, 22, 0.1), inset 0 1px 0 rgba(253, 186, 116, 0.08);
+  backdrop-filter: blur(6px);
+}
+
+/* ── Ambiance Spectre 👻 ── */
+.ambiance-spectre {
+  --background: 280 40% 5%;
+  --card: 290 35% 8%;
+  --secondary: 300 30% 11%;
+  --border: 310 40% 20%;
+  --primary: 300 90% 65%;
+  --ring: 190 95% 60%;
+}
+.ambiance-spectre body,
+.ambiance-spectre .bg-background {
+  background:
+    linear-gradient(125deg,
+      rgba(232, 121, 249, 0.18),
+      rgba(56, 189, 248, 0.14),
+      rgba(167, 139, 250, 0.16),
+      rgba(244, 114, 182, 0.12)),
+    linear-gradient(180deg, #0a0614 0%, #12081c 50%, #080410 100%);
+  background-size: 200% 200%, 100% 100%;
+  background-attachment: fixed;
+  animation: spectre-shift 8s ease-in-out infinite;
+}
+@keyframes spectre-shift {
+  0% { background-position: 0% 50%, 0 0; }
+  50% { background-position: 100% 50%, 0 0; }
+  100% { background-position: 0% 50%, 0 0; }
+}
+.ambiance-spectre::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.07) 45%,
+    rgba(167, 139, 250, 0.12) 50%,
+    rgba(34, 211, 238, 0.1) 55%,
+    transparent 60%
+  );
+  background-size: 220% 100%;
+  animation: spectre-scan 5s linear infinite;
+  mix-blend-mode: screen;
+}
+@keyframes spectre-scan {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+.ambiance-spectre::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: inset 0 0 80px rgba(232, 121, 249, 0.08);
+  animation: spectre-pulse 3.5s ease-in-out infinite alternate;
+}
+@keyframes spectre-pulse {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+.ambiance-spectre .bg-card {
+  box-shadow:
+    0 0 0 1px rgba(232, 121, 249, 0.12),
+    0 0 28px rgba(56, 189, 248, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+/* ── Ambiance Aurore 🌅 (clair adouci) ── */
+.ambiance-aurore {
+  --background: 35 28% 88%;
+  --foreground: 220 22% 22%;
+  --card: 40 25% 92%;
+  --card-foreground: 220 22% 22%;
+  --secondary: 32 20% 84%;
+  --secondary-foreground: 220 18% 28%;
+  --muted: 35 18% 82%;
+  --muted-foreground: 220 10% 38%;
+  --border: 32 16% 74%;
+  --primary: 200 70% 42%;
+  --ring: 200 70% 42%;
+  color-scheme: light;
+}
+.ambiance-aurore body,
+.ambiance-aurore .bg-background {
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 10%, rgba(245, 180, 90, 0.18), transparent 55%),
+    radial-gradient(ellipse 60% 45% at 90% 20%, rgba(125, 180, 210, 0.2), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, rgba(200, 140, 160, 0.1), transparent 55%),
+    linear-gradient(165deg, #e8e0d4 0%, #dfe6ec 45%, #e6dde2 100%);
+  background-attachment: fixed;
+  animation: aurore-breathe 12s ease-in-out infinite alternate;
+  color: hsl(220 22% 22%);
+}
+@keyframes aurore-breathe {
+  from { background-position: 15% 10%, 90% 20%, 50% 100%, 0 0; }
+  to { background-position: 20% 15%, 85% 25%, 48% 95%, 0 0; }
+}
+.ambiance-aurore::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background:
+    radial-gradient(circle at 25% 30%, rgba(255, 250, 240, 0.22) 0 40px, transparent 80px),
+    radial-gradient(circle at 75% 40%, rgba(240, 248, 255, 0.16) 0 30px, transparent 70px);
+  animation: aurore-haze 9s ease-in-out infinite alternate;
+  opacity: 0.35;
+}
+@keyframes aurore-haze {
+  from { opacity: 0.2; transform: scale(1); }
+  to { opacity: 0.4; transform: scale(1.03); }
+}
+.ambiance-aurore .bg-card {
+  background: rgba(245, 241, 235, 0.78) !important;
+  color: hsl(220 22% 22%);
+  box-shadow: 0 6px 22px rgba(120, 130, 145, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(10px);
+  border-color: rgba(180, 175, 165, 0.55);
+}
+.ambiance-aurore .text-foreground,
+.ambiance-aurore .text-card-foreground {
+  color: hsl(220 22% 22%);
+}
+.ambiance-aurore .text-muted-foreground {
+  color: hsl(220 10% 38%);
+}

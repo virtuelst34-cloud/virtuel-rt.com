@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ArrowLeft, Users } from 'lucide-react';
 import { ChatProvider, useUser, useUI } from '@/lib/contexts';
 import Avatar from '@/components/chat/Avatar';

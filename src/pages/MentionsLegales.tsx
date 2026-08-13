@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ArrowLeft, Scale } from 'lucide-react';
 
 const CONTACT_EMAIL = 'alerts@virtuel-rt.com';

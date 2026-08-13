@@ -4,7 +4,7 @@ import { supabaseAuthService } from '@/lib/supabaseAuth';
 import Avatar from './Avatar';
 import { AVATAR_IDS } from '@/lib/chatConfig';
 import { Mail, Lock, User, Eye, EyeOff, AlertCircle, KeyRound, Scale, ShieldAlert } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { AGE_GATE_LABEL, MENTIONS_LEGALES_HREF } from '@/lib/welcomeContent';
 import { hasAgeAcknowledged, setAgeAcknowledged } from '@/lib/ageGate';
 

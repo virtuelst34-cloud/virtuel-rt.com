@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { UserProvider } from '@/lib/contexts/UserContext'
 import { PreferencesProvider } from '@/lib/contexts/PreferencesContext'
 import { NotificationsProvider } from '@/lib/contexts/NotificationsContext'

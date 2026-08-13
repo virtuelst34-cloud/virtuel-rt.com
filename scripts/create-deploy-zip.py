@@ -10,8 +10,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-EXCLUDE_DIRS = {"node_modules"}
-EXCLUDE_FILES = {".env.local"}
+EXCLUDE_DIRS = {
+    "node_modules",
+    ".git",
+    "coverage",
+    "dist",
+    ".e2e",
+    "storybook-static",
+    ".husky",
+    "playwright-report",
+    "test-results",
+    ".turbo",
+    ".vite",
+}
+EXCLUDE_FILES = {".env.local", ".env"}
 
 
 def unix_mode_for(path: Path, is_dir: bool) -> int:
@@ -57,8 +69,9 @@ def create_zip(output: Path) -> None:
 
 
 def main() -> int:
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    output = ROOT.parent / f"virtuel-rt-complet-{timestamp}.zip"
+    output = ROOT.parent / "virtuel-st-HOSTINGER.zip"
+    if output.exists():
+        output.unlink()
     create_zip(output)
     size_mb = output.stat().st_size / (1024 * 1024)
     print(f"Archive creee : {output}")

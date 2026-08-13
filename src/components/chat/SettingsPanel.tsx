@@ -27,7 +27,7 @@ import {
   type MoodId,
   type QuickReply,
 } from '@/lib/funFeatures';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { MENTIONS_LEGALES_HREF } from '@/lib/welcomeContent';
 
 interface Tab {

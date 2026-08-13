@@ -12,7 +12,7 @@ import { presenceService } from '@/lib/presenceService';
 import MembersPanel from './MembersPanel';
 import DailySparkCard from './DailySparkCard';
 import WeeklyChallengeCard from './WeeklyChallengeCard';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { groupSalonsByCategory, mergeAndSortSalons } from '@/lib/salonUtils';
 import { MENTIONS_LEGALES_HREF } from '@/lib/welcomeContent';
 import { hasAdminAccess, hasStaffAccess } from '@/lib/utils/founderCheck';

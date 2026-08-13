@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""Build a Hostinger-ready SOURCE zip from the current workspace (incl. uncommitted)."""
+"""Build a Hostinger-ready SOURCE zip with Unix permissions (755 dirs, 644 files)."""
 from __future__ import annotations
 
 import json
-import shutil
+import stat
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTS = [
-    Path(r"C:\Users\user\Documents\Nouveau dossier\virtuel-rt-SOURCE-FULL-hostinger.zip"),
-    Path(r"C:\Users\user\Documents\virtuel-rt-SOURCE-FULL-hostinger.zip"),
-]
-NOTE = Path(r"C:\Users\user\Documents\Nouveau dossier\DEPLOI-HOSTINGER-FULL.txt")
 
 INCLUDE_DIRS = ["src", "public"]
 INCLUDE_FILES = [
@@ -27,17 +23,35 @@ INCLUDE_FILES = [
     "postcss.config.js",
     "components.json",
     ".env.example",
+    "validate-env.js",
 ]
 EXCLUDE_DIRS = {"node_modules", ".git", "coverage", "dist", "__pycache__", ".husky", ".temp"}
 EXCLUDE_SUFFIXES = {".bak"}
 EXCLUDE_NAMES = {".env.local", ".env"}
 
 
-def main() -> None:
-    pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-    pkg["scripts"]["prepare"] = "echo skip-husky"
-    pkg["engines"] = {"node": ">=20 <23"}
+def unix_mode(path: Path, is_dir: bool) -> int:
+    if is_dir:
+        return stat.S_IFDIR | 0o755
+    if path.suffix == ".sh":
+        return stat.S_IFREG | 0o755
+    return stat.S_IFREG | 0o644
 
+
+def add_dir(zf: zipfile.ZipFile, arcname: str) -> None:
+    name = arcname if arcname.endswith("/") else f"{arcname}/"
+    info = zipfile.ZipInfo(name)
+    info.external_attr = unix_mode(Path(name), is_dir=True) << 16
+    zf.writestr(info, b"")
+
+
+def add_file(zf: zipfile.ZipFile, path: Path, arcname: str, data: bytes | None = None) -> None:
+    info = zipfile.ZipInfo(arcname)
+    info.external_attr = unix_mode(path, is_dir=False) << 16
+    zf.writestr(info, data if data is not None else path.read_bytes())
+
+
+def collect_files() -> list[Path]:
     files: list[Path] = []
     for d in INCLUDE_DIRS:
         root = ROOT / d
@@ -64,69 +78,48 @@ def main() -> None:
             continue
         seen.add(r)
         uniq.append(p)
+    return uniq
 
-    primary = OUTS[0]
-    primary.parent.mkdir(parents=True, exist_ok=True)
-    if primary.exists():
-        primary.unlink()
 
-    with zipfile.ZipFile(primary, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("package.json", json.dumps(pkg, indent=2, ensure_ascii=False) + "\n")
-        for p in uniq:
+def main() -> None:
+    pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+    pkg["scripts"]["prepare"] = "echo skip-husky"
+    pkg["engines"] = {"node": ">=20 <23"}
+    pkg_json_bytes = (json.dumps(pkg, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+
+    files = collect_files()
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    output = ROOT.parent / f"virtuel-rt-SOURCE-hostinger-{timestamp}.zip"
+    if output.exists():
+        output.unlink()
+
+    dirs_added: set[str] = set()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        add_file(zf, ROOT / "package.json", "package.json", pkg_json_bytes)
+
+        for p in sorted(files, key=lambda x: x.as_posix()):
             if p.name == "package.json":
                 continue
-            zf.write(p, arcname=p.relative_to(ROOT).as_posix())
+            rel = p.relative_to(ROOT).as_posix()
+            parts = rel.split("/")
+            for i in range(1, len(parts)):
+                d = "/".join(parts[:i]) + "/"
+                if d not in dirs_added:
+                    add_dir(zf, d)
+                    dirs_added.add(d)
+            add_file(zf, p, rel)
 
-    with zipfile.ZipFile(primary) as zf:
-        names = zf.namelist()
-        assert "package.json" in names
-        assert "src/pages/Home.tsx" in names
-        assert "src/components/chat/QuizPanel.tsx" in names
-        quiz = zf.read("src/components/chat/QuizPanel.tsx").decode("utf-8")
-        home = zf.read("src/pages/Home.tsx").decode("utf-8")
-        css = zf.read("src/index.css").decode("utf-8")
-        prefs = zf.read("src/lib/contexts/PreferencesContext.tsx").decode("utf-8")
-        assert "Changer de thème" in quiz, "quiz themes missing"
-        assert "QUIZ_THEMES" in quiz
-        assert "lazyWithReload" not in home
-        assert "import ChatArea from" in home
-        assert "ambiance-nebula" in css
-        assert "ambiance-phosphor" in css
-        assert "Nébuleuse" in prefs
-        print("entries", len(names))
-        print("size_mb", round(primary.stat().st_size / 1e6, 2))
-        print("has_banned", "src/lib/bannedWords.ts" in names)
-
-    for dest in OUTS[1:]:
-        shutil.copy2(primary, dest)
-
-    NOTE.write_text(
-        "\n".join(
-            [
-                "Virtuel-RT — zip SOURCE COMPLET (workspace local actuel)",
-                "",
-                "Fichier: virtuel-rt-SOURCE-FULL-hostinger.zip",
-                "",
-                "Inclus:",
-                "- Fix React #306 (ChatArea + panels en import statique)",
-                "- Themes quiz (Changer de theme)",
-                "- ScenePanel (fc35107)",
-                "- Ambiances Nebuleuse / Phosphore / Abysse / Braises / Spectre / Aurore",
-                "- DM, MediaBar, WebRTC, badges, prefs, WelcomeScreen, bannedWords, etc.",
-                "",
-                "Hostinger > Parametres et redeploiement:",
-                "1. Importer CE zip (pas DIST)",
-                "2. Vars env: VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY",
-                "3. Build: npm run build / sortie dist / Node 20",
-                "4. Apres: vider donnees du site (SW) puis Ctrl+F5",
-                "5. Verifier quiz: bouton Changer de theme",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    print("OUT", primary)
-    print("NOTE", NOTE)
+    size_mb = output.stat().st_size / (1024 * 1024)
+    with zipfile.ZipFile(output) as zf:
+        print(f"Entrees : {len(zf.namelist())}")
+    print(f"Archive : {output}")
+    print(f"Taille  : {size_mb:.2f} Mo")
+    print("Permissions ZIP : repertoires 755, fichiers 644 (.sh 755)")
+    print("")
+    print("Hostinger :")
+    print("  1. Importer ce zip (deploiement Node / build sur serveur)")
+    print("  2. Variables : VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY")
+    print("  3. Build : npm run build  |  sortie : dist/")
 
 
 if __name__ == "__main__":

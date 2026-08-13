@@ -45,8 +45,8 @@ Write-Host "Configuration des secrets pour $repo..." -ForegroundColor Cyan
 
 function Set-GhSecret {
   param([string]$Name, [string]$Value)
-  # Passe la valeur via stdin pour éviter l'expansion PowerShell des $ dans les mots de passe
-  $Value.Trim() | & $ghCmd secret set $Name -R $repo --body -
+  # -b évite l'ajout d'un newline par le pipe PowerShell (cause fréquente de 530 FTP)
+  & $ghCmd secret set $Name -R $repo -b $Value.Trim()
 }
 
 Set-GhSecret "VITE_SUPABASE_URL" $vars["VITE_SUPABASE_URL"]
